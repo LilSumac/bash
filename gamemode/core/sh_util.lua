@@ -44,7 +44,7 @@ function MsgErr(errType, ...)
         srcStr = Format("%s -> %s (%s line %d)", srcFunc, GM.Name, srcFile, fromInfo.currentline);
     end
 
-    MsgCon(color_red, "[%s] %s", srcStr, Format(ERR_TYPES[errType], table.concat(args, ", ")));
+    MsgCon(color_red, "[%s] %s", srcStr, Format(ERR_TYPES[errType], unpack(args)));
 end
 
 function getID(len, pre)
@@ -62,8 +62,20 @@ function defineService_start(name)
         MsgErr("NilArgs", "name");
         return;
     end
+    if _G["SVC"] then
+        MsgErr("DefStarted", _G["SVC"].Name, name);
+        return;
+    end
 
     bash.services = bash.services or {};
+
+    if bash.services[name] then
+        MsgErr("DupEntry", name);
+        return;
+    end
+
+    _G["SVC"] = {};
+    local svc = _G["SVC"];
 end
 
 function defineService_end()
@@ -79,22 +91,30 @@ function definePlugin_start(name, singleFile)
         MsgErr("NilArgs", "name");
         return;
     end
-    if _G["PLUGIN"] then
-        MsgErr("PlgStarted", _G["Plugin"].Name, name);
+    if _G["PLUG"] then
+        MsgErr("DefStarted", _G["PLUG"].Name, name);
         return;
     end
 
     bash.plugins = bash.plugins or {};
 
-    _G["PLUGIN"] = {};
-    local plug = _G["PLUGIN"];
+    if bash.plugins[name] then
+        MsgErr("DupEntry", name);
+        return;
+    end
+
+    _G["PLUG"] = {};
+    local plug = _G["PLUG"];
+    plug.Name = name;
     plug.Author = "Unknown";
+    plug.Title = name;
+    plug.Desc = "A custom bash plugin.";
 end
 
 function definePlugin_end()
-    local plug = _G["PLUGIN"];
+    local plug = _G["PLUG"];
     if !plug then
-        MsgErr("NoPlgStarted");
+        MsgErr("NoDefStarted");
         return;
     end
 end

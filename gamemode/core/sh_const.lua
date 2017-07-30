@@ -24,5 +24,5 @@ ERR_TYPES["NilErrType"] = "Error type cannot be nil!";
 ERR_TYPES["UndefErrType"] = "Undefined error type! (%s)";
 ERR_TYPES["NilArgs"] = "Cannot have nil arguments! (%s)";
 ERR_TYPES["DupEntry"] = "An entry with that name already exists! (%s)";
-ERR_TYPES["PlgStarted"] = "Tried to start a plugin definition without ending the last one! (End %s before %s)";
-ERR_TYPES["NoPlgStarted"] = "Tried to end a plugin definition without starting one!";
+ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before %s)";
+ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
