@@ -4,6 +4,9 @@ DeriveGamemode("sandbox");
 bash = bash or {};
 bash.startTime = SysTime();
 
+-- Random seed!
+math.randomseed(os.time());
+
 -- Include required base files.
 include("core/sh_const.lua");
 include("core/sh_util.lua");

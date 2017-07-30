@@ -48,7 +48,7 @@ function MsgErr(errType, ...)
 end
 
 function getID(len, pre)
-    local id = math.Round(os.time() + (system.AppTime() or os.clock()) + (math.cos(SysTime()) * 26293888));
+    local id = math.Round(os.time() + (math.random(10000000, 99999999)) + (math.cos(SysTime()) * 26293888));
     id = tostring(id);
     MsgN(id)
     len = len or math.Min(id:len(), len);

@@ -4,6 +4,9 @@ DeriveGamemode("sandbox");
 bash = bash or {};
 bash.startTime = SysTime();
 
+-- Random seed!
+math.randomseed(os.time());
+
 -- Send required base files to client.
 AddCSLuaFile("cl_init.lua");
 AddCSLuaFile("core/sh_const.lua");
