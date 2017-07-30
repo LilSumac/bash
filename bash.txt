@@ -1,0 +1,6 @@
+"bash"
+{
+	"base"		"sandbox"
+	"title"		"/bash/"
+	"author"	"LilSumac"
+}
