@@ -79,6 +79,10 @@ function definePlugin_start(name, singleFile)
         MsgErr("NilArgs", "name");
         return;
     end
+    if _G["PLUGIN"] then
+        MsgErr("PlgStarted", _G["Plugin"].Name, name);
+        return;
+    end
 
     bash.plugins = bash.plugins or {};
 
@@ -89,6 +93,10 @@ end
 
 function definePlugin_end()
     local plug = _G["PLUGIN"];
+    if !plug then
+        MsgErr("NoPlgStarted");
+        return;
+    end
 end
 
 function getPlugin(name)
