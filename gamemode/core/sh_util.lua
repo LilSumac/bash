@@ -57,58 +57,79 @@ function getID(len, pre)
     return pre .. id;
 end
 
-function defineService_start(name)
-    if !name then
-        MsgErr("NilArgs", "name");
+function defineService_start(id)
+    if !id then
+        MsgErr("NilArgs", "id");
         return;
     end
     if _G["SVC"] then
-        MsgErr("DefStarted", _G["SVC"].Name, name);
+        MsgErr("DefStarted", _G["SVC"].ID, id);
         return;
     end
 
     bash.services = bash.services or {};
 
-    if bash.services[name] then
-        MsgErr("DupEntry", name);
+    if bash.services[id] then
+        MsgErr("DupEntry", id);
         return;
     end
 
     _G["SVC"] = {};
     local svc = _G["SVC"];
+    svc.ID = id;
+    svc.Name = id;
+    svc.Author = "Unknown";
+    svc.Desc = "A bash service.";
 end
 
 function defineService_end()
+    local svc = _G["SVC"];
+    if !svc then
+        MsgErr("NoDefStarted");
+        return;
+    end
 
+    MsgCon(color_green, "Registering service: %s", svc.ID);
+    bash.services[svc.ID] = svc;
+    _G["SVC"] = nil;
 end
 
-function getService(svc)
-    local bool = true;
+function getService(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if !bash.services[id] then
+        MsgErr("NilEntry", id);
+        return;
+    end
+
+    return bash.services[id];
 end
 
-function definePlugin_start(name, singleFile)
-    if !name then
-        MsgErr("NilArgs", "name");
+function definePlugin_start(id, singleFile)
+    if !id then
+        MsgErr("NilArgs", "id");
         return;
     end
     if _G["PLUG"] then
-        MsgErr("DefStarted", _G["PLUG"].Name, name);
+        MsgErr("DefStarted", _G["PLUG"].ID, id);
         return;
     end
 
     bash.plugins = bash.plugins or {};
 
-    if bash.plugins[name] then
-        MsgErr("DupEntry", name);
+    if bash.plugins[id] then
+        MsgErr("DupEntry", id);
         return;
     end
 
     _G["PLUG"] = {};
     local plug = _G["PLUG"];
-    plug.Name = name;
+    plug.ID = id;
+    plug.Name = id;
     plug.Author = "Unknown";
-    plug.Title = name;
-    plug.Desc = "A custom bash plugin.";
+    plug.Desc = "A custom plugin.";
 end
 
 function definePlugin_end()
@@ -117,8 +138,21 @@ function definePlugin_end()
         MsgErr("NoDefStarted");
         return;
     end
+
+    MsgCon(color_green, "Registering plugin: %s", plug.ID);
+    bash.plugins[plug.ID] = plug;
+    _G["PLUG"] = nil;
 end
 
-function getPlugin(name)
+function getPlugin(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if !bash.plugins[id] then
+        MsgErr("NilEntry", id);
+        return;
+    end
 
+    return bash.plugins[id];
 end
