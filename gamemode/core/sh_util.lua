@@ -57,6 +57,40 @@ function getID(len, pre)
     return pre .. id;
 end
 
+function processFile(file)
+    if !file then
+        MsgErr("NilArgs", "file");
+        return;
+    end
+
+    local pre = file:GetFileFromFilename();
+    pre = pre:sub(1, pre:find('_', 1));
+    MsgN(pre);
+    if PREFIXES_CLIENT[pre] then
+        if CLIENT then include(file);
+        else AddCSLuaFile(file); end
+    elseif PREFIXES_SERVER[pre] then
+        if SERVER then include(file); end
+    elseif PREFIXES_SHARED[pre] then
+        if CLIENT then include(file)
+        else AddCSLuaFile(file); include(file); end
+    end
+end
+
+function processDir(dir)
+    local from = debug.getinfo(2);
+    local src = from.short_src;
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. dir .. "/";
+
+    local files, dirs = file.Find(src .. "*", "LUA", nameasc);
+    for _, file in pairs(files) do
+        file = src .. file;
+        processFile(file);
+    end
+end
+
 function defineService_start(id)
     if !id then
         MsgErr("NilArgs", "id");

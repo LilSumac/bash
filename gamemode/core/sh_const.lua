@@ -27,3 +27,10 @@ ERR_TYPES["NilEntry"] = "An entry with that identifier doesn't exist! (%s)";
 ERR_TYPES["DupEntry"] = "An entry with that identifier already exists! (%s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
+
+PREFIXES_CLIENT = {["cl_"] = true};
+PREFIXES_SERVER = {["sv_"] = true};
+PREFIXES_SHARED = {["sh_"] = true};
+
+PROCESS_DIRS = {["core"] = true, ["services"] = true};
+PROCESS_IGNORE = {["sh_const.lua"] = true, ["sh_util.lua"] = true};

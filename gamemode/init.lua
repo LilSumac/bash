@@ -1,8 +1,17 @@
 -- Base relies on sandbox elements.
 DeriveGamemode("sandbox");
+
 -- Global table for bash elements.
 bash = bash or {};
 bash.startTime = SysTime();
+bash.nonVolatile = bash.nonVolatile or {};
+
+-- Refresh global table on restart.
+do
+    bash.services = {};
+    bash.plugins = {};
+    bash.volatile = {};
+end
 
 -- Random seed!
 math.randomseed(os.time());
