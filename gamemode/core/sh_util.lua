@@ -91,6 +91,58 @@ function processDir(dir)
     end
 end
 
+function addNonVolatileEntry(id, value)
+
+end
+
+function defineMeta_start(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if _G["META"] then
+        MsgErr("DefStarted", _G["META"].ID, id);
+        return;
+    end
+
+    bash.meta = bash.meta or {};
+
+    if bash.meta[id] then
+        MsgErr("DupEntry", id);
+        return;
+    end
+
+    _G["META"] = {};
+    local meta = _G["META"];
+    meta.ID = id;
+    meta.__index = meta;
+end
+
+function defineMeta_end()
+    local meta = _G["META"];
+    if !meta then
+        MsgErr("NoDefStarted");
+        return;
+    end
+
+    MsgCon(color_green, "Registering metatable: %s", meta.ID);
+    bash.meta[meta.ID] = meta;
+    _G["META"] = nil;
+end
+
+function getMeta(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if !bash.meta[id] then
+        MsgErr("NilEntry", id);
+        return;
+    end
+
+    return bash.meta[id];
+end
+
 function defineService_start(id)
     if !id then
         MsgErr("NilArgs", "id");
