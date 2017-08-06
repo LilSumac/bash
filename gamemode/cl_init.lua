@@ -8,6 +8,7 @@ bash.nonVolatile = bash.nonVolatile or {};
 
 -- Refresh global table on restart.
 do
+    bash.meta = {};
     bash.services = {};
     bash.plugins = {};
     bash.volatile = {};
@@ -28,4 +29,4 @@ timer.Remove("HintSystem_Annoy2");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
-MsgCon(color_green, "Successfully initialized client-side. Startup: %fs", len);
+MsgCon(color_green, "Successfully initialized base client-side. Startup: %fs", len);

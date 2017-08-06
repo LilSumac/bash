@@ -17,15 +17,22 @@ end
 
 function MsgErr(errType, ...)
     if !errType then
-        MsgErr("NilErrType");
+        MsgErr("NilArgs", "errType");
         return;
     end
     if !ERR_TYPES[errType] then
-        MsgErr("UndefErrType", errType);
+        MsgErr("NilEntry", errType);
         return;
     end
 
     local args = {...};
+    local errMsg = ERR_TYPES[errType];
+    local _, count = errMsg:gsub("%%", "");
+    if #args < count then
+        MsgErr("InsufVarArgs");
+        return;
+    end
+
     local funcInfo = debug.getinfo(2);
     local fromInfo;
     if funcInfo.what == "main" then
@@ -44,7 +51,7 @@ function MsgErr(errType, ...)
         srcStr = Format("%s -> %s (%s line %d)", srcFunc, GM.Name, srcFile, fromInfo.currentline);
     end
 
-    MsgCon(color_red, "[%s] %s", srcStr, Format(ERR_TYPES[errType], unpack(args)));
+    MsgCon(color_red, "[%s] %s", srcStr, Format(errMsg, unpack(args)));
 end
 
 function getID(len, pre)
@@ -65,7 +72,6 @@ function processFile(file)
 
     local pre = file:GetFileFromFilename();
     pre = pre:sub(1, pre:find('_', 1));
-    MsgN(pre);
     if PREFIXES_CLIENT[pre] then
         if CLIENT then include(file);
         else AddCSLuaFile(file); end
@@ -91,8 +97,59 @@ function processDir(dir)
     end
 end
 
-function addNonVolatileEntry(id, value)
+function getNonVolatileEntry(id, def)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
 
+    bash.nonVolatile = bash.nonVolatile or {};
+    local val = bash.nonVolatile[id];
+    if val == nil then
+        if type(def) == "function" then
+            val = def();
+        else
+            val = def
+        end
+
+        if val == nil then
+            MsgErr("NilNVEntry", id);
+            return;
+        end
+        bash.nonVolatile[id] = val;
+    else
+        if type(val) == "function" then
+            return val();
+        else
+            return val;
+        end
+    end
+
+    return val;
+end
+
+function setNonVolatileEntry(id, val)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if val == nil then
+        MsgErr("UnsafeNVEntry", id);
+        return;
+    end
+
+    bash.nonVolatile = bash.nonVolatile or {};
+    bash.nonVolatile[id] = val;
+end
+
+function removeNonVolatileEntry(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+
+    bash.nonVolatile = bash.nonVolatile or {};
+    bash.nonVolatile[id] = nil;
 end
 
 function defineMeta_start(id)
@@ -116,6 +173,7 @@ function defineMeta_start(id)
     local meta = _G["META"];
     meta.ID = id;
     meta.__index = meta;
+    meta.IsValid = function() return true; end
 end
 
 function defineMeta_end()
@@ -166,6 +224,7 @@ function defineService_start(id)
     svc.Name = id;
     svc.Author = "Unknown";
     svc.Desc = "A bash service.";
+    svc.IsValid = function() return true; end
 end
 
 function defineService_end()
@@ -216,6 +275,7 @@ function definePlugin_start(id, singleFile)
     plug.Name = id;
     plug.Author = "Unknown";
     plug.Desc = "A custom plugin.";
+    plug.IsValid = function() return true; end
 end
 
 function definePlugin_end()
