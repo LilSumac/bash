@@ -16,22 +16,27 @@ function SVC:AddCharVar(var)
         return;
     end
     if !var.ID then
-        MsgErr("FieldReq", "ID", "var");
+        MsgErr("NilField", "ID", "var");
         return;
     end
+    if !var.OnGenerate then
+        MsgErr("NilField", "OnGenerate", "var");
+        return;
     if self.CharVars[var.ID] then
         MsgErr("DupEntry", var.ID);
         return;
     end
 
     -- Charvar fields.
+    -- var.ID = var.ID; (Redundant, no default)
     var.Default = var.Default or "";
     var.Public = var.Public or false;
     var.BelongsInSQL = var.BelongsInSQL or false;
 
     -- Charvar functions/hooks.
-    -- var.OnGet = var.OnGet;
-    -- var.OnSet = var.OnSet;
+    -- var.OnGenerate = var.OnGenerate; (Redundant, no default)
+    -- var.OnGet = var.OnGet; (Redundant, no default)
+    -- var.OnSet = var.OnSet; (Redundant, no default)
 
     MsgCon(color_green, "Registering charvar: %s", var.ID);
     self.CharVars[var.ID] = var;
@@ -41,6 +46,8 @@ function SVC:FetchFromDB(id)
     -- query db and get char data
     -- store data in datacache
     -- call hook for instantiate
+
+    MsgCon(color_green, "Completed character fetch: %s", id);
 
     self.CachedData[id] = {};
     local name = self.Name .. "_FetchDone_" .. id;
@@ -60,11 +67,13 @@ function SVC:Instantiate(id, refresh)
 
     local data;
     if refresh or (!self.CachedChars[id] and !self.CachedData[id]) then
-        -- data must be fetched
+        MsgCon(color_orange, "Hooking character fetch: %s", id);
 
         local name = self.Name .. "_FetchDone_" .. id;
         hook.Add(name, self, self.Instantiate);
-        self:FetchFromDB(id);
+
+        local db = getService("CDatabase");
+        db:FetchCharacter(id);
         return;
     elseif self.CachedChars[id] then
         -- a char instance already exists
@@ -72,21 +81,28 @@ function SVC:Instantiate(id, refresh)
         -- data has already been fetched
         -- take data and push to new instance
 
-        local char = {};
+        MsgCon(color_green, "Instantiating character: %s", id);
+
         local charMeta = getMeta("Character");
-        setmetatable(char, charMeta);
-        char.ID = id;
+        local char = setmetatable({}, charMeta);
+        char.CharID = id;
         char.Data = self.CachedData[id];
         return char;
     end
 
+    MsgCon(color_orange, "Removing character fetch hook: %s", id);
     local name = self.Name .. "_FetchDone_" .. id;
     hook.Remove(name, self);
 end
 
 -- Add default charvars.
 SVC:AddCharVar{
-    ID = "CharID"
+    ID = "CharID",
+    OnGenerate = 
+    OnSet = function(_self, char, val)
+        char.CharID = val;
+        return val;
+    end
 };
 
 SVC:AddCharVar{
@@ -95,25 +111,6 @@ SVC:AddCharVar{
 
 SVC:AddCharVar{
     ID = "Desc"
-};
-
-SVC:AddCharVar{
-    ID = "Bing",
-    OnGet = function(_self, char)
-        MsgN("BING GET: " .. tostring(char));
-        PrintTable(_self);
-        return "nice try small fry";
-    end
-};
-
-SVC:AddCharVar{
-    ID = "Bong",
-    OnSet = function(_self, char, val)
-        if val != "blap" then
-            return "nope";
-        end
-        return val;
-    end
 };
 
 defineService_end();

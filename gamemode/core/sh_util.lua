@@ -1,10 +1,5 @@
 local bash = bash;
 
-function addErrType(name, str)
-    if !name or !str or ERR_TYPES[name] then return; end
-    ERR_TYPES[name] = str;
-end
-
 function MsgCon(color, text, ...)
     if type(color) != "table" then return; end
     if !text then text = ""; end
@@ -54,6 +49,11 @@ function MsgErr(errType, ...)
     MsgCon(color_red, "[%s] %s", srcStr, Format(errMsg, unpack(args)));
 end
 
+function addErrType(name, str)
+    if !name or !str or ERR_TYPES[name] then return; end
+    ERR_TYPES[name] = str;
+end
+
 function getID(len, pre)
     local id = math.Round(os.time() + (math.random(10000000, 99999999)) + (math.cos(SysTime()) * 26293888));
     id = tostring(id);
@@ -95,6 +95,10 @@ function processDir(dir)
         file = src .. file;
         processFile(file);
     end
+end
+
+function getClientData(ply, id)
+    
 end
 
 function getNonVolatileEntry(id, def)
