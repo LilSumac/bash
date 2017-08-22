@@ -4,11 +4,13 @@ defineService_start("CCharacter");
 SVC.Name = "Core Character";
 SVC.Author = "LilSumac";
 SVC.Desc = "The main character functions for /bash/.";
+SVC.Depends = {"CDatabase"};
 
 -- Service storage.
 SVC.CharVars = {};
 SVC.CachedData = getNonVolatileEntry("CCharacter_DataCache", EMPTY_TABLE);
 SVC.CachedChars = getNonVolatileEntry("CCharacter_CharCache", EMPTY_TABLE);
+SVC.CachedIDs = {};
 
 function SVC:AddCharVar(var)
     if !var then
@@ -19,9 +21,6 @@ function SVC:AddCharVar(var)
         MsgErr("NilField", "ID", "var");
         return;
     end
-    if !var.OnGenerate then
-        MsgErr("NilField", "OnGenerate", "var");
-        return;
     if self.CharVars[var.ID] then
         MsgErr("DupEntry", var.ID);
         return;
@@ -29,12 +28,12 @@ function SVC:AddCharVar(var)
 
     -- Charvar fields.
     -- var.ID = var.ID; (Redundant, no default)
-    var.Default = var.Default or "";
+    var.Type = var.Type or "string";
     var.Public = var.Public or false;
     var.BelongsInSQL = var.BelongsInSQL or false;
 
     -- Charvar functions/hooks.
-    -- var.OnGenerate = var.OnGenerate; (Redundant, no default)
+    var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
     -- var.OnGet = var.OnGet; (Redundant, no default)
     -- var.OnSet = var.OnSet; (Redundant, no default)
 
@@ -42,16 +41,12 @@ function SVC:AddCharVar(var)
     self.CharVars[var.ID] = var;
 end
 
-function SVC:FetchFromDB(id)
-    -- query db and get char data
-    -- store data in datacache
-    -- call hook for instantiate
+function SVC:PostDBFetch(data)
+    MsgCon(color_green, "Completed character fetch: %s", data.CharID);
 
-    MsgCon(color_green, "Completed character fetch: %s", id);
-
-    self.CachedData[id] = {};
-    local name = self.Name .. "_FetchDone_" .. id;
-    hook.Call(name, self, id);
+    self.CachedData[data.CharID] = data;
+    local name = "CharFetch_" .. data.CharID;
+    hook.Call(name, self, data.CharID);
 end
 
 function SVC:Instantiate(id, refresh)
@@ -69,7 +64,7 @@ function SVC:Instantiate(id, refresh)
     if refresh or (!self.CachedChars[id] and !self.CachedData[id]) then
         MsgCon(color_orange, "Hooking character fetch: %s", id);
 
-        local name = self.Name .. "_FetchDone_" .. id;
+        local name = "CharFetch_" .. id;
         hook.Add(name, self, self.Instantiate);
 
         local db = getService("CDatabase");
@@ -91,14 +86,15 @@ function SVC:Instantiate(id, refresh)
     end
 
     MsgCon(color_orange, "Removing character fetch hook: %s", id);
-    local name = self.Name .. "_FetchDone_" .. id;
+    local name = "CharFetch_" .. id;
     hook.Remove(name, self);
 end
 
 -- Add default charvars.
 SVC:AddCharVar{
     ID = "CharID",
-    OnGenerate = 
+    Type = "string",
+    OnGenerate = function() end,
     OnSet = function(_self, char, val)
         char.CharID = val;
         return val;
@@ -112,5 +108,25 @@ SVC:AddCharVar{
 SVC:AddCharVar{
     ID = "Desc"
 };
+
+-- Hooks.
+hook.Add("EditDatabase", "CCharacter_AddTables", function()
+    local db = getService("CDatabase");
+    db:AddTable("bash_chars", REF_CHAR);
+end);
+
+hook.Add("OnDBConnected", "CCharacter_OnDBConnected", function()
+    local db = getService("CDatabase");
+    db:Query("SELECT CharID FROM bash_chars;", function(results)
+        local ids = {};
+        local cchar = getService("CCharacter");
+
+        results = results[1];
+        for index, data in pairs(results.data) do
+            ids[data.CharID] = true;
+        end
+        cchar.CachedIDs = ids;
+    end);
+end);
 
 defineService_end();

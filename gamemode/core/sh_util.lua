@@ -1,5 +1,21 @@
 local bash = bash;
 
+function table.IsEmpty(tab)
+    if !tab or type(tab) != "table" then return true; end
+    for _, __ in pairs(tab) do return false; end
+    return true;
+end
+
+function handleFunc(var, ...)
+    if var == nil then return; end
+    local args = {...};
+    if type(var) == "function" then
+        return var(unpack(args));
+    else
+        return var;
+    end
+end
+
 function MsgCon(color, text, ...)
     if type(color) != "table" then return; end
     if !text then text = ""; end
@@ -36,17 +52,17 @@ function MsgErr(errType, ...)
         fromInfo = debug.getinfo(3);
     end
 
+    local gm = GAMEMODE.Name;
+    if _G["PLUG"] then
+        gm = gm .. " Plugin: " .. _G["PLUG"].Name;
+    end
+
     local src = fromInfo.short_src;
     local srcFile = string.GetFileFromFilename(src);
     local srcFunc = (funcInfo.name != "" and funcInfo.name) or "In File";
-    local srcStr;
-    if _G["PLUGIN"] then
-        srcStr = Format("%s -> %s (%s) (%s line %d)", srcFunc, GM.Name, "Plugin: " .. _G["PLUGIN"].Name, srcFile, fromInfo.currentline);
-    else
-        srcStr = Format("%s -> %s (%s line %d)", srcFunc, GM.Name, srcFile, fromInfo.currentline);
-    end
+    local srcStr = Format("%s -> %s line %d", srcFunc, srcFile, fromInfo.currentline);
 
-    MsgCon(color_red, "[%s] %s", srcStr, Format(errMsg, unpack(args)));
+    MsgCon(color_red, "[%s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
 end
 
 function addErrType(name, str)
@@ -98,7 +114,27 @@ function processDir(dir)
 end
 
 function getClientData(ply, id)
-    
+    if !ply then
+        MsgErr("NilArgs", "ply");
+        return;
+    end
+
+    local index = ply:EntIndex();
+    if !bash.clientData[index] then
+        MsgErr("NilEntry", index);
+        return;
+    end
+
+    if id then
+        if bash.clientData[index][id] == nil then
+            MsgErr("NilEntry", id);
+            return;
+        end
+
+        return bash.clientData[index][id];
+    else
+        return bash.clientData[index];
+    end
 end
 
 function getNonVolatileEntry(id, def)
@@ -110,26 +146,17 @@ function getNonVolatileEntry(id, def)
     bash.nonVolatile = bash.nonVolatile or {};
     local val = bash.nonVolatile[id];
     if val == nil then
-        if type(def) == "function" then
-            val = def();
-        else
-            val = def
-        end
-
+        val = handleFunc(def);
         if val == nil then
             MsgErr("NilNVEntry", id);
             return;
         end
-        bash.nonVolatile[id] = val;
-    else
-        if type(val) == "function" then
-            return val();
-        else
-            return val;
-        end
-    end
 
-    return val;
+        bash.nonVolatile[id] = val;
+        return val;
+    else
+        return handleFunc(val);
+    end
 end
 
 function setNonVolatileEntry(id, val)
@@ -143,7 +170,7 @@ function setNonVolatileEntry(id, val)
     end
 
     bash.nonVolatile = bash.nonVolatile or {};
-    bash.nonVolatile[id] = val;
+    bash.nonVolatile[id] = handleFunc(val);
 end
 
 function removeNonVolatileEntry(id)
@@ -305,4 +332,8 @@ function getPlugin(id)
     end
 
     return bash.plugins[id];
+end
+
+function checkPly(ply)
+    return ply and IsValid(ply) and ply:IsPlayer();
 end

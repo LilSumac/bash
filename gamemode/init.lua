@@ -1,3 +1,5 @@
+MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
+
 -- Base relies on sandbox elements.
 DeriveGamemode("sandbox");
 
@@ -23,6 +25,7 @@ math.randomseed(os.time());
 
 -- Send required base files to client.
 AddCSLuaFile("cl_init.lua");
+AddCSLuaFile("core/cl_util.lua");
 AddCSLuaFile("core/sh_const.lua");
 AddCSLuaFile("core/sh_util.lua");
 AddCSLuaFile("shared.lua");
@@ -30,11 +33,13 @@ AddCSLuaFile("shared.lua");
 -- Include required base files.
 include("core/sh_const.lua");
 include("core/sh_util.lua");
+include("core/sv_netpool.lua");
 include("shared.lua");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
 MsgCon(color_green, "Successfully initialized base server-side.  Startup: %fs", len);
+MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
 bash.started = true;
 
 -- Handle catching client data.
@@ -45,3 +50,6 @@ vnet.Watch("bash_sendClientData", function(pck)
     bash.clientData = bash.clientData or {};
     bash.clientData[ply:EntIndex()] = data;
 end);
+
+-- Init for all services/etc.
+hook.Call("OnInit");

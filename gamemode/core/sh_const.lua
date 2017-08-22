@@ -25,18 +25,32 @@ color_mint =        Color(0, 255, 151, 255);
 color_violet =      Color(151, 0, 255, 255);
 color_lightblue =   Color(0, 151, 255, 255);
 
+DEFAULTS = {};
+DEFAULTS["string"] = "";
+DEFAULTS["number"] = 0;
+DEFAULTS["boolean"] = false;
+
 EMPTY_TABLE = function() return {}; end
+DEFAULTS["table"] = EMPTY_TABLE;
 
 ERR_TYPES = {};
 ERR_TYPES["NilArgs"] = "Argument cannot be nil! (%s)";
 ERR_TYPES["NilEntry"] = "An entry with that identifier does not exist! (%s)";
 ERR_TYPES["DupEntry"] = "An entry with that identifier already exists! (%s)";
-ERR_TYPES["NilField"] = "Field cannot be nil! (%s in table %s)"
+ERR_TYPES["NilField"] = "Field cannot be nil! (%s in table %s)";
+ERR_TYPES["InvalidDataType"] = "This data type is not supported! (%s)";
+ERR_TYPES["InvalidEnt"] = "Invalid entity argument!";
+ERR_TYPES["InvalidPly"] = "Invalid player argument!";
 ERR_TYPES["InsufVarArgs"] = "Insufficient varible arguments!";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";
 ERR_TYPES["UnsafeNVEntry"] = "Do not set NV entries to nil! Use 'removeNonVolatileEntry' instead. (%s)";
+
+OS_WIN = 1;
+OS_OSX = 2;
+OS_LIN = 3;
+OS_UNK = 4;
 
 PREFIXES_CLIENT = {["cl_"] = true};
 PREFIXES_SERVER = {["sv_"] = true};
@@ -44,3 +58,48 @@ PREFIXES_SHARED = {["sh_"] = true};
 
 PROCESS_DIRS = {["core"] = true, ["services"] = true};
 PROCESS_IGNORE = {["sh_const.lua"] = true, ["sh_util.lua"] = true};
+
+if SERVER then
+
+    REF_NONE = 0;
+    REF_PLY = 1;
+    REF_CHAR = 2;
+
+    SQL_DEF = {};
+    SQL_DEF["boolean"] = "0";
+    SQL_DEF["number"] = "0";
+    SQL_DEF["string"] = "\'\'";
+    SQL_DEF["table"] = Format("\'%s\'", PON_EMPTY);
+
+    SQL_TYPE = {};
+    SQL_TYPE["boolean"] = "TINYINT(1) UNSIGNED "
+    SQL_TYPE["number"] = "BIGINT";
+    SQL_TYPE["string"] = "TEXT";
+    SQL_TYPE["table"] = "TEXT";
+
+elseif CLIENT then
+
+    CENTER_X = ScrW() / 2;
+    CENTER_Y = ScrH() / 2;
+
+    SCRW = ScrW();
+    SCRH = ScrH();
+
+    local resChanged = false;
+    hook.Add("HUDPaint", "bash_resChanged", function()
+        if SCRW != ScrW() then
+            SCRW = ScrW();
+            resChanged = true;
+        end
+        if SCRH != ScrH() then
+            SCRH = ScrH();
+            resChanged = true;
+        end
+        if resChanged then
+            CENTER_X = SCRW / 2;
+            CENTER_Y = SCRH / 2;
+            resChanged = false;
+        end
+    end);
+
+end

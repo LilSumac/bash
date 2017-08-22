@@ -1,3 +1,5 @@
+MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
+
 -- Base relies on sandbox elements.
 DeriveGamemode("sandbox");
 
@@ -22,6 +24,7 @@ bash.clientData = {};
 math.randomseed(os.time());
 
 -- Include required base files.
+include("core/cl_util.lua");
 include("core/sh_const.lua");
 include("core/sh_util.lua");
 include("shared.lua");
@@ -33,7 +36,8 @@ timer.Remove("HintSystem_Annoy2");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
-MsgCon(color_green, "Successfully initialized base client-side. Startup: %fs", len);
+MsgCon(color_green, "Successfully initialized base cient-side. Startup: %fs", len);
+MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
 bash.started = true
 
 -- Handle sending client data.
@@ -52,3 +56,20 @@ hook.Add("InitPostEntity", "bash_sendClientData", function()
     send:AddServer();
     send:Send();
 end);
+
+-- Add default client data.
+addClientData("Country", system.GetCountry);
+addClientData("OS", function()
+    if system.IsWindows() then
+        return OS_WIN;
+    elseif system.IsWindows() then
+        return OS_OSX;
+    elseif system.IsLinux() then
+        return OS_LIN;
+    else
+        return OS_UNK;
+    end
+end);
+
+-- Init for all services/etc.
+hook.Call("OnInit");
