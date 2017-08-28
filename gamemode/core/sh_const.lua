@@ -66,13 +66,13 @@ if SERVER then
     REF_CHAR = 2;
 
     SQL_DEF = {};
-    SQL_DEF["boolean"] = "0";
-    SQL_DEF["number"] = "0";
-    SQL_DEF["string"] = "\'\'";
-    SQL_DEF["table"] = Format("\'%s\'", PON_EMPTY);
+    SQL_DEF["boolean"] = false;
+    SQL_DEF["number"] = 0;
+    SQL_DEF["string"] = "";
+    SQL_DEF["table"] = {};
 
     SQL_TYPE = {};
-    SQL_TYPE["boolean"] = "TINYINT(1) UNSIGNED "
+    SQL_TYPE["boolean"] = "TINYINT(1) UNSIGNED"
     SQL_TYPE["number"] = "BIGINT";
     SQL_TYPE["string"] = "TEXT";
     SQL_TYPE["table"] = "TEXT";

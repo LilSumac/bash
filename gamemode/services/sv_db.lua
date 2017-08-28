@@ -52,6 +52,9 @@ function SVC:Connect()
     -- Table/column edit hook.
     hook.Call("EditDatabase");
 
+    -- Perform database existance checks.
+    self:CheckTables();
+
     -- CALL THIS AFTER ALL CHECKS
     -- Post-connection hook.
     --hook.Call("OnDBConnected");
@@ -73,39 +76,37 @@ function SVC:AddTable(name, ref)
 
     tab.Name = name;
     tab.Columns = {};
+    -- EntryNum will always be the key. If you don't like it then TOUGH.
     tab.Columns["EntryNum"] = {
         Name = "EntryNum",
         Type = "number",
         Default = "NOT NULL",
-        Query = Format("%s %s", SQL_TYPE["number"], "NOT NULL AUTO_INCREMENT UNIQUE")
+        Query = tostring(SQL_TYPE["number"]) .. " NOT NULL AUTO_INCREMENT UNIQUE"
     };
     tab.Key = "EntryNum";
     if ref == REF_PLY then
         tab.Columns["SteamID"] = {
             Name = "SteamID",
             Type = "string",
-            Default = SQL_DEF["string"],
-            Query = Format("%s %s", SQL_TYPE["string"], SQL_DEF["string"])
+            Default = SQL_DEF["string"]
         };
     elseif ref == REF_CHAR then
         tab.Columns["SteamID"] = {
             Name = "SteamID",
             Type = "string",
-            Default = SQL_DEF["string"],
-            Query = Format("%s %s", SQL_TYPE["string"], SQL_DEF["string"])
+            Default = SQL_DEF["string"]
         };
         tab.Columns["CharID"] = {
             Name = "CharID",
             Type = "string",
-            Default = SQL_DEF["string"],
-            Query = Format("%s %s", SQL_TYPE["string"], SQL_DEF["string"])
+            Default = SQL_DEF["string"]
         };
     end
 
     MsgCon(color_sql, "SQL table registered with name '%s'.", name);
 end
 
-function SVC:AddColumn(tab, col, iskey)
+function SVC:AddColumn(tab, col)
     if !tab then
         MsgErr("NilArgs", "tab");
         return;
@@ -130,17 +131,18 @@ function SVC:AddColumn(tab, col, iskey)
         return;
     end
 
-    -- col.Name = col.Name;
     tabData.Columns[col.Name] = col;
+
+    -- col.Name = col.Name;
     col.Type = col.Type or "string";
     col.Default = (col.Default != nil and col.Default) or SQL_DEF[col.Type];
-    col.Query = col.Query or Format("%s DEFAULT %s", SQL_TYPE[col.Type], self:CastValue(tab, col.Name, col.Default, CAST_IN));
 
     MsgCon(color_sql, "Column with name '%s' registered in table '%s'.", col.Name, tab);
 end
 
-function SVC:Query(query, callback, obj)
+function SVC:Query(query, callback, ...)
     if self.DBObject and self.Connected then
+        local args = {...};
         self.DBObject:Query(query, function(resultsTab)
             if #resultsTab == 1 then
                 if !resultsTab[1].status then
@@ -155,15 +157,17 @@ function SVC:Query(query, callback, obj)
                 end
             end
 
-            local firstArg = obj or resultsTab;
-            local secondArg = (firstArg != resultsTab and resultsTab) or nil;
-            callback(firstArg, secondArg);
+            args[#args + 1] = resultsTab;
+            callback(unpack(args));
         end);
     end
 end
 
 local castIn = {
-    ["boolean"] = tobool,
+    ["boolean"] = function(bool)
+        if bool then return 1;
+        else return 0; end
+    end,
     ["number"] = tonumber,
     ["string"] = function(str)
         local db = getService("CDatabase");
@@ -203,7 +207,7 @@ function SVC:CastValue(tab, col, val, inout)
     end
 
     local t = type(val);
-    if !castIn[t] and !castOut[t] then
+    if !castIn[t] and castOut[t] then
         MsgErr("InvalidDataType", t);
         return;
     end
@@ -215,7 +219,39 @@ function SVC:CastValue(tab, col, val, inout)
     return castFuncs[t](val);
 end
 
-function SVC:InsertRow(tab, data, callback, obj)
+function SVC:CheckTables()
+    if table.IsEmpty(self.Tables) then
+        MsgCon(color_sql, "No tables registered in database. Skipping...");
+        return;
+    end
+
+    local query = "";
+    for name, tab in pairs(self.Tables) do
+        query = query .. Format("CREATE TABLE IF NOT EXISTS %s(", name);
+        for _name, col in pairs(tab.Columns) do
+            if _name == "EntryNum" then
+                query = query .. "`EntryNum` BIGINT NOT NULL AUTO_INCREMENT UNIQUE, ";
+            elseif col.Type == "string" or col.Type == "table" then
+                query = query .. Format("`%s` %s, ", _name, SQL_TYPE[col.Type]);
+            else
+                query = query .. Format("`%s` %s DEFAULT %s, ", _name, SQL_TYPE[col.Type], self:CastValue(name, _name, col.Default, CAST_IN));
+            end
+        end
+        query = query .. "PRIMARY KEY(EntryNum)); ";
+    end
+
+    self:Query(query, function(results)
+        MsgCon(color_sql, "Table check complete.");
+        local db = getService("CDatabase");
+        db:CheckColumns();
+    end);
+end
+
+function SVC:CheckColumns()
+    
+end
+
+function SVC:InsertRow(tab, data, callback, ...)
     if !tab then
         MsgErr("NilArgs", "tab");
         return;
@@ -241,10 +277,10 @@ function SVC:InsertRow(tab, data, callback, obj)
     query = Format("%s) %s);", query, vals);
     self:Query(query, callback or function(results)
         MsgCon(color_sql, "New row inserted into table '%s'.", tab);
-    end, obj);
+    end, unpack({...}));
 end
 
-function SVC:GetRow(tab, cols, cond, callback, obj)
+function SVC:GetRow(tab, cols, cond, callback, ...)
     if !tab then
         MsgErr("NilArgs", "tab");
         return;
@@ -264,10 +300,10 @@ function SVC:GetRow(tab, cols, cond, callback, obj)
 
     self:Query(query, callback or function(results)
         MsgCon(color_sql, "Fetched from row in table '%s'.", tab);
-    end, obj);
+    end, unpack({...}));
 end
 
-function SVC:UpdateRow(tab, data, cond, callback, obj)
+function SVC:UpdateRow(tab, data, cond, callback, ...)
     if !tab then
         MsgErr("NilArgs", "tab");
         return;
@@ -297,7 +333,7 @@ function SVC:UpdateRow(tab, data, cond, callback, obj)
 
     self:Query(query, callback or function(results)
         MsgCon(color_sql, "Row updated in table '%s'.", tab);
-    end, obj);
+    end, unpack({...}));
 end
 
 function SVC:FetchPlayer(ply)

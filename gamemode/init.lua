@@ -53,3 +53,6 @@ end);
 
 -- Init for all services/etc.
 hook.Call("OnInit");
+
+local char = getService("CCharacter");
+PrintTable(getmetatable(bash))
