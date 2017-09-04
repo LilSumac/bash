@@ -248,7 +248,7 @@ function SVC:CheckTables()
 end
 
 function SVC:CheckColumns()
-    
+
 end
 
 function SVC:InsertRow(tab, data, callback, ...)
@@ -334,56 +334,6 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
     self:Query(query, callback or function(results)
         MsgCon(color_sql, "Row updated in table '%s'.", tab);
     end, unpack({...}));
-end
-
-function SVC:FetchPlayer(ply)
-    if !checkPly(ply) then
-        MsgErr("InvalidPly");
-        return;
-    end
-
-    local steamID = ply:SteamID();
-    local query = Format("SELECT * FROM bash_plys WHERE SteamID = \'%s\';", steamID);
-    self:Query(query, function(results)
-        results = results[1];
-        local db = getService("CDatabase");
-
-        if table.IsEmpty(results.data) then
-            MsgCon(color_sql, "No row found for player '%s', creating one now...", ply:Name());
-            db:CreatePlayer(ply);
-        else
-            if #results.data > 1 then
-                MsgCon(color_sql, "Found multiple rows for player '%s', picking the first available row...", ply:Name());
-            else
-                MsgCon(color_sql, "Found row for player '%s', continuing...", ply:Name());
-            end
-
-            ply.SQLData = ply.SQLData or {};
-            ply.SQLData["bash_plys"] = results.data[1];
-
-            local name = "PlyFetch_" .. steamID;
-            hook.Call(name, db, ply);
-            hook.Remove(name, db);
-        end
-    end);
-end
-
-function SVC:CreatePlayer(ply)
-    if !checkPly(ply) then
-        MsgErr("InvalidPly");
-        return;
-    end
-
-
-end
-
-function SVC:FinalizePlayer(ply)
-    MsgN(ply:Name() .. " loaded!");
-    PrintTable(ply.SQLData);
-end
-
-function SVC:FetchCharacter(id)
-
 end
 
 -- Custom errors.

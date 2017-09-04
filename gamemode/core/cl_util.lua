@@ -14,3 +14,15 @@ function addClientData(id, generate)
 
     bash.clientData[id] = generate;
 end
+
+function sendClientData()
+    local send = vnet.CreatePacket("bash_sendClientData");
+    local data = {};
+    for id, generate in pairs(bash.clientData) do
+        data[id] = handleFunc(generate);
+    end
+
+    send:Table(data);
+    send:AddServer();
+    send:Send();
+end

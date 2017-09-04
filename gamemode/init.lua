@@ -51,8 +51,8 @@ vnet.Watch("bash_sendClientData", function(pck)
     bash.clientData[ply:EntIndex()] = data;
 end);
 
--- Init for all services/etc.
-hook.Call("OnInit");
-
-local char = getService("CCharacter");
-PrintTable(getmetatable(bash))
+-- Hooks for post-init.
+MsgCon(color_green, "Gathering preliminary data...");
+hook.Call("GatherPrelimData");  -- Add network variable structures, finalize DB structure, etc.
+MsgCon(color_green, "Initializing services...")
+hook.Call("InitService");       -- Connect to DB, load /data files, etc.

@@ -108,6 +108,19 @@ function SVC:AddVar(var)
     var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
 end
 
+function SVC:GetDomainVars(dom)
+    if !var then
+        MsgErr("NilArgs", "dom");
+        return;
+    end
+    if !self.Domains[dom] then
+        MsgErr("NilDomain", dom);
+        return;
+    end
+
+    return self.Vars[dom];
+end
+
 function SVC:RegisterTable(tab)
     if !tab then
         MsgErr("NilArgs", "tab");

@@ -40,21 +40,9 @@ MsgCon(color_green, "Successfully initialized base cient-side. Startup: %fs", le
 MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
 bash.started = true
 
--- Handle sending client data.
+-- Handle sending initial client data.
 hook.Add("InitPostEntity", "bash_sendClientData", function()
-    local send = vnet.CreatePacket("bash_sendClientData");
-    local data = {};
-    for id, generate in pairs(bash.clientData) do
-        if type(generate) == "function" then
-            data[id] = generate();
-        else
-            data[id] = generate;
-        end
-    end
-
-    send:Table(data);
-    send:AddServer();
-    send:Send();
+    sendClientData();
 end);
 
 -- Add default client data.

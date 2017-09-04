@@ -6,9 +6,6 @@ SVC.Author = "LilSumac";
 SVC.Desc = "The main player functions for /bash/.";
 SVC.Depends = {"CDatabase"};
 
--- Service storage.
-SVC.PlyVars = {};
-
 function SVC:AddPlyVar(var)
     if !var then
         MsgErr("NilArgs", "var");
@@ -47,18 +44,10 @@ end
 local function createPlyData(ply)
     MsgCon(color_sql, "Creating new entry for '%s'...", ply:Name());
 
-    local data = {};
-    -- SteamID column always required for player-referencing tables.
-    data["SteamID"] = ply:SteamID();
-
-    for id, var in pairs(self.PlyVars) do
-        data[id] = handleFunc(var.OnGenerate, var, ply);
-    end
-
     local db = getService("CDatabase");
     db:InsertRow(
         "bash_plys",            -- Table to query.
-        data,                   -- Data to insert.
+        ply.PlyData,            -- Data to insert.
 
         function(_ply, results) -- Callback function upon completion.
             MsgCon(color_sql, "INSERT DONE!");
@@ -160,6 +149,15 @@ hook.Add("EditDatabase", "CPlayer_AddTables", function()
 end);
 
 hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
+    local netvar = getService("CNetVar");
+    local newData = {};
+    newData["SteamID"] = ply:SteamID();
+    local plyVars = netvar:GetDomainVars("CPlayer");
+    for id, var in pairs(plyVars) do
+        newData[id] = handleFunc(var.OnGenerate, var, ply);
+    end
+    ply.PlyData = newData;
+
     getPlyData(ply);
 end);
 
