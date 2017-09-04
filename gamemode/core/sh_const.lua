@@ -1,6 +1,9 @@
 -- Global constants. See Documentation for more info.
 BASE_NAME = "/bash/";
 
+CHAR_ALPHANUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+CHAR_HEX = "abcdef0123456789";
+
 color_trans =       Color(0, 0, 0, 0);
 color_black =       Color(0, 0, 0, 255);
 color_white =       Color(255, 255, 255, 255);

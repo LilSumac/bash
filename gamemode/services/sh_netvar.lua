@@ -9,6 +9,8 @@ SVC.Depends = {"CDatabase"};
 -- Service storage.
 SVC.Domains = {};
 SVC.Vars = {};
+SVC.Registry = {};
+SVC.Entries = {};
 
 function SVC:AddDomain(dom)
     if !dom then
@@ -25,7 +27,52 @@ function SVC:AddDomain(dom)
     end
 
     -- Domain fields.
-    --
+    -- dom.ID = dom.ID; (Redundant, no default)
+    -- dom.ParentMeta = dom.ParentMeta; (Redundant, no default)
+
+    self.Vars[dom.ID] = self.Vars[dom.ID] or {};
+
+    dom.StoredInSQL = dom.StoredInSQL or false;
+    if dom.StoredInSQL and !dom.SQLTable then
+        MsgErr("NilField", "SQLTable");
+        return;
+    end
+
+    local meta = dom.ParentMeta;
+    if meta and (!meta.GetNetVar or !meta.SetNetVar) then
+        meta.GetNetVar = function(_self, dom, id)
+            if !dom then
+                MsgErr("NilArgs", "dom");
+                return;
+            end
+            if !id then
+                MsgErr("NilArgs", "id");
+                return;
+            end
+
+            local netvar = getService("CNetVar");
+            if !netvar.Domains[dom] then
+                MsgErr("NilEntry", dom);
+                return;
+            end
+
+            local var = netvar.Vars[dom][varID];
+            if !var then
+                MsgErr("NilEntry", varID);
+                return;
+            end
+
+            if !netvar.Entries[_self] then
+                MsgErr("NilNetData", tostring(_self));
+                return;
+            end
+
+            return var.Entries[_self][dom][id];
+        end
+        meta.SetNetVar = function(_self, dom, id, val)
+
+        end
+    end
 end
 
 function SVC:AddVar(var)
@@ -37,14 +84,65 @@ function SVC:AddVar(var)
         MsgErr("NilField", "ID", "var");
         return;
     end
-
-    if self.Vars[var.ID] then
+    if !var.Domain then
+        MsgErr("NilField", "Domain", "var");
+        return;
+    end
+    if !self.Domains[var.Domain] then
+        MsgErr("NilDomain", var.Domain);
+        return;
+    end
+    if self.Vars[var.Domain][var.ID] then
         MsgErr("DupEntry", var.ID);
         return;
     end
 
-    -- Charvar fields.
+    -- Netvar fields.
     -- var.ID = var.ID; (Redundant, no default)
+    -- var.Domain = var.Domain; (Redundant, no default)
+    var.Type = var.Type or "string";
+    var.Public = var.Public or false;
+    var.InSQL = var.InSQL or false;
+
+    -- Netvar functions/hooks.
+    var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
 end
+
+function SVC:RegisterTable(tab)
+    if !tab then
+        MsgErr("NilArgs", "tab");
+        return;
+    end
+
+    local newID = randomString(16, CHAR_HEX);
+    while self.Registry[newID] do
+        newID = randomString(16, CHAR_HEX);
+    end
+
+    tab.RegistryID = newID;
+    self.Registry[newID] = tab;
+
+    MsgCon(color_lightblue, "%s registered with ID '%s'.", type(tab), newID);
+end
+
+function SVC:GetNetVar(dom, var)
+    if !dom then
+        MsgErr("NilArgs", "dom");
+        return;
+    end
+    if !self.Domains[dom] then
+        MsgErr("NilEntry", dom);
+        return;
+    end
+    if !var then
+        MsgErr("NilArgs", "var");
+        return;
+    end
+
+
+end
+
+-- Custom errors.
+addErrType("NilDomain", "No network domain exists with that name! (%s)");
 
 defineService_end();

@@ -337,3 +337,14 @@ end
 function checkPly(ply)
     return ply and IsValid(ply) and ply:IsPlayer();
 end
+
+function randomString(len, chars)
+    len = len or 8;
+    chars = chars or CHAR_ALPHANUM;
+
+    local ran = "";
+    while #ran != len do
+        ran = ran .. chars[math.random(1, #chars)];
+    end
+    return ran;
+end
