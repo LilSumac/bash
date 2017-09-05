@@ -41,12 +41,8 @@ function SVC:AddDomain(dom)
     local meta = dom.ParentMeta;
     if meta and (!meta.GetNetVar or !meta.SetNetVar) then
         meta.GetNetVar = function(_self, dom, id)
-            if !dom then
-                MsgErr("NilArgs", "dom");
-                return;
-            end
-            if !id then
-                MsgErr("NilArgs", "id");
+            if !dom or !id then
+                MsgErr("NilArgs", "dom/id");
                 return;
             end
 
@@ -56,21 +52,45 @@ function SVC:AddDomain(dom)
                 return;
             end
 
-            local var = netvar.Vars[dom][varID];
+            local var = netvar.Vars[dom][id];
             if !var then
                 MsgErr("NilEntry", varID);
                 return;
             end
 
-            if !netvar.Entries[_self] then
+            local regID = _self.RegistryID;
+            if !regID or !netvar.Entries[regID] then
                 MsgErr("NilNetData", tostring(_self));
                 return;
             end
 
-            return var.Entries[_self][dom][id];
+            return var.Entries[regID][dom][id];
         end
         meta.SetNetVar = function(_self, dom, id, val)
+            if !dom or !id or val == nil then
+                MsgErr("NilArgs", "dom/id/val");
+                return;
+            end
 
+            local netvar = getService("CNetVar");
+            if !netvar.Domains[dom] then
+                MsgErr("NilEntry", dom);
+                return;
+            end
+
+            local var = netvar.Vars[dom][id];
+            if !var then
+                MsgErr("NilEntry", varID);
+                return;
+            end
+
+            local regID = _self.RegistryID;
+            if !regID or !netvar.Entries[regID] then
+                MsgErr("NilNetData", tostring(_self));
+                return;
+            end
+
+            var.Entries[regID][dom][id] = val;
         end
     end
 end
@@ -136,23 +156,6 @@ function SVC:RegisterTable(tab)
     self.Registry[newID] = tab;
 
     MsgCon(color_lightblue, "%s registered with ID '%s'.", type(tab), newID);
-end
-
-function SVC:GetNetVar(dom, var)
-    if !dom then
-        MsgErr("NilArgs", "dom");
-        return;
-    end
-    if !self.Domains[dom] then
-        MsgErr("NilEntry", dom);
-        return;
-    end
-    if !var then
-        MsgErr("NilArgs", "var");
-        return;
-    end
-
-
 end
 
 -- Custom errors.
