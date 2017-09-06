@@ -21,8 +21,8 @@ function SVC:AddDomain(dom)
         MsgErr("NilField", "ID", "dom");
         return;
     end
-    if self.Domains[dom] then
-        MsgErr("DupEntry", dom);
+    if self.Domains[dom.ID] then
+        MsgErr("DupEntry", dom.ID);
         return;
     end
 
