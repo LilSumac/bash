@@ -61,3 +61,11 @@ end);
 
 -- Init for all services/etc.
 hook.Call("OnInit");
+
+
+vnet.Watch("bash_test", function(pck)
+    local data = pck:Table();
+    MsgN("Data table: " .. tostring(data));
+    MsgN("Data metatable: " .. tostring(getmetatable(data)));
+    MsgN("Character metatable: " .. tostring(getMeta("Character")));
+end);

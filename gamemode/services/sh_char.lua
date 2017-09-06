@@ -110,7 +110,7 @@ SVC:AddCharVar{
 };
 
 -- Hooks.
-hook.Add("EditDatabase", "CCharacter_AddTables", function()
+hook.Add("GatherPrelimData", "CCharacter_AddTables", function()
     local db = getService("CDatabase");
     db:AddTable("bash_chars", REF_CHAR);
 end);

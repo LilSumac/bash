@@ -49,9 +49,6 @@ function SVC:Connect()
         return;
     end
 
-    -- Table/column edit hook.
-    hook.Call("EditDatabase");
-
     -- Perform database existance checks.
     self:CheckTables();
 
@@ -344,7 +341,7 @@ addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery:
 addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
 
 -- Hooks.
-hook.Add("OnInit", "CDatabase_OnInit", function()
+hook.Add("InitService", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db.DBObject and db.Connected then
         MsgCon(color_sql, "Database still connected, skipping.");

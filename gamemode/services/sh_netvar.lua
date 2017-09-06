@@ -1,9 +1,9 @@
-defineService_start("CNetVar");
+defineService_start("CMetaNet");
 
 -- Service info.
-SVC.Name = "Core NetVar";
+SVC.Name = "Core MetaNet";
 SVC.Author = "LilSumac";
-SVC.Desc = "The main functionality for networked variables.";
+SVC.Desc = "The main functionality for networked variables attached to objects.";
 SVC.Depends = {"CDatabase"};
 
 -- Service storage.
@@ -17,8 +17,8 @@ function SVC:AddDomain(dom)
         MsgErr("NilArgs", "dom");
         return;
     end
-    if !dom.ID then
-        MsgErr("NilField", "ID", "dom");
+    if !dom.ID or !dom.ParentMeta then
+        MsgErr("NilField", "ID/ParentMeta", "dom");
         return;
     end
     if self.Domains[dom.ID] then
@@ -30,8 +30,6 @@ function SVC:AddDomain(dom)
     -- dom.ID = dom.ID; (Redundant, no default)
     -- dom.ParentMeta = dom.ParentMeta; (Redundant, no default)
 
-    self.Vars[dom.ID] = self.Vars[dom.ID] or {};
-
     dom.StoredInSQL = dom.StoredInSQL or false;
     if dom.StoredInSQL and !dom.SQLTable then
         MsgErr("NilField", "SQLTable");
@@ -39,7 +37,7 @@ function SVC:AddDomain(dom)
     end
 
     local meta = dom.ParentMeta;
-    if meta and (!meta.GetNetVar or !meta.SetNetVar) then
+    if !meta.GetNetVar or !meta.SetNetVar then
         meta.GetNetVar = function(_self, dom, id)
             if !dom or !id then
                 MsgErr("NilArgs", "dom/id");
@@ -93,6 +91,10 @@ function SVC:AddDomain(dom)
             var.Entries[regID][dom][id] = val;
         end
     end
+
+    self.Vars[dom.ID] = self.Vars[dom.ID] or {};
+    self.Domains[dom.ID] = dom;
+    MsgCon(color_lightblue, "Adding metanet domain with the ID '%s'.", dom.ID);
 end
 
 function SVC:AddVar(var)
@@ -129,7 +131,7 @@ function SVC:AddVar(var)
 end
 
 function SVC:GetDomainVars(dom)
-    if !var then
+    if !dom then
         MsgErr("NilArgs", "dom");
         return;
     end
@@ -141,9 +143,9 @@ function SVC:GetDomainVars(dom)
     return self.Vars[dom];
 end
 
-function SVC:RegisterTable(tab)
-    if !tab then
-        MsgErr("NilArgs", "tab");
+function SVC:RegisterMeta(meta)
+    if !meta then
+        MsgErr("NilArgs", "meta");
         return;
     end
 
@@ -152,10 +154,12 @@ function SVC:RegisterTable(tab)
         newID = randomString(16, CHAR_HEX);
     end
 
-    tab.RegistryID = newID;
-    self.Registry[newID] = tab;
+    meta.RegistryID = newID;
+    self.Registry[newID] = meta;
 
-    MsgCon(color_lightblue, "%s registered with ID '%s'.", type(tab), newID);
+    MsgCon(color_lightblue, "Metatable registered with ID '%s'. Distributing to clients...", type(meta), newID);
+
+
 end
 
 -- Custom errors.

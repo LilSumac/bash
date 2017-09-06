@@ -6,6 +6,8 @@ SVC.Author = "LilSumac";
 SVC.Desc = "The main player functions for /bash/.";
 SVC.Depends = {"CDatabase"};
 
+SVC.PlyVars = {};
+
 function SVC:AddPlyVar(var)
     if !var then
         MsgErr("NilArgs", "var");
@@ -122,8 +124,14 @@ SVC:AddPlyVar{
     end
 };
 
+if SERVER then
+    util.AddNetworkString("bash_test");
+end
+
 -- Hooks.
-hook.Add("EditDatabase", "CPlayer_AddTables", function()
+hook.Add();
+
+hook.Add("GatherPrelimData", "CPlayer_AddTables", function()
     local db = getService("CDatabase");
     db:AddTable("bash_plys", REF_PLY);
 
@@ -146,10 +154,23 @@ hook.Add("EditDatabase", "CPlayer_AddTables", function()
         ["Name"] = "Addresses",
         ["Type"] = "table"
     });
+
+    local metanet = getService("CMetaNet");
+    metanet:AddDomain{
+        ID = "CPlayer",
+        ParentMeta = FindMetaTable("Player"),
+        StoredInSQL = true,
+        SQLTable = "bash_plys"
+    };
 end);
 
 hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
-    local netvar = getService("CNetVar");
+    MsgN("Meta for player...");
+    MsgN(tostring(getmetatable(ply)));
+    MsgN("Player meta...")
+    MsgN(tostring(FindMetaTable("Player")));
+
+    local netvar = getService("CMetaNet");
     local newData = {};
     newData["SteamID"] = ply:SteamID();
     local plyVars = netvar:GetDomainVars("CPlayer");
@@ -159,6 +180,16 @@ hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
     ply.PlyData = newData;
 
     getPlyData(ply);
+
+
+    local test = setmetatable({}, getMeta("Character"));
+    MsgN("Data table: " .. tostring(test));
+    MsgN("Data metatable: " .. tostring(getmetatable(test)));
+    MsgN("Character metatable: " .. tostring(getMeta("Character")));
+    local testPck = vnet.CreatePacket("bash_test");
+    testPck:Table(test);
+    testPck:AddTargets(ply);
+    testPck:Send();
 end);
 
 defineService_end();
