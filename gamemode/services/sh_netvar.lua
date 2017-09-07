@@ -44,6 +44,16 @@ function SVC:AddDomain(dom)
                 return;
             end
 
+            if !_self.RegistryID or !_self.MetaNet then
+                MsgErr("MetaNotRegistered", tostring(_self));
+                return;
+            end
+
+            if !_self.MetaNet[dom] then
+                MsgErr("NoDomainInMeta", dom);
+                return;
+            end
+
             local netvar = getService("CNetVar");
             if !netvar.Domains[dom] then
                 MsgErr("NilEntry", dom);
@@ -164,5 +174,6 @@ end
 
 -- Custom errors.
 addErrType("NilDomain", "No network domain exists with that name! (%s)");
+addErrType("ObjNotRegistered", "This object is not registered! (%s)");
 
 defineService_end();
