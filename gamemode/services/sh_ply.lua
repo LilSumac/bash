@@ -130,7 +130,7 @@ if SERVER then
     util.AddNetworkString("bash_test");
 
     -- Hooks.
-    hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
+    hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
         local metanet = getService("CMetaNet");
         metanet:NewMetaNet("Player", {}, ply);
 

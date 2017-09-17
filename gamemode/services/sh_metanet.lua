@@ -208,7 +208,7 @@ function SVC:NewMetaNet(domain, data, obj, recip)
     end
     metaPack:Table(netData);
 
-    if obj and (isentity(obj)) then
+    if obj and (isentity(obj) or isplayer(obj)) then
         metaPack:Bool(true);
         metaPack:Entity(obj);
     else
@@ -219,7 +219,18 @@ function SVC:NewMetaNet(domain, data, obj, recip)
         metaPack:AddTargets(recip);
         metaPack:Send();
     else
-        metaPack:Broadcast();
+        recip = {};
+        for _, ply in pairs(player.GetAll()) do
+            if ply.InitReceived then
+                recip[#recip + 1] = ply;
+            end
+        end
+        if #recip == 0 then
+            metaPack:Discard();
+        else
+            metaPack:AddTargets(recip);
+            metaPack:Send();
+        end
     end
 
     return tab;
@@ -257,7 +268,7 @@ if SERVER then
                     end
                     metaPack:Table(netData);
 
-                    if obj and (isentity(obj)) then
+                    if obj and (isentity(obj) or isplayer(obj)) then
                         metaPack:Bool(true);
                         metaPack:Entity(obj);
                     else
@@ -307,11 +318,14 @@ elseif CLIENT then
         tab.RegistryID = regID;
         metanet.Registry[regID] = tab;
 
-        PrintTable(metanet.Registry);
+        MsgN("RECEIVING NEW OBJ:")
+        PrintTable(data);
 
         if metanet.InitialSend then
             metanet.Received = metanet.Received + 1;
             if metanet.Received == metanet.WaitingOn then
+                MsgN("REGISTRY: ");
+                PrintTable(metanet.Registry);
                 MsgCon(color_blue, "Received all networked objects!");
                 metanet.InitialSend = false;
             end
@@ -327,8 +341,6 @@ elseif CLIENT then
         local metanet = getService("CMetaNet");
         local obj = metanet.Registry[regID];
         obj.MetaNet[domain][id] = val;
-
-        PrintTable(metanet.Registry)
     end);
 
 end

@@ -36,12 +36,6 @@ include("core/sh_util.lua");
 include("core/sv_netpool.lua");
 include("shared.lua");
 
--- Report startup time.
-local len = math.Round(SysTime() - bash.startTime, 8);
-MsgCon(color_green, "Successfully initialized base server-side.  Startup: %fs", len);
-MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
-bash.started = true;
-
 -- Handle catching client data.
 bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
 vnet.Watch("bash_sendClientData", function(pck)
@@ -51,16 +45,22 @@ vnet.Watch("bash_sendClientData", function(pck)
     bash.clientData[ply:EntIndex()] = data;
 end);
 
--- Hooks for post-init.
+-- Hooks for init process.
 MsgCon(color_green, "Gathering preliminary data...");
-hook.Call("GatherPrelimData_Base"); -- For prelims that MUST come first.
+hook.Call("GatherPrelimData_Base"); -- For all prelims that MUST come first.
 hook.Call("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
-MsgCon(color_green, "Initializing services...")
-hook.Call("InitServer_Base");       -- For inits that MUST come first.
+MsgCon(color_green, "Initializing services...");
+hook.Call("InitService_Base");      -- For all inits that MUST come first.
 hook.Call("InitService");           -- Connect to DB, load /data files, etc.
+MsgCon(color_green, "Doing post-init calls...");
+hook.Call("PostInit_Base");         -- For all post-inits that MUST come first.
+hook.Call("PostInit");              -- Finish up.
 
-
-
+-- Report startup time.
+local len = math.Round(SysTime() - bash.startTime, 8);
+MsgCon(color_green, "Successfully initialized base server-side.  Startup: %fs", len);
+MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
+bash.started = true;
 
 local metanet = getService("CMetaNet");
 bash.testing = metanet:NewMetaNet("Char");

@@ -334,8 +334,8 @@ function getPlugin(id)
     return bash.plugins[id];
 end
 
-function checkPly(ply)
-    return ply and IsValid(ply) and ply:IsPlayer();
+function isplayer(ply)
+    return ply and IsValid(ply) and ply.IsPlayer and ply:IsPlayer();
 end
 
 function randomString(len, chars)
