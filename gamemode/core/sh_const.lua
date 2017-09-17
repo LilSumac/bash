@@ -3,6 +3,7 @@ BASE_NAME = "/bash/";
 
 CHAR_ALPHANUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 CHAR_HEX = "abcdef0123456789";
+CHAR_ALL = CHAR_ALPHANUM .. "!@#$%^&*()-_=+{}[]|;:<,>.?/";
 
 color_trans =       Color(0, 0, 0, 0);
 color_black =       Color(0, 0, 0, 255);

@@ -53,6 +53,14 @@ end);
 
 -- Hooks for post-init.
 MsgCon(color_green, "Gathering preliminary data...");
-hook.Call("GatherPrelimData");  -- Add network variable structures, finalize DB structure, etc.
+hook.Call("GatherPrelimData_Base"); -- For prelims that MUST come first.
+hook.Call("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
 MsgCon(color_green, "Initializing services...")
-hook.Call("InitService");       -- Connect to DB, load /data files, etc.
+hook.Call("InitServer_Base");       -- For inits that MUST come first.
+hook.Call("InitService");           -- Connect to DB, load /data files, etc.
+
+
+
+
+local metanet = getService("CMetaNet");
+bash.testing = metanet:NewMetaNet("Char");

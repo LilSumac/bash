@@ -125,71 +125,91 @@ SVC:AddPlyVar{
 };
 
 if SERVER then
+
+    -- Network pool.
     util.AddNetworkString("bash_test");
+
+    -- Hooks.
+    hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
+        local metanet = getService("CMetaNet");
+        metanet:NewMetaNet("Player", {}, ply);
+
+
+        /*
+        MsgN("Meta for player...");
+        MsgN(tostring(getmetatable(ply)));
+        MsgN("Player meta...")
+        MsgN(tostring(FindMetaTable("Player")));
+
+        local netvar = getService("CMetaNet");
+        local newData = {};
+        newData["SteamID"] = ply:SteamID();
+        local plyVars = netvar:GetDomainVars("CPlayer");
+        for id, var in pairs(plyVars) do
+            newData[id] = handleFunc(var.OnGenerate, var, ply);
+        end
+        ply.PlyData = newData;
+
+        getPlyData(ply);
+
+
+        local test = setmetatable({}, getMeta("Character"));
+        MsgN("Data table: " .. tostring(test));
+        MsgN("Data metatable: " .. tostring(getmetatable(test)));
+        MsgN("Character metatable: " .. tostring(getMeta("Character")));
+        local testPck = vnet.CreatePacket("bash_test");
+        testPck:Table(test);
+        testPck:AddTargets(ply);
+        testPck:Send();
+        */
+    end);
+
 end
 
 -- Hooks.
 hook.Add();
 
-hook.Add("GatherPrelimData", "CPlayer_AddTables", function()
-    local db = getService("CDatabase");
-    db:AddTable("bash_plys", REF_PLY);
+hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
+    if SERVER then
+        local db = getService("CDatabase");
+        db:AddTable("bash_plys", REF_PLY);
 
-    -- automate this with vars
-    db:AddColumn("bash_plys", {
-        ["Name"] = "Name",
-        ["Type"] = "string",
-        ["Default"] = "Steam Name"
-    });
-    db:AddColumn("bash_plys", {
-        ["Name"] = "NewPlayer",
-        ["Type"] = "boolean",
-        ["Default"] = true
-    });
-    db:AddColumn("bash_plys", {
-        ["Name"] = "FirstLogin",
-        ["Type"] = "number"
-    });
-    db:AddColumn("bash_plys", {
-        ["Name"] = "Addresses",
-        ["Type"] = "table"
-    });
+        -- automate this with vars
+        db:AddColumn("bash_plys", {
+            ["Name"] = "Name",
+            ["Type"] = "string",
+            ["Default"] = "Steam Name"
+        });
+        db:AddColumn("bash_plys", {
+            ["Name"] = "NewPlayer",
+            ["Type"] = "boolean",
+            ["Default"] = true
+        });
+        db:AddColumn("bash_plys", {
+            ["Name"] = "FirstLogin",
+            ["Type"] = "number"
+        });
+        db:AddColumn("bash_plys", {
+            ["Name"] = "Addresses",
+            ["Type"] = "table"
+        });
+    end
 
     local metanet = getService("CMetaNet");
     metanet:AddDomain{
-        ID = "CPlayer",
+        ID = "Player",
         ParentMeta = FindMetaTable("Player"),
         StoredInSQL = true,
         SQLTable = "bash_plys"
     };
-end);
 
-hook.Add("OnPlayerInit", "CPlayer_OnPlayerInit", function(ply)
-    MsgN("Meta for player...");
-    MsgN(tostring(getmetatable(ply)));
-    MsgN("Player meta...")
-    MsgN(tostring(FindMetaTable("Player")));
-
-    local netvar = getService("CMetaNet");
-    local newData = {};
-    newData["SteamID"] = ply:SteamID();
-    local plyVars = netvar:GetDomainVars("CPlayer");
-    for id, var in pairs(plyVars) do
-        newData[id] = handleFunc(var.OnGenerate, var, ply);
-    end
-    ply.PlyData = newData;
-
-    getPlyData(ply);
-
-
-    local test = setmetatable({}, getMeta("Character"));
-    MsgN("Data table: " .. tostring(test));
-    MsgN("Data metatable: " .. tostring(getmetatable(test)));
-    MsgN("Character metatable: " .. tostring(getMeta("Character")));
-    local testPck = vnet.CreatePacket("bash_test");
-    testPck:Table(test);
-    testPck:AddTargets(ply);
-    testPck:Send();
+    metanet:AddVariable{
+        ID = "Flags",
+        Domain = "Player",
+        Type = "string",
+        Public = true,
+        InSQL = true
+    };
 end);
 
 defineService_end();

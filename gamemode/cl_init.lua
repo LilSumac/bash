@@ -38,7 +38,7 @@ timer.Remove("HintSystem_Annoy2");
 local len = math.Round(SysTime() - bash.startTime, 8);
 MsgCon(color_green, "Successfully initialized base cient-side. Startup: %fs", len);
 MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
-bash.started = true
+bash.started = true;
 
 -- Handle sending initial client data.
 hook.Add("InitPostEntity", "bash_sendClientData", function()
@@ -59,9 +59,11 @@ addClientData("OS", function()
     end
 end);
 
--- Init for all services/etc.
-hook.Call("OnInit");
-
+-- Hooks for post-init.
+MsgCon(color_green, "Gathering preliminary data...");
+hook.Call("GatherPrelimData");  -- Add network variable structures, finalize DB structure, etc.
+MsgCon(color_green, "Initializing services...")
+hook.Call("InitService");       -- Connect to DB, load /data files, etc.
 
 vnet.Watch("bash_test", function(pck)
     local data = pck:Table();

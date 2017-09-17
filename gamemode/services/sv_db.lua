@@ -341,7 +341,7 @@ addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery:
 addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
 
 -- Hooks.
-hook.Add("InitService", "CDatabase_OnInit", function()
+hook.Add("InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db.DBObject and db.Connected then
         MsgCon(color_sql, "Database still connected, skipping.");
@@ -350,16 +350,5 @@ hook.Add("InitService", "CDatabase_OnInit", function()
 
     db:Connect();
 end);
-
---[[
-hook.Add("OnPlayerInit", "CDatabase_OnPlayerInit", function(ply)
-    local db = getService("CDatabase");
-    local steamID = ply:SteamID();
-    local name = "PlyFetch_" .. steamID;
-    hook.Add(name, db, db.FinalizePlayer);
-
-    db:FetchPlayer(ply);
-end);
-]]
 
 defineService_end();
