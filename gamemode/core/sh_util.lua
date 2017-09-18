@@ -52,7 +52,7 @@ function MsgErr(errType, ...)
         fromInfo = debug.getinfo(3);
     end
 
-    local gm = GM.Name;
+    local gm = (GM and GM.Name) or (GAMEMODE and GAMEMODE.Name);
     if _G["PLUG"] then
         gm = gm .. " Plugin: " .. _G["PLUG"].Name;
     end

@@ -42,6 +42,7 @@ ERR_TYPES["NilArgs"] = "Argument cannot be nil! (%s)";
 ERR_TYPES["NilEntry"] = "An entry with that identifier does not exist! (%s)";
 ERR_TYPES["DupEntry"] = "An entry with that identifier already exists! (%s)";
 ERR_TYPES["NilField"] = "Field cannot be nil! (%s in table %s)";
+ERR_TYPES["EmptyTable"] = "Table cannot be empty! (%s)";
 ERR_TYPES["InvalidDataType"] = "This data type is not supported! (%s)";
 ERR_TYPES["InvalidEnt"] = "Invalid entity argument!";
 ERR_TYPES["InvalidPly"] = "Invalid player argument!";

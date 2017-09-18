@@ -261,6 +261,10 @@ function SVC:InsertRow(tab, data, callback, ...)
         MsgErr("NilEntry", tab);
         return;
     end
+    if table.IsEmpty(data) then
+        MsgErr("EmptyTable", "data");
+        return;
+    end
 
     local query = Format("INSERT INTO %s(", tab);
     local vals = "VALUES(";
@@ -311,6 +315,10 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
     end
     if !self.Tables[tab] then
         MsgErr("NilEntry", tab);
+        return;
+    end
+    if table.IsEmpty(data) then
+        MsgErr("EmptyTable", "data");
         return;
     end
 

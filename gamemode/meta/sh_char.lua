@@ -1,10 +1,7 @@
 defineMeta_start("Character");
 
-META.CharID = nil;
-META.Owner = nil;
-META.Data = {};
-
 function META:SetData(data)
+    self.Data = {};
     for key, val in pairs(data) do
         self.Data[key] = val;
     end
@@ -20,6 +17,7 @@ function META:Get(vars)
         vars = {vars};
     end
 
+    self.Data = self.Data or {};
     local cchar = getService("CCharacter");
     local charvar;
     local vals = {};
@@ -54,6 +52,7 @@ function META:Set(data)
         return;
     end
 
+    self.Data = self.Data or {};
     local cchar = getService("CCharacter");
     local charvar;
     for var, val in pairs(data) do

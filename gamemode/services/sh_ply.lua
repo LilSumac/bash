@@ -3,42 +3,8 @@ defineService_start("CPlayer");
 -- Service info.
 SVC.Name = "Core Player";
 SVC.Author = "LilSumac";
-SVC.Desc = "The main player functions for /bash/.";
-SVC.Depends = {"CDatabase"};
-
-SVC.PlyVars = {};
-
-function SVC:AddPlyVar(var)
-    if !var then
-        MsgErr("NilArgs", "var");
-        return;
-    end
-    if !var.ID then
-        MsgErr("NilField", "ID", "var");
-        return;
-    end
-    if self.PlyVars[var.ID] then
-        MsgErr("DupEntry", var.ID);
-        return;
-    end
-
-    -- Plyvar fields.
-    -- var.ID = var.ID; (Redundant, no default)
-    var.Type = var.Type or "string";
-    var.Public = var.Public or false;
-    var.InSQL = var.InSQL or false;
-    var.CanThink = var.CanThink or false;
-    var.ThinkInterval = var.ThinkInterval or 0;
-
-    -- Charvar functions/hooks.
-    var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
-    -- var.Think = var.Think; (Redundant, no default)
-    -- var.OnGet = var.OnGet; (Redundant, no default)
-    -- var.OnSet = var.OnSet; (Redundant, no default)
-
-    MsgCon(color_green, "Registering charvar: %s", var.ID);
-    self.PlyVars[var.ID] = var;
-end
+SVC.Desc = "The main player functions for the gamemode.";
+SVC.Depends = {"CDatabase", "CMetaNet"};
 
 ------------------------------------------------------
 -- Local functions for specific DB operations.
@@ -46,14 +12,21 @@ end
 local function createPlyData(ply)
     MsgCon(color_sql, "Creating new entry for '%s'...", ply:Name());
 
+    local metanet = getService("CMetaNet");
+    local vars = metanet:GetDomainVars("Player");
+    local data = {};
+    for id, var in pairs(vars) do
+        data[id] = handleFunc(var.OnGenerate, var, ply);
+    end
+
     local db = getService("CDatabase");
     db:InsertRow(
         "bash_plys",            -- Table to query.
-        ply.PlyData,            -- Data to insert.
+        data,                   -- Data to insert.
 
         function(_ply, results) -- Callback function upon completion.
             MsgCon(color_sql, "INSERT DONE!");
-            -- do other shit
+            PrintTable(data);
         end,
 
         ply                     -- Argument #1 for callback.
@@ -79,7 +52,7 @@ local function getPlyData(ply)
                 createPlyData(_ply);
             else
                 MsgCon(color_sql, "GET DONE!");
-                -- do other shit
+                PrintTable(results.data);
             end
         end,
 
@@ -93,37 +66,6 @@ end
 -- Custom errors.
 addErrType("MultiPlyRows", "Player '%s' has multiple player rows, using the first one. This can cause conflicts! Remove all duplicate rows ASAP!");
 
--- Add default plyvars.
-SVC:AddPlyVar{
-    ID = "Name",
-    Type = "string",
-    OnGenerate = function(self, ply)
-        return ply:Name();
-    end
-};
-
-SVC:AddPlyVar{
-    ID = "NewPlayer",
-    Type = "boolean",
-    Default = true
-};
-
-SVC:AddPlyVar{
-    ID = "FirstLogin",
-    Type = "number",
-    OnGenerate = function()
-        return os.time();
-    end
-};
-
-SVC:AddPlyVar{
-    ID = "Addresses",
-    Type = "table",
-    OnGenerate = function(self, ply)
-        return {[ply:IPAddress()] = true};
-    end
-};
-
 if SERVER then
 
     -- Network pool.
@@ -131,6 +73,7 @@ if SERVER then
 
     -- Hooks.
     hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
+        getPlyData(ply);
         local metanet = getService("CMetaNet");
         metanet:NewMetaNet("Player", {}, ply);
 
@@ -167,8 +110,6 @@ if SERVER then
 end
 
 -- Hooks.
-hook.Add();
-
 hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
     if SERVER then
         local db = getService("CDatabase");
@@ -204,12 +145,64 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
     };
 
     metanet:AddVariable{
+        ID = "Name",
+        Domain = "Player",
+        Public = true,
+        InSQL = true,
+        OnGenerate = function(_self, ply)
+            return ply:Name();
+        end
+    };
+
+    metanet:AddVariable{
+        ID = "SteamID",
+        Domain = "Player",
+        Public = true,
+        InSQL = true,
+        OnGenerate = function(_self, ply)
+            return ply:SteamID();
+        end
+    };
+
+    metanet:AddVariable{
+        ID = "Addresses",
+        Domain = "Player",
+        Type = "table",
+        InSQL = true,
+        OnGenerate = function(_self, ply)
+            return {[ply:IPAddress()] = true};
+        end
+    };
+
+    metanet:AddVariable{
+        ID = "FirstLogin",
+        Domain = "Player",
+        Type = "number",
+        Public = true,
+        InSQL = true,
+        OnGenerate = function(_self, ply)
+            return os.time();
+        end
+    };
+
+    metanet:AddVariable{
+        ID = "NewPlayer",
+        Domain = "Player",
+        Type = "boolean",
+        Public = true,
+        InSQL = true,
+        OnGenerate = true
+    };
+
+    /*
+    metanet:AddVariable{
         ID = "Flags",
         Domain = "Player",
         Type = "string",
         Public = true,
         InSQL = true
     };
+    */
 end);
 
 defineService_end();

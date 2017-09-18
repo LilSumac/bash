@@ -151,6 +151,20 @@ function SVC:AddVariable(var)
     self.Vars[var.Domain][var.ID] = var;
 end
 
+function SVC:GetDomainVars(domain)
+    if !domain then
+        MsgErr("NilArgs", "domain");
+        return;
+    end
+
+    if !self.Vars[domain] then
+        MsgErr("NilEntry", domain);
+        return;
+    end
+
+    return self.Vars[domain];
+end
+
 function SVC:NewMetaNet(domain, data, obj, recip)
     if !domain then
         MsgErr("NilArgs", "domain");
@@ -221,7 +235,7 @@ function SVC:NewMetaNet(domain, data, obj, recip)
     else
         recip = {};
         for _, ply in pairs(player.GetAll()) do
-            if ply.InitReceived then
+            if ply.Initialized then
                 recip[#recip + 1] = ply;
             end
         end
@@ -318,14 +332,9 @@ elseif CLIENT then
         tab.RegistryID = regID;
         metanet.Registry[regID] = tab;
 
-        MsgN("RECEIVING NEW OBJ:")
-        PrintTable(data);
-
         if metanet.InitialSend then
             metanet.Received = metanet.Received + 1;
             if metanet.Received == metanet.WaitingOn then
-                MsgN("REGISTRY: ");
-                PrintTable(metanet.Registry);
                 MsgCon(color_blue, "Received all networked objects!");
                 metanet.InitialSend = false;
             end
