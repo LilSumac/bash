@@ -214,6 +214,10 @@ function defineMeta_end()
         return;
     end
 
+    if meta.New then
+        meta.__call = meta.New;
+    end
+
     MsgCon(color_green, "Registering metatable: %s", meta.ID);
     bash.meta[meta.ID] = meta;
     _G["META"] = nil;
