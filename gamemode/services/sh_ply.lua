@@ -4,7 +4,7 @@ defineService_start("CPlayer");
 SVC.Name = "Core Player";
 SVC.Author = "LilSumac";
 SVC.Desc = "The main player functions for the gamemode.";
-SVC.Depends = {"CDatabase", "CMetaNet"};
+SVC.Depends = {"CDatabase", "CTableNet"};
 
 ------------------------------------------------------
 -- Local functions for specific DB operations.
@@ -12,8 +12,8 @@ SVC.Depends = {"CDatabase", "CMetaNet"};
 local function createPlyData(ply)
     MsgCon(color_sql, "Creating new entry for '%s'...", ply:Name());
 
-    local metanet = getService("CMetaNet");
-    local vars = metanet:GetDomainVars("Player");
+    local tablenet = getService("CTableNet");
+    local vars = tablenet:GetDomainVars("Player");
     local data = {};
     for id, var in pairs(vars) do
         data[id] = handleFunc(var.OnGenerate, var, ply);
@@ -74,8 +74,8 @@ if SERVER then
     -- Hooks.
     hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
         getPlyData(ply);
-        local metanet = getService("CMetaNet");
-        metanet:NewMetaNet("Player", {}, ply);
+        local tablenet = getService("CTableNet");
+        tablenet:NewTableNet("Player", {}, ply);
 
 
         /*
@@ -84,7 +84,7 @@ if SERVER then
         MsgN("Player meta...")
         MsgN(tostring(FindMetaTable("Player")));
 
-        local netvar = getService("CMetaNet");
+        local netvar = getService("CTableNet");
         local newData = {};
         newData["SteamID"] = ply:SteamID();
         local plyVars = netvar:GetDomainVars("CPlayer");
@@ -136,15 +136,22 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         });
     end
 
-    local metanet = getService("CMetaNet");
-    metanet:AddDomain{
+    local tablenet = getService("CTableNet");
+    tablenet:AddDomain{
         ID = "Player",
         ParentMeta = FindMetaTable("Player"),
         StoredInSQL = true,
-        SQLTable = "bash_plys"
+        SQLTable = "bash_plys",
+        GetRecipients = function(_self, tab)
+            local recip = {};
+            for
+        end,
+        GetPrivateRecipients = function(_self, tab)
+
+        end
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "Name",
         Domain = "Player",
         Public = true,
@@ -154,7 +161,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         end
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "SteamID",
         Domain = "Player",
         Public = true,
@@ -164,7 +171,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         end
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "Addresses",
         Domain = "Player",
         Type = "table",
@@ -174,7 +181,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         end
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "FirstLogin",
         Domain = "Player",
         Type = "number",
@@ -185,7 +192,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         end
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "NewPlayer",
         Domain = "Player",
         Type = "boolean",
@@ -195,7 +202,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
     };
 
     /*
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "Flags",
         Domain = "Player",
         Type = "string",

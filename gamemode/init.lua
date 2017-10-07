@@ -61,6 +61,3 @@ local len = math.Round(SysTime() - bash.startTime, 8);
 MsgCon(color_green, "Successfully initialized base server-side.  Startup: %fs", len);
 MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
 bash.started = true;
-
-local metanet = getService("CMetaNet");
-bash.testing = metanet:NewMetaNet("Char");

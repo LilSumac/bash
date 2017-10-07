@@ -41,8 +41,8 @@ function SVC:Instantiate(id, refresh)
 
         MsgCon(color_green, "Instantiating character: %s", id);
 
-        local metanet = getService("CMetaNet");
-        local char = metanet:NewMetaNet("Char", self.CachedData[id]);
+        local tablenet = getService("CTableNet");
+        local char = tablenet:NewTableNet("Char", self.CachedData[id]);
         self.CachedChars[id] = char;
         return char;
     end
@@ -66,22 +66,22 @@ end
 
 -- Hooks.
 hook.Add("GatherPrelimData_Base", "CCharacter_DefaultVars", function()
-    local metanet = getService("CMetaNet");
-    metanet:AddDomain{
+    local tablenet = getService("CTableNet");
+    tablenet:AddDomain{
         ID = "Char",
         ParentMeta = getMeta("Character"),
         StoredInSQL = true,
         SQLTable = "bash_chars"
     };
 
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "CharID",
         Domain = "Char",
         Type = "string",
         Public = true,
         InSQL = true
     };
-    metanet:AddVariable{
+    tablenet:AddVariable{
         ID = "Name",
         Domain = "Char",
         Type = "string",

@@ -39,8 +39,15 @@ function SVC:AddDomain(domain)
     local meta = domain.ParentMeta;
     if meta and !meta.GetNetVar then
         meta.GetNetVar = function(_self, domain, id)
-            if !domain or !id then
-                MsgErr("NilArgs", "domain/id");
+            return _self:GetNetVars(domain, {id});
+        end
+        meta.GetNetVars = function(_self, domain, ids)
+            if !domain then
+                MsgErr("NilArgs", "domain");
+                return;
+            end
+            if !ids then
+                MsgErr("NilArgs", "ids");
                 return;
             end
 
@@ -60,20 +67,28 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            local var = tablenet.Vars[domain][id];
-            if !var then
-                MsgErr("NilEntry", id);
-                return;
+            local results = {};
+            for _, id in ipairs(ids) do
+                if !tablenet.Vars[domain][id] then continue; end
+
+                --add onget?
+                results[#results + 1] = _self.TableNet[domain][id];
             end
 
-            -- add onGet?
-            return _self.TableNet[domain][id];
+            return unpack(results);
         end
     end
     if SERVER and meta and !meta.SetNetVar then
         meta.SetNetVar = function(_self, domain, id, val)
-            if !domain or !id or val == nil then
-                MsgErr("NilArgs", "domain/id/val");
+            _self:SetNetVars(domain, {[id] = val});
+        end
+        meta.SetNetVars = function(_self, domain, data)
+            if !domain then
+                MsgErr("NilArgs", "domain");
+                return;
+            end
+            if !data then
+                MsgErr("NilArgs", "data");
                 return;
             end
 
@@ -93,22 +108,29 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            local var = tablenet.Vars[domain][id];
-            if !var then
-                MsgErr("NilEntry", id);
-                return;
+            local ids = {};
+            for id, val in pairs(data) do
+                if !tablenet.Vars[domain][id] then continue; end
+
+                -- add onset?
+                _self.TableNet[domain][id] = val;
+                ids[#ids + 1] = id;
             end
 
-            -- add onSet?
-            _self.TableNet[domain][id] = val;
-            tablenet:NetworkTable(_self.RegistryID, domain, id);
+            tablenet:NetworkTable(_self.RegistryID, domain, ids);
         end
     end
 
-    domain.GetRecipients = domain.GetRecipients or function(_self, obj)
-        return player.GetAll();
+    domain.GetRecipients = domain.GetRecipients or function(_self, tab)
+        local recips = {};
+        for _, ply in pairs(player.GetAll()) do
+            if ply.Initialized then
+                recips[#recips + 1] = ply;
+            end
+        end
+        return recips;
     end
-    domain.GetPrivateRecipients = domain.GetPrivateRecipients or function(_self, obj)
+    domain.GetPrivateRecipients = domain.GetPrivateRecipients or function(_self, tab)
         return;
     end
 
@@ -166,7 +188,7 @@ function SVC:GetDomainVars(domain)
     return self.Vars[domain];
 end
 
-function SVC:NewTableNet(domain, data, obj)
+function SVC:NewTableNet(domain, data, obj, regID)
     if !domain then
         MsgErr("NilArgs", "domain");
         return;
@@ -202,7 +224,10 @@ function SVC:NewTableNet(domain, data, obj)
     tab.TableNet = tab.TableNet or {};
     tab.TableNet[domain] = _data;
 
-    if !tab.RegistryID then
+    if regID then
+        tab.RegistryID = regID;
+        self.RegistryID[regID] = tab;
+    elseif !tab.RegistryID then
         local id = randomString(8, CHAR_ALL);
         while self.Registry[id] do
             id = randomString(8, CHAR_ALL);
@@ -213,7 +238,7 @@ function SVC:NewTableNet(domain, data, obj)
 
     MsgCon(color_blue, "Registering table in TableNet with domain %s. (%s)", domain, tostring(tab));
 
-    if SERVER then self:NetworkTable(tab, domain); end
+    if SERVER then self:NetworkTable(tab.RegistryID, domain); end
     return tab;
 end
 
@@ -221,7 +246,7 @@ end
 addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
 addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
 
-function SVC:GetNetVar(domain, )
+//function SVC:GetNetVar(domain, )
 
 if SERVER then
 
@@ -236,7 +261,7 @@ if SERVER then
     util.AddNetworkString("CTableNet_ObjOutOfScope");
 
     -- Functions.
-    function SVC:NetworkTable(id, domain, var)
+    function SVC:NetworkTable(id, domain, ids)
         if !id or !domain then
             MsgErr("NilArgs", "id/domain");
             return;
@@ -261,6 +286,11 @@ if SERVER then
             return;
         end
 
+        local pubRecip = domInfo:GetRecipients(tab);
+        local privRecip = domInfo:GetPrivateRecipients(tab);
+        if pubRecip and privRecip and #pubRecip == 0 and #privRecip == 0 then return; end
+
+
         local pubPack = vnet.CreatePacket("CTableNet_ObjUpdate");
         local privPack = vnet.CreatePacket("CTableNet_ObjUpdate");
         pubPack:String(tab.RegistryID);
@@ -271,28 +301,28 @@ if SERVER then
         local public = {};
         local private = {};
         local val;
-        if var then
+        if ids then
             local varData;
-            if type(var) == "table" then
-                for _, _var in pairs(var) do
-                    varData = self.Vars[domain][_var];
+            if type(ids) == "table" then
+                for _, id in pairs(ids) do
+                    varData = self.Vars[domain][id];
                     if !varData then
-                        MsgErr("NilEntry", "_var");
+                        MsgErr("NilEntry", id);
                         continue;
                     end
 
-                    val = tab.TableNet[domain][_var];
-                    private[_var] = val;
-                    if var.Public then
-                        public[_var] = val;
+                    val = tab.TableNet[domain][id];
+                    private[id] = val;
+                    if varData.Public then
+                        public[id] = val;
                     end
                 end
             else
-                varData = self.Vars[domain][var];
+                varData = self.Vars[domain][ids];
                 if !varData then
-                    MsgErr("NilEntry", "id");
+                    MsgErr("NilEntry", ids);
                 else
-                    private[var] = tab.TableNet[domain][var];
+                    private[ids] = tab.TableNet[domain][ids];
                 end
             end
         else
@@ -307,9 +337,10 @@ if SERVER then
             end
         end
 
-        local recip;
         pubPack:Table(public);
+        pubPack:Bool(false);
         privPack:Table(private);
+        privPack:Bool(false);
         if isentity(tab) or isplayer(tab) then
             pubPack:Bool(true);
             pubPack:Entity(tab);
@@ -320,20 +351,43 @@ if SERVER then
             privPack:Bool(false);
         end
 
-        recip = domain:GetRecipients(tab);
-        if #recip == 0 then
-            pubPack:Discard();
-        else
-            pubPack:AddTargets(recip);
-            pubPack:Send();
+        local excluded = {};
+        for _, ply in pairs(player.GetAll()) do
+            excluded[ply] = true;
         end
 
-        recip = domain:GetPrivateRecipients(tab);
-        if #recip == 0 then
+        if !pubRecip or #pubRecip == 0 then
+            pubPack:Discard();
+        else
+            pubPack:AddTargets(pubRecip);
+            pubPack:Send();
+
+            for _, ply in pairs(pubRecip) do
+                excluded[ply] = nil;
+            end
+        end
+
+        if !privRecip or #privRecip == 0 then
             privPack:Discard();
         else
-            privPack:AddTargets(recip);
+            privPack:AddTargets(privRecip);
             privPack:Send();
+
+            for _, ply in pairs(privRecip) do
+                excluded[ply] = nil;
+            end
+        end
+
+        local _excluded = {};
+        for ply, _ in pairs(excluded) do
+            _excluded[#_excluded + 1] = ply;
+        end
+        if #_excluded > 0 then
+            local scopePck = vnet.CreatePacket("CTableNet_ObjOutOfScope");
+            scopePck:String(tab.RegistryID);
+            scopePck:String(domain);
+            scopePck:AddTargets(_excluded);
+            scopePck:Send();
         end
     end
 
@@ -342,10 +396,50 @@ if SERVER then
             MsgErr("InvalidPly");
             return;
         end
-        if !id or !domain then
-            MsgErr("NilArgs", "id/domain");
+        if !id then
+            MsgErr("NilArgs", "id");
             return;
         end
+        if !domain then
+            MsgErr("NilArgs", "domain");
+            return;
+        end
+
+        if !self.Domains[domain] then
+            MsgErr("NilEntry", "domain");
+            return;
+        end
+        local domInfo = self.Domains[domain];
+
+        if !self.Registry[id] then
+            MsgErr("NilEntry", id);
+            return;
+        end
+
+        local tab = self.Registry[id];
+        if !tab.RegistryID or !tab.TableNet then
+            MsgErr("TableNotRegistered", tostring(tab));
+            return;
+        end
+        if !tab.TableNet[domain] then
+            MsgErr("NoDomainInTable", domain, tostring(tab));
+            return;
+        end
+
+        local sendPck = vnet.CreatePacket("CTableNet_ObjUpdate");
+        sendPck:String(tab.RegistryID);
+        sendPck:String(domain);
+        sendPck:Table(tab.TableNet[domain]);
+        sendPck:Bool(false);
+        if isentity(tab) or isplayer(tab) then
+            sendPck:Bool(true);
+            sendPck:Entity(tab);
+        else
+            sendPck:Bool(false);
+        end
+
+        sendPck:AddTargets(ply);
+        sendPck:Send();
     end
 
     -- Hooks.
@@ -371,6 +465,7 @@ if SERVER then
                         end
                     end
                     metaPack:Table(netData);
+                    metaPack:Bool(true);
 
                     if obj and (isentity(obj) or isplayer(obj)) then
                         metaPack:Bool(true);
@@ -398,10 +493,41 @@ elseif CLIENT then
         MsgCon(color_blue, "Waiting on %d networked objects...", objs);
     end);
 
+    vnet.Watch("CTableNet_ObjUpdate", function(pck)
+        local regID = pck:String();
+        local domain = pck:String();
+        local data = pck:Table();
+        local firstSend = pck:Bool();
+        local obj;
+        if pck:Bool() then
+            obj = pck:Entity();
+        end
+
+        local tablenet = getService("CTableNet");
+        local domInfo = tablenet.Domains[domain];
+        local tab;
+        if tablenet.Registry[regID] then
+            tab = tablenet.Registry[regID];
+            for id, val in pairs(data) do
+                tab.TableNet[domain][id] = val;
+            end
+        else
+            tab = tablenet:NewTableNet(domain, data, obj, regID);
+        end
+
+        if firstSend then
+            tablenet.Received = tablenet.Received + 1;
+            if tablenet.Received == tablenet.WaitingOn then
+                MsgCon(color_blue, "Received all networked objects!");
+            end
+        end
+    end);
+
     vnet.Watch("CTableNet_CreateObj", function(pck)
         local regID = pck:String();
         local domain = pck:String();
         local data = pck:Table();
+        local firstSend = pck:Bool();
         local obj;
         if pck:Bool() then
             obj = pck:Entity();
@@ -422,11 +548,10 @@ elseif CLIENT then
         tab.RegistryID = regID;
         tablenet.Registry[regID] = tab;
 
-        if tablenet.InitialSend then
+        if firstSend then
             tablenet.Received = tablenet.Received + 1;
             if tablenet.Received == tablenet.WaitingOn then
                 MsgCon(color_blue, "Received all networked objects!");
-                tablenet.InitialSend = false;
             end
         end
     end);
@@ -440,6 +565,19 @@ elseif CLIENT then
         local tablenet = getService("CTableNet");
         local obj = tablenet.Registry[regID];
         obj.TableNet[domain][id] = val;
+    end);
+
+    vnet.Watch("CTableNet_ObjOutOfScope", function(pck)
+        local regID = pck:String();
+        local domain = pck:String();
+
+        local tablenet = getService("CTableNet");
+        local obj = tablenet.Registry[regID];
+        if !obj then return; end
+        obj.TableNet[domain] = nil;
+        if table.IsEmpty(obj.TableNet) then
+            tablenet.Registry[regID] = nil;
+        end
     end);
 
 end
