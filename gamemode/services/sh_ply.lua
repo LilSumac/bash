@@ -75,7 +75,7 @@ if SERVER then
     hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
         getPlyData(ply);
         local tablenet = getService("CTableNet");
-        tablenet:NewTableNet("Player", {}, ply);
+        tablenet:NewTable("Player", {}, ply);
 
 
         /*

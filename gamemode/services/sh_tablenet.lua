@@ -182,7 +182,7 @@ function SVC:GetDomainVars(domain)
     return self.Vars[domain];
 end
 
-function SVC:NewTableNet(domain, data, obj, regID)
+function SVC:NewTable(domain, data, obj, regID)
     if !domain then
         MsgErr("NilArgs", "domain");
         return;
@@ -236,7 +236,7 @@ function SVC:NewTableNet(domain, data, obj, regID)
     return tab;
 end
 
-function SVC:RemoveTableNet(id, domain)
+function SVC:RemoveTable(id, domain)
     if !id then
         MsgErr("NilArgs", "id");
         return;
@@ -559,7 +559,7 @@ elseif CLIENT then
                 tab.TableNet[domain][id] = val;
             end
         else
-            tab = tablenet:NewTableNet(domain, data, obj, regID);
+            tab = tablenet:NewTable(domain, data, obj, regID);
         end
 
         if firstSend then
@@ -607,7 +607,7 @@ elseif CLIENT then
         local regID = pck:String();
         local domain = pck:String();
         local tablenet = getService("CTableNet");
-        tablenet:RemoveTableNet(regID, domain);
+        tablenet:RemoveTable(regID, domain);
     end);
 
 end

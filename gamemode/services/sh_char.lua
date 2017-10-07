@@ -42,7 +42,7 @@ function SVC:Instantiate(id, refresh)
         MsgCon(color_green, "Instantiating character: %s", id);
 
         local tablenet = getService("CTableNet");
-        local char = tablenet:NewTableNet("Char", self.CachedData[id]);
+        local char = tablenet:NewTable("Char", self.CachedData[id]);
         self.CachedChars[id] = char;
         return char;
     end
