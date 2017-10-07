@@ -1260,19 +1260,22 @@ end
 --  Sending
 
 local function _addplys(self, plys)
-    for i = 1, #plys do
-        local ply = plys[i]
-
-        if not self.Targets[ply] then
-            if type(ply) == "Player" or (type(ply) == "Entity" and ply:IsPlayer()) then
-                self.Targets[#self.Targets+1] = ply
-                self.Targets[ply] = true
-            elseif type(ply) == "table" then
-                _addplys(self, ply)
-            else
-                error("cannot add a " .. type(ply) .. " as target(s)")
-            end
+    for key, val in pairs do
+        local ply;
+        if type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer()) then
+            ply = key;
+        elseif type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer()) then
+            ply = val;
+        elseif type(val) == "table" then
+            _addplys(val);
+            continue;
+        else
+            -- assume the value is at fault, not the key
+            error("cannot add a " .. type(val) .. " as target(s)");
         end
+
+        self.Targets[#self.Targets + 1] = ply;
+        self.Targets[ply] = true;
     end
 end
 

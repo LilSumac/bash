@@ -1,11 +1,5 @@
 local bash = bash;
 
-function table.IsEmpty(tab)
-    if !tab or type(tab) != "table" then return true; end
-    for _, __ in pairs(tab) do return false; end
-    return true;
-end
-
 function handleFunc(var, ...)
     if var == nil then return; end
     local args = {...};
@@ -68,16 +62,6 @@ end
 function addErrType(name, str)
     if !name or !str or ERR_TYPES[name] then return; end
     ERR_TYPES[name] = str;
-end
-
-function getID(len, pre)
-    local id = math.Round(os.time() + (math.random(10000000, 99999999)) + (math.cos(SysTime()) * 26293888));
-    id = tostring(id);
-    MsgN(id)
-    len = len or math.Min(id:len(), len);
-    id = id:sub(id:len() - len + 1);
-
-    return pre .. id;
 end
 
 function processFile(file)
@@ -340,15 +324,4 @@ end
 
 function isplayer(ply)
     return ply and IsValid(ply) and ply.IsPlayer and ply:IsPlayer();
-end
-
-function randomString(len, chars)
-    len = len or 8;
-    chars = chars or CHAR_ALPHANUM;
-
-    local ran = "";
-    while #ran != len do
-        ran = ran .. chars[math.random(1, #chars)];
-    end
-    return ran;
 end

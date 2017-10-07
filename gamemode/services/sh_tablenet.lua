@@ -122,13 +122,7 @@ function SVC:AddDomain(domain)
     end
 
     domain.GetRecipients = domain.GetRecipients or function(_self, tab)
-        local recips = {};
-        for _, ply in pairs(player.GetAll()) do
-            if ply.Initialized then
-                recips[#recips + 1] = ply;
-            end
-        end
-        return recips;
+        return player.GetInitializedAsKeys();
     end
     domain.GetPrivateRecipients = domain.GetPrivateRecipients or function(_self, tab)
         return;
@@ -228,9 +222,9 @@ function SVC:NewTableNet(domain, data, obj, regID)
         tab.RegistryID = regID;
         self.RegistryID[regID] = tab;
     elseif !tab.RegistryID then
-        local id = randomString(8, CHAR_ALL);
+        local id = string.random(8, CHAR_ALL);
         while self.Registry[id] do
-            id = randomString(8, CHAR_ALL);
+            id = string.random(8, CHAR_ALL);
         end
         tab.RegistryID = id;
         self.Registry[id] = tab;
@@ -242,9 +236,38 @@ function SVC:NewTableNet(domain, data, obj, regID)
     return tab;
 end
 
+function SVC:RemoveTableNet(id, domain)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+    if !domain then
+        MsgErr("NilArgs", "domain");
+        return;
+    end
+
+    local tab = self.Registry[id];
+    if !tab then return; end
+    if !tab.TableNet then return; end
+    if !tab.TableNet[domain] then return; end
+
+    if SERVER then
+        local removePck = vnet.CreatePacket("CTableNet_ObjOutOfScope");
+        removePck:String(id);
+        removePck:String(domain);
+        removePck:Broadcast();
+    end
+
+    tab.TableNet[domain] = nil;
+    if table.IsEmpty(tab.TableNet) then
+        self.Registry[id] = nil;
+    end
+end
+
 -- Custom errors.
 addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
 addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
+addErrType("UnauthorizedSend", "Tried sending a table to an unauthorized recipient! To force, use the 'force' argument. (%s:%s -> %s)");
 
 //function SVC:GetNetVar(domain, )
 
@@ -254,7 +277,6 @@ if SERVER then
     util.AddNetworkString("CTableNet_PreSendObjs");
     util.AddNetworkString("CTableNet_SendObjs");
     util.AddNetworkString("CTableNet_CreateObj");
-    util.AddNetworkString("CTableNet_UpdateObj");
 
     util.AddNetworkString("CTableNet_ObjCount");
     util.AddNetworkString("CTableNet_ObjUpdate");
@@ -289,7 +311,6 @@ if SERVER then
         local pubRecip = domInfo:GetRecipients(tab);
         local privRecip = domInfo:GetPrivateRecipients(tab);
         if pubRecip and privRecip and #pubRecip == 0 and #privRecip == 0 then return; end
-
 
         local pubPack = vnet.CreatePacket("CTableNet_ObjUpdate");
         local privPack = vnet.CreatePacket("CTableNet_ObjUpdate");
@@ -391,7 +412,7 @@ if SERVER then
         end
     end
 
-    function SVC:SendTable(ply, id, domain)
+    function SVC:SendTable(ply, id, domain, vars, force)
         if !isplayer(ply) then
             MsgErr("InvalidPly");
             return;
@@ -426,10 +447,36 @@ if SERVER then
             return;
         end
 
+        local data = {};
+        local isRecip, isPrivate = false, false;
+        isRecip = domInfo:GetRecipients()[ply];
+        if !isRecip and !force then
+            MsgErr("UnauthorizedSend", id, domain, tostring(ply));
+            return;
+        end
+
+        isPrivate = domInfo:GetPrivateRecipients()[ply];
+        if vars then
+            for _, _id in pairs(vars) do
+                if !self.Vars[domain][_id] then continue; end
+                if !tab.TableNet[domain][_id] then continue; end
+
+                if isPrivate or self.Vars[domain][_id].Public then
+                    data[_id] = val;
+                end
+            end
+        else
+            for _id, val in pairs(tab.TableNet[domain]) do
+                if isPrivate or self.Vars[domain][_id].Public then
+                    data[_id] = val;
+                end
+            end
+        end
+
         local sendPck = vnet.CreatePacket("CTableNet_ObjUpdate");
         sendPck:String(tab.RegistryID);
         sendPck:String(domain);
-        sendPck:Table(tab.TableNet[domain]);
+        sendPck:Table(data);
         sendPck:Bool(false);
         if isentity(tab) or isplayer(tab) then
             sendPck:Bool(true);
@@ -484,7 +531,7 @@ if SERVER then
 
 elseif CLIENT then
 
-    net.Receive("CTableNet_PreSendObjs", function(len)
+    net.Receive("CTableNet_ObjCount", function(len)
         local tablenet = getService("CTableNet");
         local objs = net.ReadInt(8);
         tablenet.InitialSend = true;
@@ -556,28 +603,11 @@ elseif CLIENT then
         end
     end);
 
-    vnet.Watch("CTableNet_UpdateObj", function(pck)
-        local regID = pck:String();
-        local domain = pck:String();
-        local id = pck:String();
-        local val = pck:Variable();
-
-        local tablenet = getService("CTableNet");
-        local obj = tablenet.Registry[regID];
-        obj.TableNet[domain][id] = val;
-    end);
-
     vnet.Watch("CTableNet_ObjOutOfScope", function(pck)
         local regID = pck:String();
         local domain = pck:String();
-
         local tablenet = getService("CTableNet");
-        local obj = tablenet.Registry[regID];
-        if !obj then return; end
-        obj.TableNet[domain] = nil;
-        if table.IsEmpty(obj.TableNet) then
-            tablenet.Registry[regID] = nil;
-        end
+        tablenet:RemoveTableNet(regID, domain);
     end);
 
 end
