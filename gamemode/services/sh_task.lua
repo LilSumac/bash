@@ -8,6 +8,8 @@ SVC.Desc = "Simple framework for implementing code-based tasks with progress, fe
 -- Service storage.
 local tasks = {};
 local activeTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
+local inactiveTasks = getNonVolatileEntry("CTask_InactiveTasks", EMPTY_TABLE);
+local uniqueTasks = getNonVolatileEntry("CTask_UniqueTasks", EMPTY_TABLE);
 
 SVC.Tasks = {};
 SVC.ActiveTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
@@ -18,6 +20,15 @@ function SVC:AddTask(task)
     task.AllowMultiple = task.AllowMultiple or false;
     task.Conditions = {};
 
+end
+
+function SVC:GetTask(id)
+    if !id then
+        MsgErr("NilArgs", "id");
+        return;
+    end
+
+    return tasks[id];
 end
 
 function SVC:AddTaskCondition(id, cond, begin, finish)
@@ -60,7 +71,11 @@ function SVC:AddTaskCondition(id, cond, begin, finish)
     end
 end
 
-function SVC:StartTask(id)
+function SVC:AddTaskCallback(id, func)
+
+end
+
+function SVC:NewTask(id)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -72,14 +87,37 @@ function SVC:StartTask(id)
         newID = string.random(8, CHAR_ALPHANUM, "task_");
     end
 
-    activeTasks[newID] = {};
-    activeTasks[newID].TaskID = id;
-    activeTasks[newID].Conds = {};
-    for _id, cond in pairs(task.Conditions) do
-        activeTasks[newID].Conds[_id] = setmetatable({}, cond);
+    local newTask = setmetatable({}, getMeta("Task"));
+    newTask.TaskID = id;
+    newTask.UniqueID = newID;
+    newTask:Initialize();
+    newTask.Conditions = {};
+    for condID, cond in pairs(task.Conditions) do
+        newTask.Conditions[condID] = cond.Begin;
     end
 
-    return newID;
+    return newTask;
+end
+
+function SVC:AddActiveTask(task)
+    if !task then
+        MsgErr("NilArgs", "task");
+        return;
+    end
+    if !task.TaskID or !task.UniqueID then
+        MsgErr("TaskNotValid", tostring(task));
+        return;
+    end
+    if task.TaskInfo.IsUnique and uniqueTasks[task.TaskID] then
+        MsgErr("TaskAlreadyRunning", task.TaskID, tostring(task));
+        return;
+    end
+
+    if task.TaskInfo.IsUnique then
+        uniqueTasks[task.TaskID] = task;
+    end
+
+    activeTasks[task.UniqueID] = task;
 end
 
 function SVC:GetActiveTask(id)
@@ -112,5 +150,7 @@ end
 
 -- Custom errors.
 addErrType("TaskNotActive", "No task with that ID is active! (%s)");
+addErrType("TaskNotValid", "This task does not have a TaskID/UniqueID! Use the library create function! (%s)");
+addErrType("TaskAlreadyRunning", "Only one instance of this task can be active at a time! (%s running on %s)");
 
 defineService_end();
