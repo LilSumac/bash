@@ -10,6 +10,7 @@ SVC.Depends = {"CDatabase"};
 SVC.Domains = {};
 SVC.Vars = {};
 SVC.Registry = getNonVolatileEntry("CTableNet_Registry", EMPTY_TABLE);
+local singlesMade = {};
 
 function SVC:AddDomain(domain)
     if !domain then
@@ -194,6 +195,11 @@ function SVC:NewTable(domain, data, obj, regID)
         return;
     end
 
+    if domInfo.SingleTable and singlesMade[domain] then
+        MsgErr("MultiSingleTable", domain);
+        return;
+    end
+
     local tab;
     if !obj then
         if domInfo.ParentMeta then
@@ -230,6 +236,10 @@ function SVC:NewTable(domain, data, obj, regID)
         self.Registry[id] = tab;
     end
 
+    if domInfo.SingleTable then
+        singlesMade[domain] = tab.RegistryID;
+    end
+
     MsgCon(color_blue, "Registering table in TableNet with domain %s. (%s)", domain, tostring(tab));
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
@@ -262,14 +272,55 @@ function SVC:RemoveTable(id, domain)
     if table.IsEmpty(tab.TableNet) then
         self.Registry[id] = nil;
     end
+
+    if singlesMade[domain] then
+        singlesMade[domain] = nil;
+    end
 end
 
 -- Custom errors.
 addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
 addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
 addErrType("UnauthorizedSend", "Tried sending a table to an unauthorized recipient! To force, use the 'force' argument. (%s:%s -> %s)");
+addErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
 
-//function SVC:GetNetVar(domain, )
+function SVC:GetNetVars(domain, ids)
+    if !domain then
+        MsgErr("NilArgs", "domain");
+        return;
+    end
+    if !ids then
+        MsgErr("NilArgs", "ids");
+        return;
+    end
+
+    local tab = singlesMade[domain];
+    if !tab then
+        MsgErr("TableNotRegistered", domain);
+        return;
+    end
+
+    if !tab.TableNet[domain] then
+        MsgErr("NoDomainInTable", domain, tostring(tab));
+        return;
+    end
+
+    local tablenet = getService("CTableNet");
+    if !tablenet.Domains[domain] then
+        MsgErr("NilEntry", domain);
+        return;
+    end
+
+    local results = {};
+    for _, id in ipairs(ids) do
+        if !tablenet.Vars[domain][id] then continue; end
+
+        --add onget?
+        results[#results + 1] = tab.TableNet[domain][id];
+    end
+
+    return unpack(results);
+end
 
 if SERVER then
 
@@ -383,7 +434,7 @@ if SERVER then
             pubPack:AddTargets(pubRecip);
             pubPack:Send();
 
-            for _, ply in pairs(pubRecip) do
+            for ply, _ in pairs(pubRecip) do
                 excluded[ply] = nil;
             end
         end
@@ -394,20 +445,16 @@ if SERVER then
             privPack:AddTargets(privRecip);
             privPack:Send();
 
-            for _, ply in pairs(privRecip) do
+            for ply, _ in pairs(privRecip) do
                 excluded[ply] = nil;
             end
         end
 
-        local _excluded = {};
-        for ply, _ in pairs(excluded) do
-            _excluded[#_excluded + 1] = ply;
-        end
-        if #_excluded > 0 then
+        if !table.IsEmpty(excluded) then
             local scopePck = vnet.CreatePacket("CTableNet_ObjOutOfScope");
             scopePck:String(tab.RegistryID);
             scopePck:String(domain);
-            scopePck:AddTargets(_excluded);
+            scopePck:AddTargets(excluded);
             scopePck:Send();
         end
     end
