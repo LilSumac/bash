@@ -9,6 +9,23 @@ if !tmysql4 then
     end
 end
 
+-- Constants.
+REF_NONE = 0;
+REF_PLY = 1;
+REF_CHAR = 2;
+
+SQL_DEF = {};
+SQL_DEF["boolean"] = false;
+SQL_DEF["number"] = 0;
+SQL_DEF["string"] = "\'\'";
+SQL_DEF["table"] = {};
+
+SQL_TYPE = {};
+SQL_TYPE["boolean"] = "BIT"
+SQL_TYPE["number"] = "DECIMAL(%d, 5)";
+SQL_TYPE["string"] = "VARCHAR(%d)";
+SQL_TYPE["table"] = "VARCHAR(%d)";
+
 defineService_start("CDatabase");
 
 SVC.Name = "Core Database";
@@ -23,8 +40,8 @@ SVC.Tables = {};
 SVC.Columns = {};
 
 local color_sql = Color(0, 151, 151, 255);
-local CAST_IN = 1;
-local CAST_OUT = 2;
+local CAST_IN = 0;
+local CAST_OUT = 1;
 -- DB connection info.
 local host = "45.55.218.30";
 local user = "tester";
@@ -57,7 +74,7 @@ function SVC:Connect()
     --hook.Call("OnDBConnected");
 end
 
-function SVC:AddTable(name, ref)
+function SVC:AddTable(name)
     if !name then
         MsgErr("NilArgs", "name");
         return;
@@ -67,38 +84,20 @@ function SVC:AddTable(name, ref)
         return;
     end
 
-    -- Table fields.
     local tab = {};
-    self.Tables[name] = tab;
-
+    -- Table fields.
     tab.Name = name;
     tab.Columns = {};
-    -- EntryNum will always be the key. If you don't like it then TOUGH.
     tab.Columns["EntryNum"] = {
         Name = "EntryNum",
         Type = "number",
-        Default = "NOT NULL",
-        Query = tostring(SQL_TYPE["number"]) .. " NOT NULL AUTO_INCREMENT UNIQUE"
+        -- Default = something
+        NotNull = true,
+        Field = "AUTO_INCREMENT UNIQUE"
     };
-    tab.Key = "EntryNum";
-    if ref == REF_PLY then
-        tab.Columns["SteamID"] = {
-            Name = "SteamID",
-            Type = "string",
-            Default = SQL_DEF["string"]
-        };
-    elseif ref == REF_CHAR then
-        tab.Columns["SteamID"] = {
-            Name = "SteamID",
-            Type = "string",
-            Default = SQL_DEF["string"]
-        };
-        tab.Columns["CharID"] = {
-            Name = "CharID",
-            Type = "string",
-            Default = SQL_DEF["string"]
-        };
-    end
+    tab.PrimaryKey = "EntryNum";
+
+    self.Tables[name] = tab;
 
     MsgCon(color_sql, "SQL table registered with name '%s'.", name);
 end
@@ -132,7 +131,10 @@ function SVC:AddColumn(tab, col)
 
     -- col.Name = col.Name;
     col.Type = col.Type or "string";
-    col.Default = (col.Default != nil and col.Default) or SQL_DEF[col.Type];
+    col.Default = col.Default;
+    -- col.Default = (col.Default != nil and col.Default) or SQL_DEF[col.Type];
+    col.NotNull = col.NotNull or false;
+    col.Field = col.Field or "";
 
     MsgCon(color_sql, "Column with name '%s' registered in table '%s'.", col.Name, tab);
 end

@@ -1,3 +1,2 @@
--- All network strings are pooled here.
-util.AddNetworkString("bash_sendClientData");
-util.AddNetworkString("bash_clientInit");
+-- All bash network strings are pooled here.
+util.AddNetworkString("bash_Net_SendClientData");

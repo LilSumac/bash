@@ -16,7 +16,7 @@ function addClientData(id, generate)
 end
 
 function sendClientData()
-    local send = vnet.CreatePacket("bash_sendClientData");
+    local send = vnet.CreatePacket("bash_Net_SendClientData");
     local data = {};
     for id, generate in pairs(bash.clientData) do
         data[id] = handleFunc(generate);
@@ -25,4 +25,10 @@ function sendClientData()
     send:Table(data);
     send:AddServer();
     send:Send();
+end
+
+local cachedMaterials = {};
+function getMaterial(mat)
+    cachedMaterials[mat] = cachedMaterials[mat] or Material(mat);
+    return cachedMaterials[mat];
 end

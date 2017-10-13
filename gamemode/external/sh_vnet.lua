@@ -1260,15 +1260,15 @@ end
 --  Sending
 
 local function _addplys(self, plys)
-    for key, val in pairs do
+    for key, val in pairs(plys) do
         local ply;
-        if type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer()) then
+        if type(val) == "table" then
+            _addplys(self, val);
+            continue;
+        elseif type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer()) then
             ply = key;
         elseif type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer()) then
             ply = val;
-        elseif type(val) == "table" then
-            _addplys(val);
-            continue;
         else
             -- assume the value is at fault, not the key
             error("cannot add a " .. type(val) .. " as target(s)");

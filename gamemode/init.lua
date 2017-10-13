@@ -1,11 +1,20 @@
 MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
 
+-- Things that should be done, regardless of restart or JIT or whatever.
+local function miscInit()
+    -- Random seed!
+    math.randomseed(os.time());
+end
+
 -- Base relies on sandbox elements.
 DeriveGamemode("sandbox");
 
--- Use a reload hook that calls BEFORE files have been loaded.
+-- For now, we wil not be supporting JIT updates. However,
+-- there is an OnReload hook to use.
 if bash and bash.started then
-    hook.Call("PreReload", bash);
+    miscInit();
+    hook.Call("OnReload", bash);
+    return;
 end
 
 -- Global table for bash elements.
@@ -18,10 +27,7 @@ bash.nonVolatile = bash.nonVolatile or {};
 bash.meta = {};
 bash.services = {};
 bash.plugins = {};
-bash.volatile = {};
-
--- Random seed!
-math.randomseed(os.time());
+bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
 
 -- Send required base files to client.
 AddCSLuaFile("cl_init.lua");
@@ -35,15 +41,6 @@ include("core/sh_const.lua");
 include("core/sh_util.lua");
 include("core/sv_netpool.lua");
 include("shared.lua");
-
--- Handle catching client data.
-bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
-vnet.Watch("bash_sendClientData", function(pck)
-    local ply = pck.Source;
-    local data = pck:Table();
-    bash.clientData = bash.clientData or {};
-    bash.clientData[ply:EntIndex()] = data;
-end);
 
 -- Hooks for init process.
 MsgCon(color_green, "Gathering preliminary data...");

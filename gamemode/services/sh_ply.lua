@@ -141,14 +141,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         ID = "Player",
         ParentMeta = FindMetaTable("Player"),
         StoredInSQL = true,
-        SQLTable = "bash_plys",
-        GetRecipients = function(_self, tab)
-            local recip = {};
-            for
-        end,
-        GetPrivateRecipients = function(_self, tab)
-
-        end
+        SQLTable = "bash_plys"
     };
 
     tablenet:AddVariable{
@@ -157,6 +150,9 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         Public = true,
         InSQL = true,
         OnGenerate = function(_self, ply)
+            return self:OnInitialize(ply);
+        end,
+        OnInitialize = function(_self, ply, oldVal)
             return ply:Name();
         end
     };
@@ -178,6 +174,10 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         InSQL = true,
         OnGenerate = function(_self, ply)
             return {[ply:IPAddress()] = true};
+        end,
+        OnInitServer = function(_self, ply, oldVal)
+            oldVal[ply:IPAddress()] = true;
+            return oldVal;
         end
     };
 
@@ -198,7 +198,31 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         Type = "boolean",
         Public = true,
         InSQL = true,
-        OnGenerate = true
+        OnGenerate = true,
+        OnInitServer = function(_self, ply, oldVal)
+            local playtime = ply:GetNetVar("Player", "Playtime");
+            if playTime > 21600 then
+                ply:SetNetVar("Player", "NewPlayer", false);
+            end
+        end
+    };
+
+    tablenet:AddVariable{
+        ID = "Playtime",
+        Domain = "Player",
+        Type = "number",
+        Public = true,
+        InSQL = true,
+        OnGenerate = 0,
+        OnInitServer = function(_self, ply, oldVal)
+            ply.StartTime = CurTime();
+        end,
+        OnDeinitServer = function(_self, ply, oldVal)
+            local startTime = ply.StartTime or CurTime();
+            local played = CurTime() - startTime;
+            local newTime = oldVal + played;
+            ply:SetNetVar("Player", "Playtime", newTime);
+        end
     };
 
     /*

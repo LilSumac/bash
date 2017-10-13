@@ -66,21 +66,8 @@ PROCESS_IGNORE = {["sh_const.lua"] = true, ["sh_util.lua"] = true};
 
 if SERVER then
 
-    REF_NONE = 0;
-    REF_PLY = 1;
-    REF_CHAR = 2;
-
-    SQL_DEF = {};
-    SQL_DEF["boolean"] = false;
-    SQL_DEF["number"] = 0;
-    SQL_DEF["string"] = "";
-    SQL_DEF["table"] = {};
-
-    SQL_TYPE = {};
-    SQL_TYPE["boolean"] = "TINYINT(1) UNSIGNED"
-    SQL_TYPE["number"] = "BIGINT";
-    SQL_TYPE["string"] = "TEXT";
-    SQL_TYPE["table"] = "TEXT";
+    -- SQL constants were here. Now, they are defined inside the service.
+    -- As they should be.
 
 elseif CLIENT then
 

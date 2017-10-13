@@ -6,6 +6,12 @@ SVC.Author = "LilSumac";
 SVC.Desc = "A framework for creating, networking, and adding persistant variables to tables and objects.";
 SVC.Depends = {"CDatabase"};
 
+-- Custom errors.
+addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
+addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
+addErrType("UnauthorizedSend", "Tried sending a table to an unauthorized recipient! To force, use the 'force' argument. (%s:%s -> %s)");
+addErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
+
 -- Service storage.
 SVC.Domains = {};
 SVC.Vars = {};
@@ -71,8 +77,6 @@ function SVC:AddDomain(domain)
             local results = {};
             for _, id in ipairs(ids) do
                 if !tablenet.Vars[domain][id] then continue; end
-
-                --add onget?
                 results[#results + 1] = _self.TableNet[domain][id];
             end
 
@@ -113,7 +117,6 @@ function SVC:AddDomain(domain)
             for id, val in pairs(data) do
                 if !tablenet.Vars[domain][id] then continue; end
 
-                -- add onset?
                 _self.TableNet[domain][id] = val;
                 ids[#ids + 1] = id;
             end
@@ -156,14 +159,24 @@ function SVC:AddVariable(var)
     -- var.ID = var.ID; (Redundant, no default)
     -- var.Domain = var.Domain; (Redundant, no default)
     var.Type = var.Type or "string";
+    var.MaxLength = var.MaxLength or -1;
     var.Public = var.Public or false;
-    if CLIENT and !var.Public then return; end
-    var.InSQL = var.InSQL or false;
 
-    -- Charvar functions/hooks.
-    var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
-    -- var.OnGet = var.OnGet; (Redundant, no default)
-    -- var.OnSet = var.OnSet; (Redundant, no default)
+    if SERVER then
+        var.InSQL = var.InSQL or false;
+
+        -- Charvar functions/hooks.
+        var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
+        var.OnInitClient = nil;
+        var.OnDeinitClient = nil;
+        -- var.OnInitServer = var.OnInitServer; (Redundant, no default)
+        -- var.OnDeinitServer = var.OnDeinitServer; (Redundant, no default)
+    elseif CLIENT then
+        var.OnInitServer = nil;
+        var.OnDeinitServer = nil;
+        -- var.OnInitClient = var.OnInitClient; (Redundant, no default)
+        -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
+    end
 
     MsgCon(color_green, "Registering netvar %s in domain %s.", var.ID, var.Domain);
     self.Vars[var.Domain][var.ID] = var;
@@ -181,6 +194,22 @@ function SVC:GetDomainVars(domain)
     end
 
     return self.Vars[domain];
+end
+
+local function runInits(tab, domain)
+    local tablenet = getService("CTableNet");
+    local varInfo, initFunc;
+    for id, val in pairs(tab.TableNet[domain]) do
+        varInfo = tablenet.Vars[domain][id];
+        if !varInfo then continue; end
+
+        if CLIENT and varInfo.OnInitClient then
+            initFunc = varInfo.OnInitClient;
+        elseif SERVER and varInfo.OnInitServer then
+            initFunc = varInfo.OnInitServer;
+        end
+        initFunc(varInfo, tab, val);
+    end
 end
 
 function SVC:NewTable(domain, data, obj, regID)
@@ -226,7 +255,7 @@ function SVC:NewTable(domain, data, obj, regID)
 
     if regID then
         tab.RegistryID = regID;
-        self.RegistryID[regID] = tab;
+        self.Registry[regID] = tab;
     elseif !tab.RegistryID then
         local id = string.random(8, CHAR_ALL);
         while self.Registry[id] do
@@ -241,8 +270,10 @@ function SVC:NewTable(domain, data, obj, regID)
     end
 
     MsgCon(color_blue, "Registering table in TableNet with domain %s. (%s)", domain, tostring(tab));
+    PrintTable(tab.TableNet);
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
+    runInits(tab, domain);
     return tab;
 end
 
@@ -262,7 +293,7 @@ function SVC:RemoveTable(id, domain)
     if !tab.TableNet[domain] then return; end
 
     if SERVER then
-        local removePck = vnet.CreatePacket("CTableNet_ObjOutOfScope");
+        local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");
         removePck:String(id);
         removePck:String(domain);
         removePck:Broadcast();
@@ -277,12 +308,6 @@ function SVC:RemoveTable(id, domain)
         singlesMade[domain] = nil;
     end
 end
-
--- Custom errors.
-addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
-addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
-addErrType("UnauthorizedSend", "Tried sending a table to an unauthorized recipient! To force, use the 'force' argument. (%s:%s -> %s)");
-addErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
 
 function SVC:GetNetVars(domain, ids)
     if !domain then
@@ -299,21 +324,21 @@ function SVC:GetNetVars(domain, ids)
         MsgErr("TableNotRegistered", domain);
         return;
     end
+    tab = self.Registry[tab];
 
     if !tab.TableNet[domain] then
         MsgErr("NoDomainInTable", domain, tostring(tab));
         return;
     end
 
-    local tablenet = getService("CTableNet");
-    if !tablenet.Domains[domain] then
+    if !self.Domains[domain] then
         MsgErr("NilEntry", domain);
         return;
     end
 
     local results = {};
     for _, id in ipairs(ids) do
-        if !tablenet.Vars[domain][id] then continue; end
+        if !self.Vars[domain][id] then continue; end
 
         --add onget?
         results[#results + 1] = tab.TableNet[domain][id];
@@ -322,16 +347,50 @@ function SVC:GetNetVars(domain, ids)
     return unpack(results);
 end
 
+function SVC:SetNetVars(domain, data)
+    if !domain then
+        MsgErr("NilArgs", "domain");
+        return;
+    end
+    if !data then
+        MsgErr("NilArgs", "data");
+        return;
+    end
+
+    local tab = singlesMade[domain];
+    if !tab then
+        MsgErr("TableNotRegistered", domain);
+        return;
+    end
+    tab = self.Registry[tab];
+
+    if !tab.TableNet[domain] then
+        MsgErr("NoDomainInTable", domain, tostring(tab));
+        return;
+    end
+
+    if !self.Domains[domain] then
+        MsgErr("NilEntry", domain);
+        return;
+    end
+
+    local ids = {};
+    for id, val in pairs(data) do
+        if !self.Vars[domain][id] then continue; end
+
+        tab.TableNet[domain][id] = val;
+        ids[#ids + 1] = id;
+    end
+
+    self:NetworkTable(tab.RegistryID, domain, ids);
+end
+
 if SERVER then
 
     -- Network pool.
-    util.AddNetworkString("CTableNet_PreSendObjs");
-    util.AddNetworkString("CTableNet_SendObjs");
-    util.AddNetworkString("CTableNet_CreateObj");
-
-    util.AddNetworkString("CTableNet_ObjCount");
-    util.AddNetworkString("CTableNet_ObjUpdate");
-    util.AddNetworkString("CTableNet_ObjOutOfScope");
+    util.AddNetworkString("CTableNet_Net_ObjCount");
+    util.AddNetworkString("CTableNet_Net_ObjUpdate");
+    util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
 
     -- Functions.
     function SVC:NetworkTable(id, domain, ids)
@@ -363,8 +422,8 @@ if SERVER then
         local privRecip = domInfo:GetPrivateRecipients(tab);
         if pubRecip and privRecip and #pubRecip == 0 and #privRecip == 0 then return; end
 
-        local pubPack = vnet.CreatePacket("CTableNet_ObjUpdate");
-        local privPack = vnet.CreatePacket("CTableNet_ObjUpdate");
+        local pubPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
+        local privPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
         pubPack:String(tab.RegistryID);
         pubPack:String(domain);
         privPack:String(tab.RegistryID);
@@ -451,7 +510,7 @@ if SERVER then
         end
 
         if !table.IsEmpty(excluded) then
-            local scopePck = vnet.CreatePacket("CTableNet_ObjOutOfScope");
+            local scopePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");
             scopePck:String(tab.RegistryID);
             scopePck:String(domain);
             scopePck:AddTargets(excluded);
@@ -495,14 +554,17 @@ if SERVER then
         end
 
         local data = {};
+        local recip;
         local isRecip, isPrivate = false, false;
-        isRecip = domInfo:GetRecipients()[ply];
+        recip = domInfo:GetRecipients();
+        isRecip = recip and recip[ply] or false;
         if !isRecip and !force then
             MsgErr("UnauthorizedSend", id, domain, tostring(ply));
             return;
         end
 
-        isPrivate = domInfo:GetPrivateRecipients()[ply];
+        recip = domInfo:GetPrivateRecipients();
+        isPrivate = recip and recip[ply] or false;
         if vars then
             for _, _id in pairs(vars) do
                 if !self.Vars[domain][_id] then continue; end
@@ -520,7 +582,7 @@ if SERVER then
             end
         end
 
-        local sendPck = vnet.CreatePacket("CTableNet_ObjUpdate");
+        local sendPck = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
         sendPck:String(tab.RegistryID);
         sendPck:String(domain);
         sendPck:Table(data);
@@ -537,39 +599,21 @@ if SERVER then
     end
 
     -- Hooks.
-    hook.Add("OnPlayerInit", "CTableNet_SendObjs", function(ply)
+    hook.Add("OnPlayerInit", "CTableNet_Hook_OnPlayerInit", function(ply)
         local tablenet = getService("CTableNet");
 
-        net.Start("CTableNet_ObjCount");
+        net.Start("CTableNet_Net_ObjCount");
             net.WriteInt(table.Count(tablenet.Registry), 8);
         net.Send(ply);
 
         local delay = 0.1;
         for id, obj in pairs(tablenet.Registry) do
+            if obj == NULL then continue; end
+
             for dom, vars in pairs(obj.TableNet) do
                 timer.Simple(delay, function()
-                    local metaPack = vnet.CreatePacket("CTableNet_CreateObj");
-                    metaPack:String(id);
-                    metaPack:String(dom);
-
-                    local netData = {};
-                    for _id, val in pairs(vars) do
-                        if tablenet.Vars[dom][_id].Public then
-                            netData[_id] = val;
-                        end
-                    end
-                    metaPack:Table(netData);
-                    metaPack:Bool(true);
-
-                    if obj and (isentity(obj) or isplayer(obj)) then
-                        metaPack:Bool(true);
-                        metaPack:Entity(obj);
-                    else
-                        metaPack:Bool(false);
-                    end
-
-                    metaPack:AddTargets(ply);
-                    metaPack:Send();
+                    local tablenet = getService("CTableNet");
+                    tablenet:SendTable(ply, id, dom);
                 end);
                 delay = delay + 0.1;
             end
@@ -578,7 +622,8 @@ if SERVER then
 
 elseif CLIENT then
 
-    net.Receive("CTableNet_ObjCount", function(len)
+    -- Network hooks.
+    net.Receive("CTableNet_Net_ObjCount", function(len)
         local tablenet = getService("CTableNet");
         local objs = net.ReadInt(8);
         tablenet.InitialSend = true;
@@ -587,7 +632,7 @@ elseif CLIENT then
         MsgCon(color_blue, "Waiting on %d networked objects...", objs);
     end);
 
-    vnet.Watch("CTableNet_ObjUpdate", function(pck)
+    vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
         local regID = pck:String();
         local domain = pck:String();
         local data = pck:Table();
@@ -617,40 +662,7 @@ elseif CLIENT then
         end
     end);
 
-    vnet.Watch("CTableNet_CreateObj", function(pck)
-        local regID = pck:String();
-        local domain = pck:String();
-        local data = pck:Table();
-        local firstSend = pck:Bool();
-        local obj;
-        if pck:Bool() then
-            obj = pck:Entity();
-        end
-
-        local tablenet = getService("CTableNet");
-        local domInfo = tablenet.Domains[domain];
-        local tab;
-        if !obj then
-            tab = setmetatable({}, domInfo.ParentMeta);
-        else
-            tab = obj;
-        end
-
-        tab.TableNet = tab.TableNet or {};
-        tab.TableNet[domain] = data;
-
-        tab.RegistryID = regID;
-        tablenet.Registry[regID] = tab;
-
-        if firstSend then
-            tablenet.Received = tablenet.Received + 1;
-            if tablenet.Received == tablenet.WaitingOn then
-                MsgCon(color_blue, "Received all networked objects!");
-            end
-        end
-    end);
-
-    vnet.Watch("CTableNet_ObjOutOfScope", function(pck)
+    vnet.Watch("CTableNet_Net_ObjOutOfScope", function(pck)
         local regID = pck:String();
         local domain = pck:String();
         local tablenet = getService("CTableNet");

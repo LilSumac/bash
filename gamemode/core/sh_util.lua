@@ -2,9 +2,8 @@ local bash = bash;
 
 function handleFunc(var, ...)
     if var == nil then return; end
-    local args = {...};
     if type(var) == "function" then
-        return var(unpack(args));
+        return var(unpack({...}));
     else
         return var;
     end
