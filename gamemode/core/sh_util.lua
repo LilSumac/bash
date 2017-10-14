@@ -56,6 +56,7 @@ function MsgErr(errType, ...)
     local srcFunc = (funcInfo.name != "" and funcInfo.name) or "In File";
     local srcStr = Format("%s -> %s line %d", srcFunc, srcFile, fromInfo.currentline);
 
+    --MsgCon(color_red, "%s", debug.traceback(nil, nil, 2));
     MsgCon(color_red, "[%s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
 end
 
@@ -95,6 +96,11 @@ function processDir(dir)
         file = src .. file;
         processFile(file);
     end
+end
+
+function processModules()
+    local from = debug.getinfo(2);
+    local src = from.short_src;
 end
 
 function getClientData(ply, id)

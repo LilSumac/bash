@@ -10,11 +10,14 @@ TASK_NUMERIC = 0;
 TASK_TIMED = 1;
 TASK_OTHER = 2;
 
+STATUS_PAUSED = 0;
+STATUS_RUNNING = 1;
+STATUS_SUCCESS = 2;
+STATUS_FAILED = 3;
+
 -- Service storage.
 local tasks = {};
 local activeTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
-local inactiveTasks = getNonVolatileEntry("CTask_InactiveTasks", EMPTY_TABLE);
-local uniqueTasks = getNonVolatileEntry("CTask_UniqueTasks", EMPTY_TABLE);
 
 function SVC:AddTask(id)
 
@@ -97,29 +100,6 @@ function SVC:NewTask(id)
     return newTask;
 end
 
-/*
-function SVC:AddActiveTask(task)
-    if !task then
-        MsgErr("NilArgs", "task");
-        return;
-    end
-    if !task.TaskID or !task.UniqueID then
-        MsgErr("TaskNotValid", tostring(task));
-        return;
-    end
-    if task.TaskInfo.IsUnique and uniqueTasks[task.TaskID] then
-        MsgErr("TaskAlreadyRunning", task.TaskID, tostring(task));
-        return;
-    end
-
-    if task.TaskInfo.IsUnique then
-        uniqueTasks[task.TaskID] = task;
-    end
-
-    activeTasks[task.UniqueID] = task;
-end
-*/
-
 function SVC:GetActiveTask(id)
     if !id then
         MsgErr("NilArgs", "id");
@@ -133,22 +113,9 @@ function SVC:GetActiveTask(id)
     return activeTasks[id];
 end
 
-/*
-function SVC:UpdateTask(id, cond, value)
-    if !activeTasks[id] then
-        MsgErr("TaskNotActive", id);
-        return;
-    end
-
-    local curTask = activeTasks[id];
-    if !curTask.Conds[cond] then
-        MsgErr("NilEntry", cond);
-        return;
-    end
-
-    curTask.Conds[cond]:Update(value);
+function SVC:RemoveActiveTask(id)
+    activeTasks[id] = nil;
 end
-*/
 
 -- Custom errors.
 addErrType("TaskNotActive", "No task with that ID is active! (%s)");
@@ -164,30 +131,38 @@ if SERVER then
         ctask:AddTaskOnFinish("bash_PlayerPreInit", function(data)
             if !isplayer(data["Player"]) then return; end
 
+            local ply = data["Player"];
             local ctask = getService("CTask");
             local oninit = ctask:NewTask("bash_PlayerOnInit");
-            oninit:PassData("Player", data["Player"]);
+            oninit:PassData("Player", ply);
             oninit:Start();
-            data["Player"].PreInitTask = nil;
-            data["Player"].OnInitTask = oninit;
-            data["Player"].Initialized = true;
-            hook.Run("PlayerOnInit", data["Player"]);
+            ply.PreInitTask = nil;
+            ply.OnInitTask = oninit.UniqueID;
+            ply.Initialized = true;
+            hook.Run("PlayerOnInit", ply);
         end);
 
         ctask:AddTask("bash_PlayerOnInit");
         ctask:AddTaskOnFinish("bash_PlayerOnInit", function(data)
             if !isplayer(data["Player"]) then return; end
 
+            local ply = data["Player"];
             local ctask = getService("CTask");
             local postinit = ctask:NewTask("bash_PlayerPostInit");
-            postinit:PassData("Player", data["Player"]);
+            postinit:PassData("Player", ply);
             postinit:Start();
-            data["Player"].OnInitTask = nil;
-            data["Player"].PostInitTask = postinit;
-            hook.Run("PlayerPostInit", data["Player"]);
+            ply.OnInitTask = nil;
+            ply.PostInitTask = postinit.UniqueID;
+            hook.Run("PlayerPostInit", ply);
         end);
 
         ctask:AddTask("bash_PlayerPostInit");
+        ctask:AddTaskOnFinish("bash_PlayerPostInit", function(data)
+            if !isplayer(data["Player"]) then return; end
+
+            local ply = data["Player"];
+            ply.PostInitTask = nil;
+        end);
     end);
 
     hook.Add("PrePlayerInit", "bash_Hook_StartPlyTasks", function(ply)
@@ -197,7 +172,7 @@ if SERVER then
         local preinit = ctask:NewTask("bash_PlayerPreInit");
         preinit:PassData("Player", ply);
         preinit:Start();
-        ply.PreInitTask = preinit;
+        ply.PreInitTask = preinit.UniqueID;
         hook.Run("PlayerPreInit", ply);
     end);
 

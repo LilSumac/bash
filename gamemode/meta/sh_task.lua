@@ -6,46 +6,54 @@ function META:Initialize()
         return;
     end
 
-    self.Paused = true;
-    self.Finished = false;
+    self.Status = STATUS_PAUSED;
 
     local task = getService("CTask");
     local taskInfo = task:GetTask(self.TaskID);
     self.TaskInfo = taskInfo;
 
     self.StartTime = -1;
-    self.Conditions = {};
+    self.Values = {};
+    self.Progress = {};
     self.Timers = {};
     self.SavedValues = {};
     self.PassedData = {};
 
     local timerID;
-    for condID, cond in pairs(self.TaskInfo.Conditions) do
-        self.Conditions[condID] = cond.Begin;
-        if cond.Type == TASK_TIMED then
-            timerID = Format("CTask_%s_%d", self.UniqueID, #self.Timers + 1);
-            self.Timers[timerID] = true;
-            timer.Create(timerID, cond.Interval, 0, self.Update, self, condID);
-            timer.Stop(timerID);
+    if table.IsEmpty(self.TaskInfo.Conditions) then
+        MsgCon(color_lightblue, "The task '%s->%s' has no conditions! Starting it will automatically complete it.", self.TaskID, self.UniqueID);
+    else
+        for condID, cond in pairs(self.TaskInfo.Conditions) do
+            if cond.Type == TASK_TIMED then
+                self.Values[condID] = 0;
+                timerID = Format("CTask_%s_%d", self.UniqueID, #self.Timers + 1);
+                self.Timers[timerID] = true;
+                timer.Create(timerID, cond.Finish, 0, self.Update, self, condID, cond.Finish);
+                timer.Stop(timerID);
+            else
+                self.Values[condID] = cond.Begin;
+            end
         end
     end
 end
 
 function META:Start()
-    MsgCon(color_blue, "Starting task '%s'...", self.TaskInfo.ID);
-    self.Paused = false;
-    self.Finished = false;
+    MsgCon(color_blue, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
+    self.Status = STATUS_RUNNING;
     self.StartTime = SysTime();
 
+    for timerID, _ in pairs(self.Timers) do
+        timer.Start(timerID);
+    end
+
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        MsgCon(color_lightblue, "The task '%s' has no conditions! Automatically completed.", self.TaskInfo.ID);
-        self:Finish();
+        self:Finish(STATUS_SUCCESS);
     end
 end
 
 function META:Pause()
-    if self.Paused then return; end
-    self.Paused = true;
+    if self.Status == STATUS_PAUSED then return; end
+    self.Status = STATUS_PAUSED;
 
     for timerID, _ in pairs(self.Timers) do
         timer.Pause(timerID);
@@ -53,8 +61,8 @@ function META:Pause()
 end
 
 function META:Unpause()
-    if !self.Paused then return; end
-    self.Paused = false;
+    if self.Status != STATUS_PAUSED then return; end
+    self.Status = STATUS_RUNNING;
 
     for timerID, _ in pairs(self.Timers) do
         timer.UnPause(timerID);
@@ -67,12 +75,12 @@ function META:Unpause()
 end
 
 function META:Restart()
-    self.Paused = false;
-    self.Finished = false;
+    self.Status = STATUS_RUNNING;
 
     for condID, cond in pairs(self.TaskInfo.Conditions) do
         self.Conditions[condID] = cond.Begin;
     end
+
     for timerID, _ in pairs(self.Timers) do
         timer.Stop(timerID);
         timer.Start(timerID);
@@ -84,58 +92,48 @@ function META:PassData(id, data)
 end
 
 function META:Update(cond, value)
+    if self.Status == STATUS_SUCCESS or self.Status == STATUS_FAILED then return; end
+
     local condInfo = self.TaskInfo.Conditions[cond];
     if !condInfo then
         MsgErr("NilEntry", cond);
         return;
     end
 
-    if self.Paused then
+    if self.Status == STATUS_PAUSED then
         self.SavedValues[cond] = value;
         return;
     end
 
     if condInfo.Type == TASK_NUMERIC then
         self.Conditions[cond] = self.Conditions[cond] + value;
-    elseif confInfo.Type == TASK_TIMED then
-        self.Conditions[cond] = value or SysTime();
     else
         self.Conditions[cond] = value;
     end
 
-    if self:IsFinished() then
-        self:Finish();
+    if self:CheckConditions() then
+        self:Finish(STATUS_SUCCESS);
     end
 end
 
-function META:GetProgressTable()
-    local progress = {};
-    for condID, cond in pairs(self.TaskInfo.Conditions) do
-        if cond.Type == TASK_NUMERIC then
-
-        elseif cond.Type == TASK_TIMED then
-            progress[condID] = (cond.Finish - self.Conditions[condID]) / cond.Length;
-        else
-            progress[condID] = tonumber(self.Conditions[condID] == cond.Finish);
-        end
-    end
+function META:Fail()
+    self:Finish(STATUS_FAILED);
 end
 
-function META:Finish()
-    self.Paused = false;
-    self.Finished = true;
+function META:Finish(status)
+    self.Status = status;
 
-    MsgCon(color_blue, "Task '%s' has finished! Calling callbacks...", self.TaskInfo.ID);
-    for index, func in ipairs(self.TaskInfo.Callbacks) do
-        func(self.PassedData);
+    MsgCon(color_blue, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
+    for _, func in ipairs(self.TaskInfo.Callbacks) do
+        func(status, self.PassedData);
     end
 
     if self.TaskInfo.OnFinish then
-        self.TaskInfo.OnFinish(self.PassedData);
+        self.TaskInfo.OnFinish(status, self.PassedData);
     end
 end
 
-function META:IsFinished()
+function META:CheckConditions()
     for condID, cond in pairs(self.TaskInfo.Conditions) do
         if cond.Type == TASK_NUMERIC or cond.Type == TASK_TIMED then
             if self.Conditions[condID] < cond.Finish then
@@ -148,10 +146,6 @@ function META:IsFinished()
         end
     end
     return true;
-end
-
-function META:AddListener(plys)
-
 end
 
 defineMeta_end();
