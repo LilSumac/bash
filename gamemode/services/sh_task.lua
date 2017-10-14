@@ -5,20 +5,27 @@ SVC.Name = "CTask";
 SVC.Author = "LilSumac";
 SVC.Desc = "Simple framework for implementing code-based tasks with progress, feedback, and callbacks.";
 
+-- Constants.
+TASK_NUMERIC = 0;
+TASK_TIMED = 1;
+TASK_OTHER = 2;
+
 -- Service storage.
 local tasks = {};
 local activeTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
 local inactiveTasks = getNonVolatileEntry("CTask_InactiveTasks", EMPTY_TABLE);
 local uniqueTasks = getNonVolatileEntry("CTask_UniqueTasks", EMPTY_TABLE);
 
-SVC.Tasks = {};
-SVC.ActiveTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
+function SVC:AddTask(id)
 
-function SVC:AddTask(task)
-
-    task.ID = task.ID;
-    task.AllowMultiple = task.AllowMultiple or false;
+    local task = {};
+    task.ID = id;
+    --task.AllowMultiple = task.AllowMultiple or false;
     task.Conditions = {};
+    task.Callbacks = {};
+    task.CallbacksArgs = {};
+
+    tasks[id] = task;
 
 end
 
@@ -31,7 +38,7 @@ function SVC:GetTask(id)
     return tasks[id];
 end
 
-function SVC:AddTaskCondition(id, cond, begin, finish)
+function SVC:AddTaskCondition(id, cond, type, begin, finish)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -43,36 +50,31 @@ function SVC:AddTaskCondition(id, cond, begin, finish)
         return;
     end
 
-    local newCond = {};
-    newCond.__index = newCond;
-    newCond.Type = TASK_NUMERIC;
-    newCond.Start = begin;
-    newCond.Finish = finish;
-    newCond.Update = function(_self, value)
-        if _self.Type == TASK_NUMERIC then
-            _self.Value = _self.Value + value;
-        else
-            _self.Value = value;
-        end
-    end
-    newCond.Progress = function(_self)
-        if _self.Type == TASK_NUMERIC then
-            return ((_self.Value - _self.Start) / (_self.Finish - _self.Start));
-        else
-            return _self.Value;
-        end
-    end
-    newCond.IsFinished = function(_self)
-        if _self.Type == TASK_NUMERIC then
-            return _self.Value >= _self.Finish;
-        else
-            return _self.Value == _self.Finish;
-        end
-    end
+    task.Conditions[cond] = {
+        Type = type,
+        Begin = begin,
+        Finish = finish
+    };
 end
 
 function SVC:AddTaskCallback(id, func)
+    if !tasks[id] then
+        MsgErr("NilEntry", id);
+        return;
+    end
 
+    local task = tasks[id];
+    task.Callbacks[#task.Callbacks + 1] = func;
+end
+
+function SVC:AddTaskOnFinish(id, func)
+    if !tasks[id] then
+        MsgErr("NilEntry", id);
+        return;
+    end
+
+    local task = tasks[id];
+    task.OnFinish = func;
 end
 
 function SVC:NewTask(id)
@@ -91,14 +93,11 @@ function SVC:NewTask(id)
     newTask.TaskID = id;
     newTask.UniqueID = newID;
     newTask:Initialize();
-    newTask.Conditions = {};
-    for condID, cond in pairs(task.Conditions) do
-        newTask.Conditions[condID] = cond.Begin;
-    end
-
+    activeTasks[newID] = newTask;
     return newTask;
 end
 
+/*
 function SVC:AddActiveTask(task)
     if !task then
         MsgErr("NilArgs", "task");
@@ -119,6 +118,7 @@ function SVC:AddActiveTask(task)
 
     activeTasks[task.UniqueID] = task;
 end
+*/
 
 function SVC:GetActiveTask(id)
     if !id then
@@ -133,6 +133,7 @@ function SVC:GetActiveTask(id)
     return activeTasks[id];
 end
 
+/*
 function SVC:UpdateTask(id, cond, value)
     if !activeTasks[id] then
         MsgErr("TaskNotActive", id);
@@ -147,10 +148,59 @@ function SVC:UpdateTask(id, cond, value)
 
     curTask.Conds[cond]:Update(value);
 end
+*/
 
 -- Custom errors.
 addErrType("TaskNotActive", "No task with that ID is active! (%s)");
 addErrType("TaskNotValid", "This task does not have a TaskID/UniqueID! Use the library create function! (%s)");
 addErrType("TaskAlreadyRunning", "Only one instance of this task can be active at a time! (%s running on %s)");
+
+if SERVER then
+
+    -- Hooks.
+    hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
+        local ctask = getService("CTask");
+        ctask:AddTask("bash_PlayerPreInit");
+        ctask:AddTaskOnFinish("bash_PlayerPreInit", function(data)
+            if !isplayer(data["Player"]) then return; end
+
+            local ctask = getService("CTask");
+            local oninit = ctask:NewTask("bash_PlayerOnInit");
+            oninit:PassData("Player", data["Player"]);
+            oninit:Start();
+            data["Player"].PreInitTask = nil;
+            data["Player"].OnInitTask = oninit;
+            data["Player"].Initialized = true;
+            hook.Run("PlayerOnInit", data["Player"]);
+        end);
+
+        ctask:AddTask("bash_PlayerOnInit");
+        ctask:AddTaskOnFinish("bash_PlayerOnInit", function(data)
+            if !isplayer(data["Player"]) then return; end
+
+            local ctask = getService("CTask");
+            local postinit = ctask:NewTask("bash_PlayerPostInit");
+            postinit:PassData("Player", data["Player"]);
+            postinit:Start();
+            data["Player"].OnInitTask = nil;
+            data["Player"].PostInitTask = postinit;
+            hook.Run("PlayerPostInit", data["Player"]);
+        end);
+
+        ctask:AddTask("bash_PlayerPostInit");
+    end);
+
+    hook.Add("PrePlayerInit", "bash_Hook_StartPlyTasks", function(ply)
+        if !isplayer(ply) then return; end
+
+        local ctask = getService("CTask");
+        local preinit = ctask:NewTask("bash_PlayerPreInit");
+        preinit:PassData("Player", ply);
+        preinit:Start();
+        ply.PreInitTask = preinit;
+        hook.Run("PlayerPreInit", ply);
+    end);
+
+end
 
 defineService_end();

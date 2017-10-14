@@ -1,5 +1,3 @@
-MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
-
 -- Things that should be done, regardless of restart or JIT or whatever.
 local function miscInit()
     -- Random seed!
@@ -12,10 +10,13 @@ DeriveGamemode("sandbox");
 -- For now, we wil not be supporting JIT updates. However,
 -- there is an OnReload hook to use.
 if bash and bash.started then
+    MsgC(Color(0, 151, 255, 255), "Full JIT refreshes are not supported right now. Restart the server to apply any changes made.\n");
     miscInit();
-    hook.Call("OnReload", bash);
+    hook.Run("OnReload", bash);
     return;
 end
+
+MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
 
 -- Global table for bash elements.
 bash = bash or {};
@@ -27,7 +28,6 @@ bash.nonVolatile = bash.nonVolatile or {};
 bash.meta = {};
 bash.services = {};
 bash.plugins = {};
-bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
 
 -- Send required base files to client.
 AddCSLuaFile("cl_init.lua");
@@ -42,16 +42,19 @@ include("core/sh_util.lua");
 include("core/sv_netpool.lua");
 include("shared.lua");
 
+-- Client data should persist.
+bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
+
 -- Hooks for init process.
 MsgCon(color_green, "Gathering preliminary data...");
-hook.Call("GatherPrelimData_Base"); -- For all prelims that MUST come first.
-hook.Call("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
+hook.Run("GatherPrelimData_Base"); -- For all prelims that MUST come first.
+hook.Run("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
 MsgCon(color_green, "Initializing services...");
-hook.Call("InitService_Base");      -- For all inits that MUST come first.
-hook.Call("InitService");           -- Connect to DB, load /data files, etc.
+hook.Run("InitService_Base");      -- For all inits that MUST come first.
+hook.Run("InitService");           -- Connect to DB, load /data files, etc.
 MsgCon(color_green, "Doing post-init calls...");
-hook.Call("PostInit_Base");         -- For all post-inits that MUST come first.
-hook.Call("PostInit");              -- Finish up.
+hook.Run("PostInit_Base");         -- For all post-inits that MUST come first.
+hook.Run("PostInit");              -- Finish up.
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);

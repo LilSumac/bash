@@ -1,9 +1,6 @@
 -- Local functions.
 local function initPlayer(ply)
-    hook.Call("PrePlayerInit", bash, ply);
-    ply.Initialized = true;
-    hook.Call("OnPlayerInit", bash, ply);
-    hook.Call("PostPlayerInit", bash, ply);
+    hook.Run("PrePlayerInit", ply);
 end
 
 -- Server-side Gamemode Hooks
@@ -16,6 +13,6 @@ vnet.Watch("bash_Net_SendClientData", function(pck)
     bash.clientData[ply:EntIndex()] = data;
 
     if !ply.Initialized then
-        ackClientData(ply);
+        initPlayer(ply);
     end
 end);

@@ -9,45 +9,49 @@ if !tmysql4 then
     end
 end
 
--- Constants.
-REF_NONE = 0;
-REF_PLY = 1;
-REF_CHAR = 2;
-
-SQL_DEF = {};
-SQL_DEF["boolean"] = false;
-SQL_DEF["number"] = 0;
-SQL_DEF["string"] = "\'\'";
-SQL_DEF["table"] = {};
-
-SQL_TYPE = {};
-SQL_TYPE["boolean"] = "BIT"
-SQL_TYPE["number"] = "DECIMAL(%d, 5)";
-SQL_TYPE["string"] = "VARCHAR(%d)";
-SQL_TYPE["table"] = "VARCHAR(%d)";
-
 defineService_start("CDatabase");
 
+-- Service info.
 SVC.Name = "Core Database";
 SVC.Author = "LilSumac";
 SVC.Desc = "The core interface between /bash/ and the external database.";
 SVC.Depends = {"CPlayer", "CCharacter"};
 
--- Service storage.
-SVC.DBObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
-SVC.Connected = getNonVolatileEntry("CDatabase_Connected", false);
-SVC.Tables = {};
-SVC.Columns = {};
+-- Constants.
+color_sql = Color(0, 151, 151, 255);
 
-local color_sql = Color(0, 151, 151, 255);
-local CAST_IN = 0;
-local CAST_OUT = 1;
+-- Service storage.
+local dbObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
+local connected = getNonVolatileEntry("CDatabase_Connected", false);
+local tables = {};
+
+-- Local storage.
 -- DB connection info.
 local host = "45.55.218.30";
 local user = "tester";
 local pass = "testpass";
 local data = "srp_db";
 local port = 3306;
+
+local CAST_IN = 0;
+local CAST_OUT = 1;
+
+local SQL_DEF = {};
+SQL_DEF["boolean"] = false;
+SQL_DEF["number"] = 0;
+SQL_DEF["string"] = "";
+SQL_DEF["table"] = {};
+
+local SQL_TYPE = {};
+SQL_TYPE["counter"] = "INT";
+SQL_TYPE["boolean"] = "BIT"
+SQL_TYPE["number"] = "DECIMAL(%d)";
+SQL_TYPE["string"] = "VARCHAR(%d)";
+SQL_TYPE["table"] = "VARCHAR(%d)";
+
+function SVC:IsConnected()
+    return dbObject and connected;
+end
 
 function SVC:Connect()
     local obj, err = tmysql.initialize(
@@ -57,8 +61,8 @@ function SVC:Connect()
     if obj then
         setNonVolatileEntry("CDatabase_DBObject", obj);
         setNonVolatileEntry("CDatabase_Connected", true);
-        self.DBObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
-        self.Connected = getNonVolatileEntry("CDatabase_Connected", false);
+        dbObject = obj;
+        connected = true;
 
         MsgCon(color_sql, "Successfully connected to MySQL server!");
     else
@@ -71,7 +75,7 @@ function SVC:Connect()
 
     -- CALL THIS AFTER ALL CHECKS
     -- Post-connection hook.
-    --hook.Call("OnDBConnected");
+    --hook.Run("OnDBConnected");
 end
 
 function SVC:AddTable(name)
@@ -79,7 +83,7 @@ function SVC:AddTable(name)
         MsgErr("NilArgs", "name");
         return;
     end
-    if self.Tables[name] then
+    if tables[name] then
         MsgErr("DupEntry", name);
         return;
     end
@@ -90,24 +94,24 @@ function SVC:AddTable(name)
     tab.Columns = {};
     tab.Columns["EntryNum"] = {
         Name = "EntryNum",
-        Type = "number",
-        -- Default = something
-        NotNull = true,
-        Field = "AUTO_INCREMENT UNIQUE"
+        Type = "counter",
+        MaxLength = 5,
+        -- Default = 0,
+        Field = "UNSIGNED NOT NULL AUTO_INCREMENT UNIQUE"
     };
     tab.PrimaryKey = "EntryNum";
 
-    self.Tables[name] = tab;
+    tables[name] = tab;
 
-    MsgCon(color_sql, "SQL table registered with name '%s'.", name);
+    MsgCon(color_sql, "Database table registered with name '%s'.", name);
 end
 
-function SVC:AddColumn(tab, col)
+function SVC:AddColumn(tab, col, primary)
     if !tab then
         MsgErr("NilArgs", "tab");
         return;
     end
-    if !self.Tables[tab] then
+    if !tables[tab] then
         MsgErr("NilEntry", tab);
         return;
     end
@@ -121,28 +125,33 @@ function SVC:AddColumn(tab, col)
         return;
     end
 
-    local tabData = self.Tables[tab];
+    local tabData = tables[tab];
     if tabData.Columns[col.Name] then
         MsgErr("DupEntry", col.Name);
         return;
     end
 
-    tabData.Columns[col.Name] = col;
-
     -- col.Name = col.Name;
     col.Type = col.Type or "string";
-    col.Default = col.Default;
-    -- col.Default = (col.Default != nil and col.Default) or SQL_DEF[col.Type];
+    --col.MaxLength = col.MaxLength;
+    col.Default = col.Default != nil and col.Default or SQL_DEF[col.Type];
     col.NotNull = col.NotNull or false;
     col.Field = col.Field or "";
 
-    MsgCon(color_sql, "Column with name '%s' registered in table '%s'.", col.Name, tab);
+    MsgCon(color_sql, "Database column '%s' registered in table '%s'.", col.Name, tab);
+
+    if primary then
+        tabData.PrimaryKey = col.Name;
+        MsgCon(color_sql, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
+    end
+
+    tabData.Columns[col.Name] = col;
 end
 
 function SVC:Query(query, callback, ...)
-    if self.DBObject and self.Connected then
+    if self:IsConnected() then
         local args = {...};
-        self.DBObject:Query(query, function(resultsTab)
+        dbObject:Query(query, function(resultsTab)
             if #resultsTab == 1 then
                 if !resultsTab[1].status then
                     MsgErr("QueryFailed", query, resultsTab[1].error);
@@ -170,11 +179,11 @@ local castIn = {
     ["number"] = tonumber,
     ["string"] = function(str)
         local db = getService("CDatabase");
-        return Format("\'%s\'", db.DBObject:Escape(tostring(str)));
+        return Format("\'%s\'", dbObject:Escape(tostring(str)));
     end,
     ["table"] = function(tab)
         local db = getService("CDatabase");
-        return Format("\'%s\'", db.DBObject:Escape(pon.encode(tab)));
+        return Format("\'%s\'", dbObject:Escape(pon.encode(tab)));
     end
 };
 local castOut = {
@@ -190,12 +199,12 @@ function SVC:CastValue(tab, col, val, inout)
         MsgErr("NilArgs", "tab");
         return;
     end
-    if !self.Tables[tab] then
+    if !tables[tab] then
         MsgErr("NilEntry", tab);
         return;
     end
 
-    local tab = self.Tables[tab];
+    local tab = tables[tab];
     if !col then
         MsgErr("NilArgs", "col");
         return;
@@ -219,24 +228,30 @@ function SVC:CastValue(tab, col, val, inout)
 end
 
 function SVC:CheckTables()
-    if table.IsEmpty(self.Tables) then
+    if table.IsEmpty(tables) then
         MsgCon(color_sql, "No tables registered in database. Skipping...");
         return;
     end
 
-    local query = "";
-    for name, tab in pairs(self.Tables) do
+    local query, sqlType = "";
+    for name, tab in pairs(tables) do
         query = query .. Format("CREATE TABLE IF NOT EXISTS %s(", name);
         for _name, col in pairs(tab.Columns) do
-            if _name == "EntryNum" then
-                query = query .. "`EntryNum` BIGINT NOT NULL AUTO_INCREMENT UNIQUE, ";
-            elseif col.Type == "string" or col.Type == "table" then
-                query = query .. Format("`%s` %s, ", _name, SQL_TYPE[col.Type]);
+            if col.Type == "boolean" then
+                sqlType = SQL_TYPE[col.Type];
             else
-                query = query .. Format("`%s` %s DEFAULT %s, ", _name, SQL_TYPE[col.Type], self:CastValue(name, _name, col.Default, CAST_IN));
+                sqlType = Format(SQL_TYPE[col.Type], (col.MaxLength or 8000));
             end
+
+            query = query .. Format(
+                "`%s` %s %s %s, ",
+                _name,
+                sqlType,
+                col.Default != nil and ("DEFAULT " .. self:CastValue(name, _name, col.Default, CAST_IN)) or "",
+                col.Field or ""
+            );
         end
-        query = query .. "PRIMARY KEY(EntryNum)); ";
+        query = query .. Format("PRIMARY KEY(%s)); ", tab.PrimaryKey);
     end
 
     self:Query(query, function(results)
@@ -259,7 +274,7 @@ function SVC:InsertRow(tab, data, callback, ...)
         MsgErr("NilArgs", "data");
         return;
     end
-    if !self.Tables[tab] then
+    if !tables[tab] then
         MsgErr("NilEntry", tab);
         return;
     end
@@ -288,7 +303,7 @@ function SVC:GetRow(tab, cols, cond, callback, ...)
         MsgErr("NilArgs", "tab");
         return;
     end
-    if !self.Tables[tab] then
+    if !tables[tab] then
         MsgErr("NilEntry", tab);
         return;
     end
@@ -315,7 +330,7 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
         MsgErr("NilArgs", "data");
         return;
     end
-    if !self.Tables[tab] then
+    if !tables[tab] then
         MsgErr("NilEntry", tab);
         return;
     end
@@ -353,7 +368,7 @@ addErrType("KeyExists", "A key already exists in this table! (Column %s in table
 -- Hooks.
 hook.Add("InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
-    if db.DBObject and db.Connected then
+    if db:IsConnected() then
         MsgCon(color_sql, "Database still connected, skipping.");
         return;
     end

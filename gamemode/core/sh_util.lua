@@ -10,6 +10,7 @@ function handleFunc(var, ...)
 end
 
 function MsgCon(color, text, ...)
+    color = color or color_white;
     if type(color) != "table" then return; end
     if !text then text = ""; end
 

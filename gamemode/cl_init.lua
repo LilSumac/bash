@@ -1,5 +1,3 @@
-MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
-
 -- Things that should be done, regardless of restart or JIT or whatever.
 local function miscInit()
     -- Random seed!
@@ -18,9 +16,11 @@ DeriveGamemode("sandbox");
 -- there is an OnReload hook to use.
 if bash and bash.started then
     miscInit();
-    hook.Call("OnReload", bash);
+    hook.Run("OnReload", bash);
     return;
 end
+
+MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
 
 -- Global table for bash elements.
 bash = bash or {};
@@ -55,11 +55,11 @@ end);
 
 -- Hooks for init process.
 MsgCon(color_green, "Gathering preliminary data...");
-hook.Call("GatherPrelimData_Base"); -- For all prelims that MUST come first.
-hook.Call("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
+hook.Run("GatherPrelimData_Base"); -- For all prelims that MUST come first.
+hook.Run("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
 MsgCon(color_green, "Initializing services...");
-hook.Call("InitService_Base");      -- For all inits that MUST come first.
-hook.Call("InitService");           -- Connect to DB, load /data files, etc.
+hook.Run("InitService_Base");      -- For all inits that MUST come first.
+hook.Run("InitService");           -- Connect to DB, load /data files, etc.
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
@@ -68,5 +68,5 @@ MsgCon(color_cyan, "======================== BASE COMPLETE =====================
 bash.started = true;
 
 MsgCon(color_green, "Doing post-init calls...");
-hook.Call("PostInit_Base");         -- For all post-inits that MUST come first.
-hook.Call("PostInit");              -- Finish up.
+hook.Run("PostInit_Base");         -- For all post-inits that MUST come first.
+hook.Run("PostInit");              -- Finish up.

@@ -6,9 +6,10 @@ SVC.Author = "LilSumac";
 SVC.Desc = "The main player functions for the gamemode.";
 SVC.Depends = {"CDatabase", "CTableNet"};
 
-------------------------------------------------------
--- Local functions for specific DB operations.
-------------------------------------------------------
+-- Custom errors.
+addErrType("MultiPlyRows", "Player '%s' has multiple player rows, using the first one. This can cause conflicts! Remove all duplicate rows ASAP!");
+
+-- Local functions.
 local function createPlyData(ply)
     MsgCon(color_sql, "Creating new entry for '%s'...", ply:Name());
 
@@ -25,8 +26,8 @@ local function createPlyData(ply)
         data,                   -- Data to insert.
 
         function(_ply, results) -- Callback function upon completion.
-            MsgCon(color_sql, "INSERT DONE!");
-            PrintTable(data);
+            ply.PreInitTask:PassData("SQLData", data);
+            ply.PreInitTask:Update("WaitForSQL", 1);
         end,
 
         ply                     -- Argument #1 for callback.
@@ -51,20 +52,17 @@ local function getPlyData(ply)
             if table.IsEmpty(results.data) then
                 createPlyData(_ply);
             else
-                MsgCon(color_sql, "GET DONE!");
-                PrintTable(results.data);
+                MsgN("Found row...");
+                ply.PreInitTask:PassData("SQLData", results.Data);
+                ply.PreInitTask:Update("WaitForSQL", 1);
             end
         end,
 
         ply                                         -- Argument #1 for callback.
     );
 end
-------------------------------------------------------
---
-------------------------------------------------------
 
--- Custom errors.
-addErrType("MultiPlyRows", "Player '%s' has multiple player rows, using the first one. This can cause conflicts! Remove all duplicate rows ASAP!");
+
 
 if SERVER then
 
@@ -72,70 +70,24 @@ if SERVER then
     util.AddNetworkString("bash_test");
 
     -- Hooks.
+    hook.Add("GatherPrelimData", "CPlayer_AddTasks", function()
+        local ctask = getService("CTask");
+        ctask:AddTaskCondition("bash_PlayerPreInit", "WaitForSQL", TASK_NUMERIC, 0, 1);
+
+        ctask:AddTaskCallback("bash_PlayerPreInit", function(data)
+            local tabnet = getService("CTableNet");
+            tabnet:NewTable("Player", data["SQLData"], data["Player"]);
+        end);
+    end);
+
     hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
         getPlyData(ply);
-        local tablenet = getService("CTableNet");
-        tablenet:NewTable("Player", {}, ply);
-
-
-        /*
-        MsgN("Meta for player...");
-        MsgN(tostring(getmetatable(ply)));
-        MsgN("Player meta...")
-        MsgN(tostring(FindMetaTable("Player")));
-
-        local netvar = getService("CTableNet");
-        local newData = {};
-        newData["SteamID"] = ply:SteamID();
-        local plyVars = netvar:GetDomainVars("CPlayer");
-        for id, var in pairs(plyVars) do
-            newData[id] = handleFunc(var.OnGenerate, var, ply);
-        end
-        ply.PlyData = newData;
-
-        getPlyData(ply);
-
-
-        local test = setmetatable({}, getMeta("Character"));
-        MsgN("Data table: " .. tostring(test));
-        MsgN("Data metatable: " .. tostring(getmetatable(test)));
-        MsgN("Character metatable: " .. tostring(getMeta("Character")));
-        local testPck = vnet.CreatePacket("bash_test");
-        testPck:Table(test);
-        testPck:AddTargets(ply);
-        testPck:Send();
-        */
     end);
 
 end
 
 -- Hooks.
 hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
-    if SERVER then
-        local db = getService("CDatabase");
-        db:AddTable("bash_plys", REF_PLY);
-
-        -- automate this with vars
-        db:AddColumn("bash_plys", {
-            ["Name"] = "Name",
-            ["Type"] = "string",
-            ["Default"] = "Steam Name"
-        });
-        db:AddColumn("bash_plys", {
-            ["Name"] = "NewPlayer",
-            ["Type"] = "boolean",
-            ["Default"] = true
-        });
-        db:AddColumn("bash_plys", {
-            ["Name"] = "FirstLogin",
-            ["Type"] = "number"
-        });
-        db:AddColumn("bash_plys", {
-            ["Name"] = "Addresses",
-            ["Type"] = "table"
-        });
-    end
-
     local tablenet = getService("CTableNet");
     tablenet:AddDomain{
         ID = "Player",
@@ -147,10 +99,12 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
     tablenet:AddVariable{
         ID = "Name",
         Domain = "Player",
+        Type = "string",
+        MaxLength = 32,
         Public = true,
         InSQL = true,
         OnGenerate = function(_self, ply)
-            return self:OnInitialize(ply);
+            return _self:OnInitialize(ply);
         end,
         OnInitialize = function(_self, ply, oldVal)
             return ply:Name();
@@ -160,8 +114,11 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
     tablenet:AddVariable{
         ID = "SteamID",
         Domain = "Player",
+        Type = "string",
+        MaxLength = 18,
         Public = true,
         InSQL = true,
+        PrimaryKey = true,
         OnGenerate = function(_self, ply)
             return ply:SteamID();
         end
@@ -171,6 +128,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         ID = "Addresses",
         Domain = "Player",
         Type = "table",
+        MaxLength = 255,
         InSQL = true,
         OnGenerate = function(_self, ply)
             return {[ply:IPAddress()] = true};
@@ -185,6 +143,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         ID = "FirstLogin",
         Domain = "Player",
         Type = "number",
+        MaxLength = 10,
         Public = true,
         InSQL = true,
         OnGenerate = function(_self, ply)
@@ -201,7 +160,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         OnGenerate = true,
         OnInitServer = function(_self, ply, oldVal)
             local playtime = ply:GetNetVar("Player", "Playtime");
-            if playTime > 21600 then
+            if playtime > 21600 then
                 ply:SetNetVar("Player", "NewPlayer", false);
             end
         end
@@ -211,6 +170,7 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         ID = "Playtime",
         Domain = "Player",
         Type = "number",
+        MaxLength = 10,
         Public = true,
         InSQL = true,
         OnGenerate = 0,
@@ -224,16 +184,6 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
             ply:SetNetVar("Player", "Playtime", newTime);
         end
     };
-
-    /*
-    tablenet:AddVariable{
-        ID = "Flags",
-        Domain = "Player",
-        Type = "string",
-        Public = true,
-        InSQL = true
-    };
-    */
 end);
 
 defineService_end();
