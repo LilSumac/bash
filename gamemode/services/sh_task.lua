@@ -6,6 +6,8 @@ SVC.Author = "LilSumac";
 SVC.Desc = "Simple framework for implementing code-based tasks with progress, feedback, and callbacks.";
 
 -- Constants.
+color_task = Color(151, 0, 151, 255);
+
 TASK_NUMERIC = 0;
 TASK_TIMED = 1;
 TASK_OTHER = 2;
@@ -128,7 +130,8 @@ if SERVER then
     hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         local ctask = getService("CTask");
         ctask:AddTask("bash_PlayerPreInit");
-        ctask:AddTaskOnFinish("bash_PlayerPreInit", function(data)
+        ctask:AddTaskOnFinish("bash_PlayerPreInit", function(status, data)
+            if status == STATUS_FAILED then return; end
             if !isplayer(data["Player"]) then return; end
 
             local ply = data["Player"];
@@ -139,11 +142,13 @@ if SERVER then
             ply.PreInitTask = nil;
             ply.OnInitTask = oninit.UniqueID;
             ply.Initialized = true;
-            hook.Run("PlayerOnInit", ply);
+
+            hook.Run("PlayerPreInit", ply);
         end);
 
         ctask:AddTask("bash_PlayerOnInit");
-        ctask:AddTaskOnFinish("bash_PlayerOnInit", function(data)
+        ctask:AddTaskOnFinish("bash_PlayerOnInit", function(status, data)
+            if status == STATUS_FAILED then return; end
             if !isplayer(data["Player"]) then return; end
 
             local ply = data["Player"];
@@ -153,15 +158,19 @@ if SERVER then
             postinit:Start();
             ply.OnInitTask = nil;
             ply.PostInitTask = postinit.UniqueID;
-            hook.Run("PlayerPostInit", ply);
+
+            hook.Run("PlayerOnInit", ply);
         end);
 
         ctask:AddTask("bash_PlayerPostInit");
-        ctask:AddTaskOnFinish("bash_PlayerPostInit", function(data)
+        ctask:AddTaskOnFinish("bash_PlayerPostInit", function(status, data)
+            if status == STATUS_FAILED then return; end
             if !isplayer(data["Player"]) then return; end
 
             local ply = data["Player"];
             ply.PostInitTask = nil;
+
+            hook.Run("PlayerPostInit", ply);
         end);
     end);
 
@@ -173,7 +182,6 @@ if SERVER then
         preinit:PassData("Player", ply);
         preinit:Start();
         ply.PreInitTask = preinit.UniqueID;
-        hook.Run("PlayerPreInit", ply);
     end);
 
 end

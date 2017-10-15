@@ -21,7 +21,7 @@ function META:Initialize()
 
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        MsgCon(color_lightblue, "The task '%s->%s' has no conditions! Starting it will automatically complete it.", self.TaskID, self.UniqueID);
+        MsgCon(color_task, "The task '%s->%s' has no conditions! Starting it will automatically complete it.", self.TaskID, self.UniqueID);
     else
         for condID, cond in pairs(self.TaskInfo.Conditions) do
             if cond.Type == TASK_TIMED then
@@ -38,7 +38,7 @@ function META:Initialize()
 end
 
 function META:Start()
-    MsgCon(color_blue, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
+    MsgCon(color_task, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
     self.Status = STATUS_RUNNING;
     self.StartTime = SysTime();
 
@@ -78,7 +78,7 @@ function META:Restart()
     self.Status = STATUS_RUNNING;
 
     for condID, cond in pairs(self.TaskInfo.Conditions) do
-        self.Conditions[condID] = cond.Begin;
+        self.Values[condID] = cond.Begin;
     end
 
     for timerID, _ in pairs(self.Timers) do
@@ -106,9 +106,9 @@ function META:Update(cond, value)
     end
 
     if condInfo.Type == TASK_NUMERIC then
-        self.Conditions[cond] = self.Conditions[cond] + value;
+        self.Values[cond] = self.Values[cond] + value;
     else
-        self.Conditions[cond] = value;
+        self.Values[cond] = value;
     end
 
     if self:CheckConditions() then
@@ -123,7 +123,7 @@ end
 function META:Finish(status)
     self.Status = status;
 
-    MsgCon(color_blue, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
+    MsgCon(color_task, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
     for _, func in ipairs(self.TaskInfo.Callbacks) do
         func(status, self.PassedData);
     end
@@ -136,11 +136,11 @@ end
 function META:CheckConditions()
     for condID, cond in pairs(self.TaskInfo.Conditions) do
         if cond.Type == TASK_NUMERIC or cond.Type == TASK_TIMED then
-            if self.Conditions[condID] < cond.Finish then
+            if self.Values[condID] < cond.Finish then
                 return false;
             end
         else
-            if self.Conditions[condID] != cond.Finish then
+            if self.Values[condID] != cond.Finish then
                 return false;
             end
         end

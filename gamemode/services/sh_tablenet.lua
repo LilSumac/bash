@@ -447,7 +447,9 @@ if SERVER then
         end
 
         timer.Simple(delay, function()
-            ply.OnInitTask:Update("WaitForTableNet", 1);
+            local ctask = getService("CTask");
+            local oninit = ctask:GetActiveTask(ply.OnInitTask);
+            oninit:Update("WaitForTableNet", 1);
         end);
     end
 
@@ -661,7 +663,9 @@ if SERVER then
     -- Hooks.
     hook.Add("GatherPrelimData", "CTableNet_AddTasks", function()
         local ctask = getService("CTask");
-        ctask:AddTaskCallback("bash_PlayerPreInit", function(data)
+        ctask:AddTaskCallback("bash_PlayerPreInit", function(status, data)
+            if status == STATUS_FAILED then return; end
+
             onPlayerInit(data["Player"]);
         end);
         ctask:AddTaskCondition("bash_PlayerOnInit", "WaitForTableNet", TASK_NUMERIC, 0, 1);

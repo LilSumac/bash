@@ -26,8 +26,10 @@ local function createPlyData(ply)
         data,                   -- Data to insert.
 
         function(_ply, results) -- Callback function upon completion.
-            ply.PreInitTask:PassData("SQLData", data);
-            ply.PreInitTask:Update("WaitForSQL", 1);
+            local ctask = getService("CTask");
+            local preinit = ctask:GetActiveTask(ply.PreInitTask);
+            preinit:PassData("SQLData", data);
+            preinit:Update("WaitForSQL", 1);
         end,
 
         ply                     -- Argument #1 for callback.
@@ -53,8 +55,10 @@ local function getPlyData(ply)
                 createPlyData(_ply);
             else
                 MsgN("Found row...");
-                ply.PreInitTask:PassData("SQLData", results.Data);
-                ply.PreInitTask:Update("WaitForSQL", 1);
+                local ctask = getService("CTask");
+                local preinit = ctask:GetActiveTask(ply.PreInitTask);
+                preinit:PassData("SQLData", results.Data);
+                preinit:Update("WaitForSQL", 1);
             end
         end,
 
@@ -74,7 +78,7 @@ if SERVER then
         local ctask = getService("CTask");
         ctask:AddTaskCondition("bash_PlayerPreInit", "WaitForSQL", TASK_NUMERIC, 0, 1);
 
-        ctask:AddTaskCallback("bash_PlayerPreInit", function(data)
+        ctask:AddTaskCallback("bash_PlayerPreInit", function(status, data)
             local tabnet = getService("CTableNet");
             tabnet:NewTable("Player", data["SQLData"], data["Player"]);
         end);
