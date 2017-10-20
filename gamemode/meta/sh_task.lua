@@ -167,6 +167,7 @@ if SERVER then
         data.PassedData = self.PassedData;
 
         local taskpck = vnet.CreatePacket();
+        -- add data, send to ply
     end
 
 end

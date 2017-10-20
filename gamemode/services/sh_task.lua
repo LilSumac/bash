@@ -124,9 +124,13 @@ addErrType("TaskNotActive", "No task with that ID is active! (%s)");
 addErrType("TaskNotValid", "This task does not have a TaskID/UniqueID! Use the library create function! (%s)");
 addErrType("TaskAlreadyRunning", "Only one instance of this task can be active at a time! (%s running on %s)");
 
+-- Hooks.
+-- GatherPrelimData: create task
+
 if SERVER then
 
     -- Hooks.
+    -- GatherPrelimData: add sv onfinishes
     hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         local ctask = getService("CTask");
         ctask:AddTask("bash_PlayerPreInit");
@@ -192,10 +196,17 @@ if SERVER then
 
         local ctask = getService("CTask");
         local preinit = ctask:NewTask("bash_PlayerPreInit");
+        -- add listener to task
         preinit:PassData("Player", ply);
         preinit:Start();
         ply.PreInitTask = preinit.UniqueID;
     end);
+
+elseif CLIENT then
+
+    -- watch for new tasks (added listener)
+
+    -- watch for updated tasks (already listening)
 
 end
 
