@@ -21,7 +21,7 @@ function META:Initialize()
 
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        MsgCon(color_task, "The task '%s->%s' has no conditions! Starting it will automatically complete it.", self.TaskID, self.UniqueID);
+        MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.TaskID, self.UniqueID);
     else
         for condID, cond in pairs(self.TaskInfo.Conditions) do
             if cond.Type == TASK_TIMED then
@@ -38,7 +38,7 @@ function META:Initialize()
 end
 
 function META:Start()
-    MsgCon(color_task, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
+    MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
     self.Status = STATUS_RUNNING;
     self.StartTime = SysTime();
 
@@ -47,7 +47,9 @@ function META:Start()
     end
 
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        self:Finish(STATUS_SUCCESS);
+        timer.Simple(0.1, function()
+            self:Finish(STATUS_SUCCESS);
+        end);
     end
 end
 
@@ -123,7 +125,7 @@ end
 function META:Finish(status)
     self.Status = status;
 
-    MsgCon(color_task, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
+    MsgLog(LOG_DEF, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
     for _, func in ipairs(self.TaskInfo.Callbacks) do
         func(status, self.PassedData);
     end

@@ -47,6 +47,7 @@ function META:Get(vars)
 end
 
 function META:Set(data)
+    --[[
     if !data then
         MsgErr("NilArgs", "data");
         return;
@@ -76,6 +77,7 @@ function META:Set(data)
             end
         end
     end
+    ]]
 end
 
 function META:AttachTo(ent)
@@ -93,7 +95,7 @@ end
 function META:OnDetach(old, new)
     // hook for when changing owners
 
-    MsgCon(color_orange, "Switched character (%s) owner from '%s' to '%s'.", self.CharID, tostring(old), tostring(new));
+    MsgLog(LOG_DEF, "Switched character (%s) owner from '%s' to '%s'.", self.CharID, tostring(old), tostring(new));
 end
 
 function META:OnSave()

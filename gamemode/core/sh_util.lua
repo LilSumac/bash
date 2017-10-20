@@ -9,13 +9,12 @@ function handleFunc(var, ...)
     end
 end
 
-function MsgCon(color, text, ...)
-    color = color or color_white;
-    if type(color) != "table" then return; end
+function MsgLog(log, text, ...)
+    log = log or LOG_DEF;
     if !text then text = ""; end
 
-    text = Format(text, unpack({...})) .. '\n';
-    MsgC(color, text);
+    text = Format("%s " .. text, log.pre or "", unpack({...})) .. '\n';
+    MsgC(log.col or color_con, text);
 
     -- if verbose logging enabled, log text
 end
@@ -56,8 +55,7 @@ function MsgErr(errType, ...)
     local srcFunc = (funcInfo.name != "" and funcInfo.name) or "In File";
     local srcStr = Format("%s -> %s line %d", srcFunc, srcFile, fromInfo.currentline);
 
-    --MsgCon(color_red, "%s", debug.traceback(nil, nil, 2));
-    MsgCon(color_red, "[%s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
+    MsgLog(LOG_ERR, "[From %s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
 end
 
 function addErrType(name, str)
@@ -204,7 +202,7 @@ function defineMeta_end()
         return;
     end
 
-    MsgCon(color_green, "Registering metatable: %s", meta.ID);
+    MsgLog(LOG_INIT, "Registering metatable: %s", meta.ID);
     bash.meta[meta.ID] = meta;
     _G["META"] = nil;
 end
@@ -255,7 +253,7 @@ function defineService_end()
         return;
     end
 
-    MsgCon(color_green, "Registering service: %s", svc.ID);
+    MsgLog(LOG_INIT, "Registering service: %s", svc.ID);
     bash.services[svc.ID] = svc;
     _G["SVC"] = nil;
 end
@@ -306,7 +304,7 @@ function definePlugin_end()
         return;
     end
 
-    MsgCon(color_green, "Registering plugin: %s", plug.ID);
+    MsgLog(LOG_INIT, "Registering plugin: %s", plug.ID);
     bash.plugins[plug.ID] = plug;
     _G["PLUG"] = nil;
 end

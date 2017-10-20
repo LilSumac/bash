@@ -52,6 +52,11 @@ ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";
 ERR_TYPES["UnsafeNVEntry"] = "Do not set NV entries to nil! Use 'removeNonVolatileEntry' instead. (%s)";
 
+LOG_DEF = {pre = "[LOG]", col = color_con};
+LOG_INIT = {pre = "[INIT]", col = color_green};
+LOG_ERR = {pre = "[ERR]", col = color_red, log = true};
+LOG_WARN = {pre = "[WARN]", col = color_orange, log = true};
+
 OS_WIN = 1;
 OS_OSX = 2;
 OS_LIN = 3;

@@ -136,14 +136,19 @@ if SERVER then
 
             local ply = data["Player"];
             local ctask = getService("CTask");
+
+            -- Handle player affairs.
+            ply:Initialize();
+
+            -- Create next task.
             local oninit = ctask:NewTask("bash_PlayerOnInit");
             oninit:PassData("Player", ply);
             oninit:Start();
-            ply.PreInitTask = nil;
             ply.OnInitTask = oninit.UniqueID;
-            ply.Initialized = true;
 
-            hook.Run("PlayerPreInit", ply);
+            -- Remove completed task.
+            ctask:RemoveActiveTask(ply.PreInitTask);
+            ply.PreInitTask = nil;
         end);
 
         ctask:AddTask("bash_PlayerOnInit");
@@ -153,13 +158,19 @@ if SERVER then
 
             local ply = data["Player"];
             local ctask = getService("CTask");
+
+            -- Handle player affairs.
+            ply:PostInitialize();
+
+            -- Create next task.
             local postinit = ctask:NewTask("bash_PlayerPostInit");
             postinit:PassData("Player", ply);
             postinit:Start();
-            ply.OnInitTask = nil;
             ply.PostInitTask = postinit.UniqueID;
 
-            hook.Run("PlayerOnInit", ply);
+            -- Remove completed task.
+            ctask:RemoveActiveTask(ply.OnInitTask);
+            ply.OnInitTask = nil;
         end);
 
         ctask:AddTask("bash_PlayerPostInit");
@@ -168,9 +179,11 @@ if SERVER then
             if !isplayer(data["Player"]) then return; end
 
             local ply = data["Player"];
-            ply.PostInitTask = nil;
+            local ctask = getService("CTask");
 
-            hook.Run("PlayerPostInit", ply);
+            -- Remove completed task.
+            ctask:RemoveActiveTask(ply.PostInitTask);
+            ply.PostInitTask = nil;
         end);
     end);
 

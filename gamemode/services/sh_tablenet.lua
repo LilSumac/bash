@@ -156,7 +156,7 @@ function SVC:AddDomain(domain)
         return {};
     end
 
-    MsgCon("Registering domain: %s", domain.ID);
+    MsgLog(LOG_INIT, "Registering domain: %s", domain.ID);
     domains[domain.ID] = domain;
     vars[domain.ID] = {};
 end
@@ -207,7 +207,7 @@ function SVC:AddVariable(var)
         -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
     end
 
-    MsgCon(color_green, "Registering netvar %s in domain %s.", var.ID, var.Domain);
+    MsgLog(LOG_INIT, "Registering netvar %s in domain %s.", var.ID, var.Domain);
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
@@ -299,7 +299,7 @@ function SVC:NewTable(domain, data, obj, regID)
         singlesMade[domain] = tab.RegistryID;
     end
 
-    MsgCon(color_blue, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
+    MsgLog(LOG_DEF, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
     PrintTable(registry);
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
@@ -663,12 +663,11 @@ if SERVER then
     -- Hooks.
     hook.Add("GatherPrelimData", "CTableNet_AddTasks", function()
         local ctask = getService("CTask");
-        ctask:AddTaskCallback("bash_PlayerPreInit", function(status, data)
-            if status == STATUS_FAILED then return; end
-
-            onPlayerInit(data["Player"]);
-        end);
         ctask:AddTaskCondition("bash_PlayerOnInit", "WaitForTableNet", TASK_NUMERIC, 0, 1);
+    end);
+
+    hook.Add("PlayerOnInit", "CTableNet_InitPlayer", function(ply)
+        onPlayerInit(ply);
     end);
 
 elseif CLIENT then
@@ -680,7 +679,7 @@ elseif CLIENT then
         tablenet.InitialSend = true;
         tablenet.WaitingOn = objs;
         tablenet.Received = 0;
-        MsgCon(color_blue, "Waiting on %d networked objects...", objs);
+        MsgLog(LOG_INIT, "Waiting on %d networked objects...", objs);
     end);
 
     vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
@@ -708,7 +707,7 @@ elseif CLIENT then
         if firstSend then
             tablenet.Received = tablenet.Received + 1;
             if tablenet.Received == tablenet.WaitingOn then
-                MsgCon(color_blue, "Received all networked objects!");
+                MsgLog(LOG_INIT, "Received all networked objects!");
             end
         end
     end);

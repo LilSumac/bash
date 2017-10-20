@@ -5,7 +5,7 @@ if !tmysql4 then
         MsgErr("NoDBModule");
         return;
     else
-        MsgCon(color_green, "tmysql4 module loaded.");
+        MsgLog(LOG_INIT, "tmysql4 module loaded.");
     end
 end
 
@@ -64,7 +64,7 @@ function SVC:Connect()
         dbObject = obj;
         connected = true;
 
-        MsgCon(color_sql, "Successfully connected to MySQL server!");
+        MsgLog(LOG_INIT, "Successfully connected to MySQL server!");
     else
         MsgErr("NoDBConnect", err);
         return;
@@ -103,7 +103,7 @@ function SVC:AddTable(name)
 
     tables[name] = tab;
 
-    MsgCon(color_sql, "Database table registered with name '%s'.", name);
+    MsgLog(LOG_INIT, "Database table registered with name '%s'.", name);
 end
 
 function SVC:AddColumn(tab, col, primary)
@@ -138,11 +138,11 @@ function SVC:AddColumn(tab, col, primary)
     col.NotNull = col.NotNull or false;
     col.Field = col.Field or "";
 
-    MsgCon(color_sql, "Database column '%s' registered in table '%s'.", col.Name, tab);
+    MsgLog(LOG_INIT, "Database column '%s' registered in table '%s'.", col.Name, tab);
 
     if primary then
         tabData.PrimaryKey = col.Name;
-        MsgCon(color_sql, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
+        MsgLog(LOG_INIT, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
     end
 
     tabData.Columns[col.Name] = col;
@@ -229,7 +229,7 @@ end
 
 function SVC:CheckTables()
     if table.IsEmpty(tables) then
-        MsgCon(color_sql, "No tables registered in database. Skipping...");
+        MsgLog(LOG_INIT, "No tables registered in database. Skipping...");
         return;
     end
 
@@ -255,7 +255,7 @@ function SVC:CheckTables()
     end
 
     self:Query(query, function(results)
-        MsgCon(color_sql, "Table check complete.");
+        MsgLog(LOG_INIT, "Table check complete.");
         local db = getService("CDatabase");
         db:CheckColumns();
     end);
@@ -294,7 +294,7 @@ function SVC:InsertRow(tab, data, callback, ...)
 
     query = Format("%s) %s);", query, vals);
     self:Query(query, callback or function(results)
-        MsgCon(color_sql, "New row inserted into table '%s'.", tab);
+        MsgLog(LOG_DEF, "New row inserted into table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -317,7 +317,7 @@ function SVC:GetRow(tab, cols, cond, callback, ...)
     end
 
     self:Query(query, callback or function(results)
-        MsgCon(color_sql, "Fetched from row in table '%s'.", tab);
+        MsgLog(LOG_DEF, "Fetched from row in table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -354,7 +354,7 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
     end
 
     self:Query(query, callback or function(results)
-        MsgCon(color_sql, "Row updated in table '%s'.", tab);
+        MsgLog(LOG_DEF, "Row updated in table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -369,7 +369,7 @@ addErrType("KeyExists", "A key already exists in this table! (Column %s in table
 hook.Add("InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db:IsConnected() then
-        MsgCon(color_sql, "Database still connected, skipping.");
+        MsgLog(LOG_INIT, "Database still connected, skipping.");
         return;
     end
 

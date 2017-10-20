@@ -2281,6 +2281,6 @@ end
 
 vnet.versionString = "1.1.5"
 vnet.versionNumber = 1001005
-MsgCon(color_green, "vNet loaded! (%s)", vnet.versionString);
+MsgLog(LOG_INIT, "vNet loaded! (%s)", vnet.versionString);
 
 return vnet

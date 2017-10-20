@@ -3,7 +3,7 @@
 -- Handle sending initial client data.
 hook.Add("InitPostEntity", "bash_Hook_DelayedClientInit", function()
     if bash.waitForPostInit then
-        MsgCon(color_green, "Contacting server...");
+        MsgLog(LOG_INIT, "Contacting server...");
         sendClientData();
         bash.waitForPostInit = false;
     end
@@ -17,6 +17,6 @@ hook.Add("PostInit_Base", "bash_Hook_ClientInit", function()
         return;
     end
 
-    MsgCon(color_green, "Contacting server...");
+    MsgLog(LOG_INIT, "Contacting server...");
     sendClientData();
 end);

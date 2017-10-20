@@ -365,4 +365,4 @@ function tween.new(duration, subject, target, easing)
   }, Tween_mt)
 end
 
-MsgCon(color_green, "tween loaded! (%s)", tween._VERSION);
+MsgLog(LOG_INIT, "tween loaded! (%s)", tween._VERSION);

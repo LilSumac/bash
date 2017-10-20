@@ -11,7 +11,7 @@ addErrType("MultiPlyRows", "Player '%s' has multiple player rows, using the firs
 
 -- Local functions.
 local function createPlyData(ply)
-    MsgCon(color_sql, "Creating new entry for '%s'...", ply:Name());
+    MsgLog(LOG_DEF, "Creating new entry for '%s'...", ply:Name());
 
     local tablenet = getService("CTableNet");
     local vars = tablenet:GetDomainVars("Player");
@@ -37,7 +37,7 @@ local function createPlyData(ply)
 end
 
 local function getPlyData(ply)
-    MsgCon(color_sql, "Gathering player data for '%s'...", ply:Name());
+    MsgLog(LOG_DEF, "Gathering player data for '%s'...", ply:Name());
 
     local db = getService("CDatabase");
     db:GetRow(
@@ -66,7 +66,14 @@ local function getPlyData(ply)
     );
 end
 
+-- Service functions.
+function SVC:KickPlayer(ply, reason, kicker)
 
+end
+
+function SVC:BanPlayer(ply, reason, length, banner)
+
+end
 
 if SERVER then
 

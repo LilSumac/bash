@@ -54,19 +54,19 @@ addClientData("OS", function()
 end);
 
 -- Hooks for init process.
-MsgCon(color_green, "Gathering preliminary data...");
+MsgLog(LOG_INIT, "Gathering preliminary data...");
 hook.Run("GatherPrelimData_Base"); -- For all prelims that MUST come first.
 hook.Run("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
-MsgCon(color_green, "Initializing services...");
+MsgLog(LOG_INIT, "Initializing services...");
 hook.Run("InitService_Base");      -- For all inits that MUST come first.
 hook.Run("InitService");           -- Connect to DB, load /data files, etc.
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
-MsgCon(color_green, "Successfully initialized base client-side. Startup: %fs", len);
-MsgCon(color_cyan, "======================== BASE COMPLETE ========================");
+MsgLog(LOG_INIT, "Successfully initialized base client-side. Startup: %fs", len);
+MsgLog(color_cyan, "======================== BASE COMPLETE ========================");
 bash.started = true;
 
-MsgCon(color_green, "Doing post-init calls...");
+MsgLog(LOG_DEF, "Doing post-init calls...");
 hook.Run("PostInit_Base");         -- For all post-inits that MUST come first.
 hook.Run("PostInit");              -- Finish up.
