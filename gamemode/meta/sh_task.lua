@@ -14,10 +14,13 @@ function META:Initialize()
 
     self.StartTime = -1;
     self.Values = {};
-    self.Progress = {};
     self.Timers = {};
     self.SavedValues = {};
     self.PassedData = {};
+
+    if SERVER then
+        self.Listeners = {};
+    end
 
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
@@ -40,7 +43,7 @@ end
 function META:Start()
     MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
     self.Status = STATUS_RUNNING;
-    self.StartTime = SysTime();
+    self.StartTime = os.time();
 
     for timerID, _ in pairs(self.Timers) do
         timer.Start(timerID);
@@ -148,6 +151,24 @@ function META:CheckConditions()
         end
     end
     return true;
+end
+
+if SERVER then
+
+    function META:AddListener(ply)
+        self.Listeners[ply] = true;
+
+        local data = {};
+        data.TaskID = self.TaskID;
+        data.UniqueID = self.UniqueID;
+        data.StartTime = self.StartTime;
+        data.Values = self.Values;
+        data.SavedValues = self.SavedValues;
+        data.PassedData = self.PassedData;
+
+        local taskpck = vnet.CreatePacket();
+    end
+
 end
 
 defineMeta_end();
