@@ -129,9 +129,61 @@ addErrType("TaskAlreadyRunning", "Only one instance of this task can be active a
 
 if SERVER then
 
+    -- Network pool.
+    util.AddNetworkString("CTask_Net_SendTask");
+    util.AddNetworkString("CTask_Net_UpdateTask");
+
     -- Hooks.
     -- GatherPrelimData: add sv onfinishes
-    hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
+    hook.Add("GatherPrelimData", "bash_Hook_AddPlyTasks", function()
+        local tabnet = getService("CTableNet");
+        tabnet:AddDomain{
+            ID = "Task",
+            ParentMeta = getMeta("Task"),
+            Secure = false,
+            GetRecipients = function(_self, task)
+                return task.Listeners;
+            end
+        };
+
+        tabnet:AddVariable{
+            ID = "Status",
+            Domain = "Task",
+            Type = "number",
+            Public = true,
+            OnGenerate = STATUS_PAUSED,
+            OnSetClient
+        };
+
+        tabnet:AddVariable{
+            ID = "StartTime",
+            Domain = "Task",
+            Type = "number",
+            Public = true,
+            OnGenerate = -1
+        };
+
+        tabnet:AddVariable{
+            ID = "Values",
+            Domain = "Task",
+            Type = "table",
+            Public = true
+        };
+
+        tabnet:AddVariable{
+            ID = "SavedValues",
+            Domain = "Task",
+            Type = "table",
+            Public = true
+        };
+
+        tabnet:AddVariable{
+            ID = "PassedData",
+            Domain = "Task",
+            Type = "table",
+            Public = true
+        };
+
         local ctask = getService("CTask");
         ctask:AddTask("bash_PlayerPreInit");
         ctask:AddTaskOnFinish("bash_PlayerPreInit", function(status, data)
@@ -204,6 +256,10 @@ if SERVER then
 
 elseif CLIENT then
 
+    vnet.Watch("CTask_Net_SendTask", function(pck)
+        local data = pck:Table();
+
+    end);
     -- watch for new tasks (added listener)
 
     -- watch for updated tasks (already listening)

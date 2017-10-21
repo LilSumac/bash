@@ -115,9 +115,9 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         Public = true,
         InSQL = true,
         OnGenerate = function(_self, ply)
-            return _self:OnInitialize(ply);
+            return ply:Name();
         end,
-        OnInitialize = function(_self, ply, oldVal)
+        OnInitServer = function(_self, ply, oldVal)
             return ply:Name();
         end
     };

@@ -12,11 +12,7 @@ function META:Initialize()
     local taskInfo = task:GetTask(self.TaskID);
     self.TaskInfo = taskInfo;
 
-    self.StartTime = -1;
-    self.Values = {};
     self.Timers = {};
-    self.SavedValues = {};
-    self.PassedData = {};
 
     if SERVER then
         self.Listeners = {};
@@ -26,24 +22,28 @@ function META:Initialize()
     if table.IsEmpty(self.TaskInfo.Conditions) then
         MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.TaskID, self.UniqueID);
     else
+        local startVals = {};
         for condID, cond in pairs(self.TaskInfo.Conditions) do
             if cond.Type == TASK_TIMED then
-                self.Values[condID] = 0;
+                startVals[condID] = 0;
                 timerID = Format("CTask_%s_%d", self.UniqueID, #self.Timers + 1);
                 self.Timers[timerID] = true;
                 timer.Create(timerID, cond.Finish, 0, self.Update, self, condID, cond.Finish);
                 timer.Stop(timerID);
             else
-                self.Values[condID] = cond.Begin;
+                startVals[condID] = cond.Begin;
             end
         end
+        self:SetNetVar("Task", "Values", startVals);
     end
 end
 
 function META:Start()
     MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
-    self.Status = STATUS_RUNNING;
-    self.StartTime = os.time();
+    self:SetNetVars("Task", {
+        ["Status"] = STATUS_RUNNING,
+        ["StartTime"] = os.time()
+    });
 
     for timerID, _ in pairs(self.Timers) do
         timer.Start(timerID);
@@ -57,8 +57,8 @@ function META:Start()
 end
 
 function META:Pause()
-    if self.Status == STATUS_PAUSED then return; end
-    self.Status = STATUS_PAUSED;
+    if self:GetNetVar("Task", "Status") == STATUS_PAUSED then return; end
+    self:SetNetVar("Task", "Status", STATUS_PAUSED);
 
     for timerID, _ in pairs(self.Timers) do
         timer.Pause(timerID);
@@ -66,25 +66,39 @@ function META:Pause()
 end
 
 function META:Unpause()
-    if self.Status != STATUS_PAUSED then return; end
-    self.Status = STATUS_RUNNING;
+    if self:GetNetVar("Task", "Status") != STATUS_PAUSED then return; end
+    self:SetNetVar("Task", "Status", STATUS_RUNNING);
 
     for timerID, _ in pairs(self.Timers) do
         timer.UnPause(timerID);
     end
 
-    for cond, val in pairs(self.SavedValues) do
-        self:Update(cond, val);
+    local saved = self:GetNetVar("Task", "SavedValues");
+    if table.IsEmpty(saved) then return; end
+
+    local newVals = {};
+    for cond, val in pairs(self:GetNetVar("Task", "Values")) do
+        if saved[cond] != nil then
+            newVals[cond] = saved[cond];
+        else
+            newVals[cond] = val;
+        end
     end
-    self.SavedValues = {};
+    self:SetNetVars("Task", {
+        ["Values"] = newVals,
+        ["SavedValues"] = {}
+    });
 end
 
 function META:Restart()
-    self.Status = STATUS_RUNNING;
-
+    local newVals = {};
     for condID, cond in pairs(self.TaskInfo.Conditions) do
-        self.Values[condID] = cond.Begin;
+        newVals[condID] = cond.Begin;
     end
+    self:SetNetVars("Task", {
+        ["Status"] = STATUS_RUNNING,
+        ["Values"] = newVals
+    });
 
     for timerID, _ in pairs(self.Timers) do
         timer.Stop(timerID);
@@ -93,11 +107,14 @@ function META:Restart()
 end
 
 function META:PassData(id, data)
-    self.PassedData[id] = data;
+    local passed = self:GetNetVar("Task", "PassedData");
+    passed[id] = data;
+    self:SetNetVar("Task", "PassedData", passed);
 end
 
 function META:Update(cond, value)
-    if self.Status == STATUS_SUCCESS or self.Status == STATUS_FAILED then return; end
+    local status = self:GetNetVar("Task", "Status");
+    if status == STATUS_SUCCESS or status == STATUS_FAILED then return; end
 
     local condInfo = self.TaskInfo.Conditions[cond];
     if !condInfo then
@@ -105,16 +122,20 @@ function META:Update(cond, value)
         return;
     end
 
-    if self.Status == STATUS_PAUSED then
-        self.SavedValues[cond] = value;
+    if status == STATUS_PAUSED then
+        local saved = self:GetNetVar("Task", "SavedValues");
+        saved[cond] = value;
+        self:SetNetVar("Task", "SavedValues", saved);
         return;
     end
 
+    local values = self:GetNetVar("Task", "Values");
     if condInfo.Type == TASK_NUMERIC then
-        self.Values[cond] = self.Values[cond] + value;
+        values[cond] = values[cond] + value;
     else
-        self.Values[cond] = value;
+        values[cond] = value;
     end
+    self:SetNetVar("Task", "Values", values);
 
     if self:CheckConditions() then
         self:Finish(STATUS_SUCCESS);
@@ -126,15 +147,17 @@ function META:Fail()
 end
 
 function META:Finish(status)
-    self.Status = status;
+    self:SetNetVar("Task", "Status", status);
 
     MsgLog(LOG_DEF, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
+
+    local passed = self:GetNetVar("Task", "PassedData");
     for _, func in ipairs(self.TaskInfo.Callbacks) do
-        func(status, self.PassedData);
+        func(status, passed);
     end
 
     if self.TaskInfo.OnFinish then
-        self.TaskInfo.OnFinish(status, self.PassedData);
+        self.TaskInfo.OnFinish(status, passed;
     end
 end
 
@@ -166,8 +189,10 @@ if SERVER then
         data.SavedValues = self.SavedValues;
         data.PassedData = self.PassedData;
 
-        local taskpck = vnet.CreatePacket();
-        -- add data, send to ply
+        local taskpck = vnet.CreatePacket("CTask_Net_SendTask");
+        taskpck:Table(data);
+        taskpck:AddTargets(ply);
+        taskpck:Send();
     end
 
 end

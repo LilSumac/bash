@@ -37,6 +37,7 @@ local function runInits(tab, domain)
     end
 end
 
+-- Service functions.
 function SVC:AddDomain(domain)
     if !domain then
         MsgErr("NilArgs", "domain");
@@ -54,6 +55,7 @@ function SVC:AddDomain(domain)
     -- Domain fields.
     -- domain.ID = domain.ID; (Redundant, no default)
     -- domain.ParentMeta = domain.ParentMeta; (Redundant, no default);
+    domain.Secure = domain.Secure == nil and true or domain.Secure;
     domain.StoredInSQL = domain.StoredInSQL or false;
     if SERVER and domain.StoredInSQL then
         if !domain.SQLTable then
@@ -107,7 +109,7 @@ function SVC:AddDomain(domain)
             return unpack(results);
         end
     end
-    if SERVER and meta and !meta.SetNetVar then
+    if (SERVER or domain.Secure) and meta and !meta.SetNetVar then
         meta.SetNetVar = function(_self, domain, id, val)
             _self:SetNetVars(domain, {[id] = val});
         end
@@ -132,20 +134,31 @@ function SVC:AddDomain(domain)
             end
 
             local tablenet = getService("CTableNet");
-            if !tablenet:GetDomain(domain) then
+            local domInfo = tablenet:GetDomain(domain);
+            if !domInfo then
                 MsgErr("NilEntry", domain);
                 return;
             end
 
             local ids = {};
+            local varData;
             for id, val in pairs(data) do
-                if !tablenet:GetVariable(domain, id) then continue; end
+                varData = tablenet:GetVariable(domain, id);
+                if !varData then continue; end
 
                 _self.TableNet[domain][id] = val;
                 ids[#ids + 1] = id;
+
+                if SERVER and varData.OnSetServer then
+                    varData:OnSetServer(_self, val);
+                elseif CLIENT and varData.OnSetClient then
+                    varData:OnSetClient(_self, val);
+                end
             end
 
-            tablenet:NetworkTable(_self.RegistryID, domain, ids);
+            if SERVER then
+                tablenet:NetworkTable(_self.RegistryID, domain, ids);
+            end
         end
     end
 
@@ -190,6 +203,11 @@ function SVC:AddVariable(var)
     -- var.MaxLength = var.MaxLength;
     var.Public = var.Public or false;
 
+    -- var.OnGen
+    -- var.OnInit
+    -- var.OnDeinit
+    -- var.OnSet
+
     if SERVER then
         var.InSQL = var.InSQL or false;
 
@@ -197,12 +215,16 @@ function SVC:AddVariable(var)
         var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
         var.OnInitClient = nil;
         var.OnDeinitClient = nil;
+        var.OnSetClient  = nil;
+        -- var.OnSetServer = var.OnSetServer; (Redundant, no default)
         -- var.OnInitServer = var.OnInitServer; (Redundant, no default)
         -- var.OnDeinitServer = var.OnDeinitServer; (Redundant, no default)
     elseif CLIENT then
         var.OnGenerate = nil;
         var.OnInitServer = nil;
         var.OnDeinitServer = nil;
+        var.OnSetServer = nil;
+        -- var.OnSetClient = var.OnSetClient; (Redundant, no default)
         -- var.OnInitClient = var.OnInitClient; (Redundant, no default)
         -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
     end
@@ -322,6 +344,18 @@ function SVC:RemoveTable(id, domain)
     if !tab.TableNet then return; end
     if !tab.TableNet[domain] then return; end
 
+    local varData;
+    for id, val in pairs(tab.TableNet[domain]) do
+        varData = self:GetVariable(domain, id);
+        if !varData then continue; end
+
+        if SERVER and varData.OnDeinitServer then
+            varData:OnDeinitServer(tab, val);
+        elseif CLIENT and varData.OnDeinitClient then
+            varData:OnDeinitClient(tab, val);
+        end
+    end
+
     if SERVER then
         local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");
         removePck:String(id);
@@ -418,7 +452,7 @@ end
 if SERVER then
 
     -- Network pool.
-    util.AddNetworkString("CTableNet_Net_ObjCount");
+    util.AddNetworkString("CTableNet_Net_ClientInit");
     util.AddNetworkString("CTableNet_Net_ObjUpdate");
     util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
 
@@ -429,10 +463,6 @@ if SERVER then
             -- jump past this step
             return;
         end
-
-        net.Start("CTableNet_Net_ObjCount");
-            net.WriteInt(table.Count(registry), 8);
-        net.Send(ply);
 
         local delay = 0.1;
         for id, obj in pairs(registry) do
@@ -673,15 +703,6 @@ if SERVER then
 elseif CLIENT then
 
     -- Network hooks.
-    net.Receive("CTableNet_Net_ObjCount", function(len)
-        local tablenet = getService("CTableNet");
-        local objs = net.ReadInt(8);
-        tablenet.InitialSend = true;
-        tablenet.WaitingOn = objs;
-        tablenet.Received = 0;
-        MsgLog(LOG_INIT, "Waiting on %d networked objects...", objs);
-    end);
-
     vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
         local regID = pck:String();
         local domain = pck:String();
