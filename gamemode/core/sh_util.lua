@@ -99,6 +99,7 @@ end
 function processModules()
     local from = debug.getinfo(2);
     local src = from.short_src;
+    PrintTable(from);
 end
 
 function getClientData(ply, id)

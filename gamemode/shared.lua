@@ -6,3 +6,5 @@ processDir("libraries");
 processDir("meta");
 processDir("services");
 processDir("hooks");
+
+processModules();
