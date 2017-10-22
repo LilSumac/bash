@@ -18,7 +18,7 @@ SVC.Desc = "The core interface between /bash/ and the external database.";
 SVC.Depends = {"CPlayer", "CCharacter"};
 
 -- Constants.
-color_sql = Color(0, 151, 151, 255);
+LOG_DB = {pre = "[DB]", col = Color(0, 151, 151, 255)};
 
 -- Service storage.
 local dbObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
@@ -64,7 +64,7 @@ function SVC:Connect()
         dbObject = obj;
         connected = true;
 
-        MsgLog(LOG_INIT, "Successfully connected to MySQL server!");
+        MsgLog(LOG_DB, "Successfully connected to MySQL server!");
     else
         MsgErr("NoDBConnect", err);
         return;
@@ -229,7 +229,7 @@ end
 
 function SVC:CheckTables()
     if table.IsEmpty(tables) then
-        MsgLog(LOG_INIT, "No tables registered in database. Skipping...");
+        MsgLog(LOG_DB, "No tables registered in database. Skipping...");
         return;
     end
 
@@ -255,7 +255,7 @@ function SVC:CheckTables()
     end
 
     self:Query(query, function(results)
-        MsgLog(LOG_INIT, "Table check complete.");
+        MsgLog(LOG_DB, "Table check complete.");
         local db = getService("CDatabase");
         db:CheckColumns();
     end);
@@ -294,7 +294,7 @@ function SVC:InsertRow(tab, data, callback, ...)
 
     query = Format("%s) %s);", query, vals);
     self:Query(query, callback or function(results)
-        MsgLog(LOG_DEF, "New row inserted into table '%s'.", tab);
+        MsgLog(LOG_DB, "New row inserted into table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -317,7 +317,7 @@ function SVC:GetRow(tab, cols, cond, callback, ...)
     end
 
     self:Query(query, callback or function(results)
-        MsgLog(LOG_DEF, "Fetched from row in table '%s'.", tab);
+        MsgLog(LOG_DB, "Fetched from row in table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -354,7 +354,7 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
     end
 
     self:Query(query, callback or function(results)
-        MsgLog(LOG_DEF, "Row updated in table '%s'.", tab);
+        MsgLog(LOG_DB, "Row updated in table '%s'.", tab);
     end, unpack({...}));
 end
 
@@ -369,7 +369,7 @@ addErrType("KeyExists", "A key already exists in this table! (Column %s in table
 hook.Add("InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db:IsConnected() then
-        MsgLog(LOG_INIT, "Database still connected, skipping.");
+        MsgLog(LOG_DB, "Database still connected, skipping.");
         return;
     end
 

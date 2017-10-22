@@ -30,7 +30,10 @@ local function runInits(tab, domain)
             initFunc = varInfo.OnInitClient;
         elseif SERVER and varInfo.OnInitServer then
             initFunc = varInfo.OnInitServer;
+        else
+            initFunc = nil;
         end
+
         if initFunc then
             initFunc(varInfo, tab, val);
         end
@@ -322,7 +325,6 @@ function SVC:NewTable(domain, data, obj, regID)
     end
 
     MsgLog(LOG_DEF, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
-    PrintTable(registry);
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
     runInits(tab, domain);
@@ -365,12 +367,17 @@ function SVC:RemoveTable(id, domain)
 
     tab.TableNet[domain] = nil;
     if table.IsEmpty(tab.TableNet) then
+        MsgN("REMOVING " .. id);
         registry[id] = nil;
     end
 
     if singlesMade[domain] then
         singlesMade[domain] = nil;
     end
+end
+
+function SVC:IsRegistered(id)
+    return registry[id] != nil and registry[id] != NULL;
 end
 
 function SVC:GetNetVars(domain, ids)
@@ -456,7 +463,7 @@ if SERVER then
     util.AddNetworkString("CTableNet_Net_ObjUpdate");
     util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
 
-    local function onPlayerInit(ply)
+    local function sendPlyTables(ply)
         local tablenet = getService("CTableNet");
         if table.IsEmpty(registry) then
             MsgN("Empty registry!");
@@ -470,6 +477,9 @@ if SERVER then
 
             for dom, vars in pairs(obj.TableNet) do
                 timer.Simple(delay, function()
+                    -- Prevent sending tables that were removed during delay.
+                    if !tablenet:IsRegistered(id) then return; end
+
                     tablenet:SendTable(ply, id, dom);
                 end);
                 delay = delay + 0.1;
@@ -477,8 +487,7 @@ if SERVER then
         end
 
         timer.Simple(delay, function()
-            local ctask = getService("CTask");
-            local oninit = ctask:GetActiveTask(ply.OnInitTask);
+            local oninit = ply.OnInitTask;
             oninit:Update("WaitForTableNet", 1);
         end);
     end
@@ -509,8 +518,8 @@ if SERVER then
             return;
         end
 
-        local pubRecip = domInfo:GetRecipients(tab);
-        local privRecip = domInfo:GetPrivateRecipients(tab);
+        local pubRecip = domInfo:GetRecipients(tab) or {};
+        local privRecip = domInfo:GetPrivateRecipients(tab) or {};
         if pubRecip and privRecip and table.IsEmpty(pubRecip) and table.IsEmpty(privRecip) then return; end
 
         local pubPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
@@ -691,13 +700,14 @@ if SERVER then
     end
 
     -- Hooks.
-    hook.Add("GatherPrelimData", "CTableNet_AddTasks", function()
+    hook.Add("GatherPrelimData_Base", "CTableNet_AddTasks", function()
         local ctask = getService("CTask");
         ctask:AddTaskCondition("bash_PlayerOnInit", "WaitForTableNet", TASK_NUMERIC, 0, 1);
-    end);
-
-    hook.Add("PlayerOnInit", "CTableNet_InitPlayer", function(ply)
-        onPlayerInit(ply);
+        ctask:AddTaskOnStart("bash_PlayerOnInit", function(task)
+            local data = task:GetPassedData();
+            if !isplayer(data["Player"]) then return; end
+            sendPlyTables(data["Player"]);
+        end);
     end);
 
 elseif CLIENT then

@@ -46,21 +46,17 @@ include("shared.lua");
 bash.clientData = getNonVolatileEntry("ClientData", EMPTY_TABLE);
 
 -- Hooks for init process.
-MsgLog(LOG_INIT, "Gathering preliminary data...");
-hook.Run("GatherPrelimData_Base"); -- For all prelims that MUST come first.
-hook.Run("GatherPrelimData");      -- Add network variable structures, finalize DB structure, etc.
-MsgLog(LOG_INIT, "Initializing services...");
-hook.Run("InitService_Base");      -- For all inits that MUST come first.
-hook.Run("InitService");           -- Connect to DB, load /data files, etc.
+MsgLog(LOG_INIT, "Gathering base preliminary data...");
+hook.Run("GatherPrelimData_Base");
+MsgLog(LOG_INIT, "Initializing base services...");
+hook.Run("InitService_Base");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
-MsgLog(color_green, "Successfully initialized base server-side.  Startup: %fs", len);
-MsgLog(color_cyan, "======================== BASE COMPLETE ========================");
+MsgLog(LOG_INIT, "Successfully initialized base server-side.  Startup: %fs", len);
 bash.started = true;
 
-MsgLog(LOG_DEF, "Doing post-init calls...");
-hook.Run("PostInit_Base");         -- For all post-inits that MUST come first.
-hook.Run("PostInit");              -- Finish up.
+MsgLog(LOG_DEF, "Doing base post-init calls...");
+hook.Run("PostInit_Base");
 
-MsgErr("NilArgs", "blip");
+MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");

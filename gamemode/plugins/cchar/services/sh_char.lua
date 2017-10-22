@@ -1,16 +1,15 @@
-defineService_start("CCharacter");
+defineService_start("CChar");
 
 -- Service info.
-SVC.Name = "Core Character";
+SVC.Name = "CChar";
 SVC.Author = "LilSumac";
-SVC.Desc = "The main character functions for /bash/.";
+SVC.Desc = "A collection of the main character functions.";
 SVC.Depends = {"CDatabase"};
 
 -- Service storage.
-local cachedData = getNonVolatileEntry("CCharacter_DataCache", EMPTY_TABLE);
-local cachedChars = getNonVolatileEntry("CCharacter_CharCache", EMPTY_TABLE);
+local cachedData = getNonVolatileEntry("CChar_DataCache", EMPTY_TABLE);
+local cachedChars = getNonVolatileEntry("CChar_CharCache", EMPTY_TABLE);
 local cachedIDs = {};
-SVC.CachedIDs = {};
 
 function SVC:Instantiate(id, refresh)
     -- look for data from id in cache
@@ -25,9 +24,9 @@ function SVC:Instantiate(id, refresh)
 
     local data;
     if refresh or (!cachedChars[id] and !cachedData[id]) then
-        MsgLog(LOG_DEF, "Hooking character fetch: %s", id);
+        MsgLog(LOG_CHAR, "Hooking character fetch: %s", id);
 
-        local name = "CCharacter_Hook_CharFetch_" .. id;
+        local name = "CChar_Hook_CharFetch_" .. id;
         hook.Add(name, id, self.Instantiate);
 
         self:DBFetch(id);
@@ -40,7 +39,7 @@ function SVC:Instantiate(id, refresh)
         -- data has already been fetched
         -- take data and push to new instance
 
-        MsgLog(LOG_DEF, "Instantiating character: %s", id);
+        MsgLog(LOG_CHAR, "Instantiating character: %s", id);
 
         local tablenet = getService("CTableNet");
         local char = tablenet:NewTable("Char", cachedData[id]);
@@ -48,8 +47,8 @@ function SVC:Instantiate(id, refresh)
         return char;
     end
 
-    MsgLog(LOG_DEF, "Removing character fetch hook: %s", id);
-    local name = "CCharacter_Hook_CharFetch_" .. id;
+    MsgLog(LOG_CHAR, "Removing character fetch hook: %s", id);
+    local name = "CChar_Hook_CharFetch_" .. id;
     hook.Remove(name, id);
 end
 
@@ -58,26 +57,26 @@ function SVC:DBFetch(id)
 end
 
 function SVC:PostDBFetch(data)
-    MsgLog(LOG_DEF, "Completed character fetch: %s", data.CharID);
+    MsgLog(LOG_CHAR, "Completed character fetch: %s", data.CharID);
 
     cachedData[data.CharID] = data;
-    local name = "CCharacter_Hook_CharFetch_" .. data.CharID;
+    local name = "CChar_Hook_CharFetch_" .. data.CharID;
     hook.Run(name, data.CharID);
 end
 
 -- Hooks.
-hook.Add("GatherPrelimData_Base", "CCharacter_DefaultVars", function()
+hook.Add("GatherPrelimData_Base", "CChar_DefaultVars", function()
     local tablenet = getService("CTableNet");
     tablenet:AddDomain{
-        ID = "Character",
-        ParentMeta = getMeta("Character"),
+        ID = "Char",
+        ParentMeta = getMeta("CChar"),
         StoredInSQL = true,
         SQLTable = "bash_chars"
     };
 
     tablenet:AddVariable{
         ID = "CharID",
-        Domain = "Character",
+        Domain = "Char",
         Type = "string",
         MaxLength = 17,
         Public = true,
@@ -88,7 +87,7 @@ hook.Add("GatherPrelimData_Base", "CCharacter_DefaultVars", function()
     };
     tablenet:AddVariable{
         ID = "Name",
-        Domain = "Character",
+        Domain = "Char",
         Type = "string",
         MaxLength = 32,
         Public = true,
@@ -99,16 +98,17 @@ end);
 if SERVER then
 
     -- Hooks.
-    hook.Add("OnDBConnected", "CCharacter_OnDBConnected", function()
+    hook.Add("OnDBConnected", "CChar_OnDBConnected", function()
         local db = getService("CDatabase");
         db:GetRow("bash_chars", "*", "", function(results)
             results = results[1];
 
-            local cchar = getService("CCharacter");
+            local cchar = getService("CChar");
             local ids = {};
             for index, data in pairs(results.data) do
                 ids[data.CharID] = true;
             end
+            MsgCon(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
             cachedIDs = ids;
         end);
     end);
@@ -117,15 +117,11 @@ if SERVER then
 
     concommand.Add("testchar", function(ply, cmd, args)
         local tabnet = getService("CTableNet");
-        bash.testchar = tabnet:NewTable("Character", {
+        bash.testchar = tabnet:NewTable("Char", {
             CharID = "dood",
             Name = "dooder"
         });
     end);
-
-elseif CLIENT then
-
-
 
 end
 

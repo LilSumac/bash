@@ -26,8 +26,8 @@ local function createPlyData(ply)
         data,                   -- Data to insert.
 
         function(_ply, results) -- Callback function upon completion.
-            local ctask = getService("CTask");
-            local preinit = ctask:GetActiveTask(ply.PreInitTask);
+            local preinit = ply.PreInitTask;
+            if !preinit then return; end
             preinit:PassData("SQLData", data);
             preinit:Update("WaitForSQL", 1);
         end,
@@ -55,8 +55,8 @@ local function getPlyData(ply)
                 createPlyData(_ply);
             else
                 MsgN("Found row...");
-                local ctask = getService("CTask");
-                local preinit = ctask:GetActiveTask(ply.PreInitTask);
+                local preinit = ply.PreInitTask;
+                if !preinit then return; end
                 preinit:PassData("SQLData", results.Data);
                 preinit:Update("WaitForSQL", 1);
             end
@@ -72,28 +72,6 @@ function SVC:KickPlayer(ply, reason, kicker)
 end
 
 function SVC:BanPlayer(ply, reason, length, banner)
-
-end
-
-if SERVER then
-
-    -- Network pool.
-    util.AddNetworkString("bash_test");
-
-    -- Hooks.
-    hook.Add("GatherPrelimData", "CPlayer_AddTasks", function()
-        local ctask = getService("CTask");
-        ctask:AddTaskCondition("bash_PlayerPreInit", "WaitForSQL", TASK_NUMERIC, 0, 1);
-
-        ctask:AddTaskCallback("bash_PlayerPreInit", function(status, data)
-            local tabnet = getService("CTableNet");
-            tabnet:NewTable("Player", data["SQLData"], data["Player"]);
-        end);
-    end);
-
-    hook.Add("PrePlayerInit", "CPlayer_CreatePlyNet", function(ply)
-        getPlyData(ply);
-    end);
 
 end
 
@@ -196,5 +174,32 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTables", function()
         end
     };
 end);
+
+if SERVER then
+
+    -- Network pool.
+    util.AddNetworkString("bash_test");
+
+    -- Hooks.
+    hook.Add("GatherPrelimData_Base", "CPlayer_AddTasks", function()
+        local ctask = getService("CTask");
+        ctask:AddTaskCondition("bash_PlayerPreInit", "WaitForSQL", TASK_NUMERIC, 0, 1);
+
+        ctask:AddTaskOnStart("bash_PlayerPreInit", function(task)
+            local data = task:GetPassedData();
+            if !isplayer(data["Player"]) then return; end
+            getPlyData(data["Player"]);
+        end);
+
+        ctask:AddTaskOnFinish("bash_PlayerPreInit", function(status, task)
+            local data = task:GetPassedData();
+            if !isplayer(data["Player"]) or !data["SQLData"] then return; end
+            
+            local tabnet = getService("CTableNet");
+            tabnet:NewTable("Player", data["SQLData"], data["Player"]);
+        end);
+    end);
+
+end
 
 defineService_end();

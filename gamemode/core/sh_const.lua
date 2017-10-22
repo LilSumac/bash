@@ -51,8 +51,9 @@ ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last o
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";
 ERR_TYPES["UnsafeNVEntry"] = "Do not set NV entries to nil! Use 'removeNonVolatileEntry' instead. (%s)";
+ERR_TYPES["NoPluginFile"] = "A sh_plugin.lua file does not exists in this plugin directory! (%s)";
 
-LOG_DEF = {pre = "[LOG]", col = color_con};
+LOG_DEF = {pre = "[LOG]", col = color_grey};
 LOG_INIT = {pre = "[INIT]", col = color_green};
 LOG_ERR = {pre = "[ERR]", col = color_red, log = true};
 LOG_WARN = {pre = "[WARN]", col = color_orange, log = true};

@@ -1,12 +1,12 @@
-defineMeta_start("Task");
+defineMeta_start("CTask");
 
 function META:Initialize()
-    if !self.TaskID or !self.UniqueID then
+    if !self.RegistryID then
         MsgErr("TaskNotValid", tostring(self));
         return;
     end
 
-    self.Status = STATUS_PAUSED;
+    self:SetNetVar("Task", "Status", STATUS_PAUSED);
 
     local task = getService("CTask");
     local taskInfo = task:GetTask(self.TaskID);
@@ -20,13 +20,13 @@ function META:Initialize()
 
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.TaskID, self.UniqueID);
+        MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.RegistryID, self.TaskID);
     else
         local startVals = {};
         for condID, cond in pairs(self.TaskInfo.Conditions) do
             if cond.Type == TASK_TIMED then
                 startVals[condID] = 0;
-                timerID = Format("CTask_%s_%d", self.UniqueID, #self.Timers + 1);
+                timerID = Format("CTask_%s_%d", self.RegistryID, #self.Timers + 1);
                 self.Timers[timerID] = true;
                 timer.Create(timerID, cond.Finish, 0, self.Update, self, condID, cond.Finish);
                 timer.Stop(timerID);
@@ -39,7 +39,7 @@ function META:Initialize()
 end
 
 function META:Start()
-    MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.TaskID, self.UniqueID);
+    MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
     self:SetNetVars("Task", {
         ["Status"] = STATUS_RUNNING,
         ["StartTime"] = os.time()
@@ -47,6 +47,14 @@ function META:Start()
 
     for timerID, _ in pairs(self.Timers) do
         timer.Start(timerID);
+    end
+
+    if self.TaskInfo.OnBorn then
+        self.TaskInfo.OnBorn(self);
+    end
+
+    for _, func in ipairs(self.TaskInfo.OnStarts) do
+        func(self);
     end
 
     if table.IsEmpty(self.TaskInfo.Conditions) then
@@ -106,10 +114,18 @@ function META:Restart()
     end
 end
 
+function META:GetStatus()
+    return self:GetNetVar("Task", "Status");
+end
+
 function META:PassData(id, data)
-    local passed = self:GetNetVar("Task", "PassedData");
+    local passed = self:GetPassedData();
     passed[id] = data;
     self:SetNetVar("Task", "PassedData", passed);
+end
+
+function META:GetPassedData()
+    return self:GetNetVar("Task", "PassedData");
 end
 
 function META:Update(cond, value)
@@ -149,26 +165,19 @@ end
 function META:Finish(status)
     self:SetNetVar("Task", "Status", status);
 
-    MsgLog(LOG_DEF, "Task '%s->%s' has finished with status %d! Calling callbacks...", self.TaskID, self.UniqueID, self.Status);
-
-    local passed = self:GetNetVar("Task", "PassedData");
-    for _, func in ipairs(self.TaskInfo.Callbacks) do
-        func(status, passed);
-    end
-
-    if self.TaskInfo.OnFinish then
-        self.TaskInfo.OnFinish(status, passed;
-    end
+    local ctask = getService("CTask");
+    ctask:RemoveActiveTask(self.RegistryID);
 end
 
 function META:CheckConditions()
+    local values = self:GetNetVar("Task", "Values");
     for condID, cond in pairs(self.TaskInfo.Conditions) do
         if cond.Type == TASK_NUMERIC or cond.Type == TASK_TIMED then
-            if self.Values[condID] < cond.Finish then
+            if values[condID] < cond.Finish then
                 return false;
             end
         else
-            if self.Values[condID] != cond.Finish then
+            if values[condID] != cond.Finish then
                 return false;
             end
         end
@@ -180,19 +189,8 @@ if SERVER then
 
     function META:AddListener(ply)
         self.Listeners[ply] = true;
-
-        local data = {};
-        data.TaskID = self.TaskID;
-        data.UniqueID = self.UniqueID;
-        data.StartTime = self.StartTime;
-        data.Values = self.Values;
-        data.SavedValues = self.SavedValues;
-        data.PassedData = self.PassedData;
-
-        local taskpck = vnet.CreatePacket("CTask_Net_SendTask");
-        taskpck:Table(data);
-        taskpck:AddTargets(ply);
-        taskpck:Send();
+        local tabnet = getService("CTableNet");
+        tabnet:SendTable(ply, self.RegistryID, "Task");
     end
 
 end

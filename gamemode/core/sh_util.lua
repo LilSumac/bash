@@ -96,10 +96,28 @@ function processDir(dir)
     end
 end
 
-function processModules()
+function processPlugins()
     local from = debug.getinfo(2);
     local src = from.short_src;
-    PrintTable(from);
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. "plugins/";
+
+    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
+    for _, file in pairs(singles) do
+        file = src .. file;
+        processFile(file);
+    end
+
+    local plugFiles;
+    for _, plugin in pairs(plugins) do
+        plugFiles = file.Find(src .. plugin .. "/*.lua", "LUA", nameasc);
+        if table.HasValue(plugFiles, "sh_plugin.lua") then
+            processFile(src .. plugin .. "/sh_plugin.lua");
+        else
+            MsgErr("NoPluginFile", plugin);
+        end
+    end
 end
 
 function getClientData(ply, id)
@@ -203,7 +221,14 @@ function defineMeta_end()
         return;
     end
 
-    MsgLog(LOG_INIT, "Registering metatable: %s", meta.ID);
+    local pre = "";
+    local plug = _G["PLUG"];
+    if plug then
+        plug.Metas[meta.ID] = meta;
+        pre = Format("(In Plugin %s ->) ", plug.Name);
+    end
+
+    MsgLog(LOG_INIT, "%sRegistering metatable: %s", pre, meta.ID);
     bash.meta[meta.ID] = meta;
     _G["META"] = nil;
 end
@@ -254,7 +279,14 @@ function defineService_end()
         return;
     end
 
-    MsgLog(LOG_INIT, "Registering service: %s", svc.ID);
+    local pre = "";
+    local plug = _G["PLUG"];
+    if plug then
+        plug.Services[svc.ID] = svc;
+        pre = Format("(In Plugin %s ->) ", plug.Name);
+    end
+
+    MsgLog(LOG_INIT, "%sRegistering service: %s", pre, svc.ID);
     bash.services[svc.ID] = svc;
     _G["SVC"] = nil;
 end
@@ -272,7 +304,7 @@ function getService(id)
     return bash.services[id];
 end
 
-function definePlugin_start(id, singleFile)
+function definePlugin_start(id)
     if !id then
         MsgErr("NilArgs", "id");
         return;
@@ -295,6 +327,8 @@ function definePlugin_start(id, singleFile)
     plug.Name = id;
     plug.Author = "Unknown";
     plug.Desc = "A custom plugin.";
+    plug.Metas = {};
+    plug.Services = {};
     plug.IsValid = function() return true; end
 end
 

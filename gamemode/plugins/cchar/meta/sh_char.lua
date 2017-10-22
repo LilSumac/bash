@@ -1,4 +1,4 @@
-defineMeta_start("Character");
+defineMeta_start("CChar");
 
 function META:SetData(data)
     self.Data = {};
@@ -95,7 +95,7 @@ end
 function META:OnDetach(old, new)
     // hook for when changing owners
 
-    MsgLog(LOG_DEF, "Switched character (%s) owner from '%s' to '%s'.", self.CharID, tostring(old), tostring(new));
+    MsgLog(LOG_CHAR, "Switched character (%s) owner from '%s' to '%s'.", self.CharID, tostring(old), tostring(new));
 end
 
 function META:OnSave()
