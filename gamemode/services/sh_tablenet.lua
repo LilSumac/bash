@@ -175,7 +175,7 @@ function SVC:AddDomain(domain)
         return {};
     end
 
-    MsgLog(LOG_TABNET, "Registering domain: %s", domain.ID);
+    MsgLog(LOG_TABNET, "Registered domain: %s", domain.ID);
     domains[domain.ID] = domain;
     vars[domain.ID] = {};
 end
@@ -235,7 +235,7 @@ function SVC:AddVariable(var)
         -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
     end
 
-    MsgLog(LOG_TABNET, "Registering netvar %s in domain %s.", var.ID, var.Domain);
+    MsgLog(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
@@ -338,7 +338,7 @@ function SVC:NewTable(domain, data, obj, regID)
         singlesMade[domain] = tab.RegistryID;
     end
 
-    MsgLog(LOG_TABNET, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
+    MsgLog(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
     runInits(tab, domain);

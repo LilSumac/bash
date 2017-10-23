@@ -239,7 +239,8 @@ if SERVER then
     end
 
     -- Hooks.
-    hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
+    gameevent.Listen("player_disconnect");
+    hook.Add("player_disconnect", "CPlayer_RemovePlayer", function(ply)
         if ply.RegistryID then
             local tabnet = getService("CTableNet");
             tabnet:RemoveTable(ply.RegistryID, "CPlayer");

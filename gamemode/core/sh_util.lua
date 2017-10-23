@@ -228,7 +228,7 @@ function defineMeta_end()
         pre = Format("(In Plugin %s ->) ", plug.Name);
     end
 
-    MsgLog(LOG_INIT, "%sRegistering metatable: %s", pre, meta.ID);
+    MsgLog(LOG_INIT, "%sRegistered metatable: %s", pre, meta.ID);
     bash.meta[meta.ID] = meta;
     _G["META"] = nil;
 end
@@ -286,7 +286,7 @@ function defineService_end()
         pre = Format("(In Plugin %s ->) ", plug.Name);
     end
 
-    MsgLog(LOG_INIT, "%sRegistering service: %s", pre, svc.ID);
+    MsgLog(LOG_INIT, "%sRegistered service: %s", pre, svc.ID);
     bash.services[svc.ID] = svc;
     _G["SVC"] = nil;
 end
@@ -339,7 +339,7 @@ function definePlugin_end()
         return;
     end
 
-    MsgLog(LOG_INIT, "Registering plugin: %s", plug.ID);
+    MsgLog(LOG_INIT, "Registered plugin: %s", plug.ID);
     bash.plugins[plug.ID] = plug;
     _G["PLUG"] = nil;
 end
