@@ -16,7 +16,7 @@ DeriveGamemode("sandbox");
 -- there is an OnReload hook to use.
 if bash and bash.started then
     miscInit();
-    hook.Run("OnReload", bash);
+    hook.Run("bash_OnReload", bash);
     return;
 end
 
@@ -55,9 +55,9 @@ end);
 
 -- Hooks for init process.
 MsgLog(LOG_INIT, "Gathering base preliminary data...");
-hook.Run("GatherPrelimData_Base");
+hook.Run("bash_GatherPrelimData_Base");
 MsgLog(LOG_INIT, "Initializing base services...");
-hook.Run("InitService_Base");
+hook.Run("bash_InitService_Base");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.startTime, 8);
@@ -65,6 +65,6 @@ MsgLog(LOG_INIT, "Successfully initialized base client-side. Startup: %fs", len)
 bash.started = true;
 
 MsgLog(LOG_DEF, "Doing base post-init calls...");
-hook.Run("PostInit_Base");
+hook.Run("bash_PostInit_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");

@@ -39,18 +39,18 @@ function META:Initialize()
 end
 
 function META:Start()
-    MsgLog(LOG_DEF, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
+    MsgLog(LOG_TASK, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
     self:SetNetVars("Task", {
         ["Status"] = STATUS_RUNNING,
         ["StartTime"] = os.time()
     });
 
-    for timerID, _ in pairs(self.Timers) do
-        timer.Start(timerID);
-    end
-
     if self.TaskInfo.OnBorn then
         self.TaskInfo.OnBorn(self);
+    end
+
+    for timerID, _ in pairs(self.Timers) do
+        timer.Start(timerID);
     end
 
     for _, func in ipairs(self.TaskInfo.OnStarts) do
@@ -129,6 +129,8 @@ function META:GetPassedData()
 end
 
 function META:Update(cond, value)
+    if !self.InScope then return; end
+
     local status = self:GetNetVar("Task", "Status");
     if status == STATUS_SUCCESS or status == STATUS_FAILED then return; end
 

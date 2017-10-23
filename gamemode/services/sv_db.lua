@@ -33,8 +33,8 @@ local pass = "testpass";
 local data = "srp_db";
 local port = 3306;
 
-local CAST_IN = 0;
-local CAST_OUT = 1;
+local CAST_IN = 1;
+local CAST_OUT = 2;
 
 local SQL_DEF = {};
 SQL_DEF["boolean"] = false;
@@ -74,8 +74,7 @@ function SVC:Connect()
     self:CheckTables();
 
     -- CALL THIS AFTER ALL CHECKS
-    -- Post-connection hook.
-    --hook.Run("OnDBConnected");
+    hook.Run("CDatabase_Hook_OnConnected");
 end
 
 function SVC:AddTable(name)
@@ -103,7 +102,7 @@ function SVC:AddTable(name)
 
     tables[name] = tab;
 
-    MsgLog(LOG_INIT, "Database table registered with name '%s'.", name);
+    MsgLog(LOG_DB, "Database table registered with name '%s'.", name);
 end
 
 function SVC:AddColumn(tab, col, primary)
@@ -138,11 +137,11 @@ function SVC:AddColumn(tab, col, primary)
     col.NotNull = col.NotNull or false;
     col.Field = col.Field or "";
 
-    MsgLog(LOG_INIT, "Database column '%s' registered in table '%s'.", col.Name, tab);
+    MsgLog(LOG_DB, "Database column '%s' registered in table '%s'.", col.Name, tab);
 
     if primary then
         tabData.PrimaryKey = col.Name;
-        MsgLog(LOG_INIT, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
+        MsgLog(LOG_DB, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
     end
 
     tabData.Columns[col.Name] = col;
@@ -190,7 +189,7 @@ local castOut = {
     ["boolean"] = tobool,
     ["number"] = tonumber,
     ["string"] = tostring,
-    ["table"] = function(tab)
+    ["table"] = function(str)
         return pon.decode(tostring(str));
     end
 };
@@ -209,22 +208,22 @@ function SVC:CastValue(tab, col, val, inout)
         MsgErr("NilArgs", "col");
         return;
     end
-    if !tab.Columns[col] then
+    local colData = tab.Columns[col];
+    if !colData then
         MsgErr("NilEntry", col);
         return;
     end
 
-    local t = type(val);
-    if !castIn[t] and castOut[t] then
-        MsgErr("InvalidDataType", t);
-        return;
+    if !castIn[colData.Type] and !castOut[colData.Type] then
+        --MsgErr("InvalidDataType", colData.Type);
+        return val;
     end
 
     inout = inout or CAST_IN;
     local castFuncs = (inout == CAST_IN and castIn) or castOut;
 
-    if val == nil then return castFuncs[t](SQL_DEF[tab.Type]); end
-    return castFuncs[t](val);
+    if val == nil then return castFuncs[colData.Type](SQL_DEF[colData.Type]); end
+    return castFuncs[colData.Type](val);
 end
 
 function SVC:CheckTables()
@@ -265,6 +264,45 @@ function SVC:CheckColumns()
 
 end
 
+function SVC:SelectRow(tab, cols, conds, callback, ...)
+    if !tab then
+        MsgErr("NilArgs", "tab");
+        return;
+    end
+    if !tables[tab] then
+        MsgErr("NilEntry", tab);
+        return;
+    end
+
+    cols = cols or "*";
+    local query = Format("SELECT %s FROM %s", cols, tab);
+    if conds and conds != "" then
+        query = query .. Format(" %s;", cond);
+    else
+        query = query .. ";";
+    end
+
+    local args = {...};
+    self:Query(query, function(results)
+        local db = getService("CDatabase");
+        --MsgLog(LOG_DB, "Selected row from table '%s'.", tab);
+
+        for _, subQuery in pairs(results) do
+            if !subQuery.status then return; end
+            for _, row in pairs(subQuery.data) do
+                for id, val in pairs(row) do
+                    row[id] = db:CastValue(tab, id, val, CAST_OUT) or val;
+                end
+            end
+        end
+
+        if callback then
+            args[#args + 1] = results;
+            callback(unpack(args));
+        end
+    end);
+end
+
 function SVC:InsertRow(tab, data, callback, ...)
     if !tab then
         MsgErr("NilArgs", "tab");
@@ -293,32 +331,15 @@ function SVC:InsertRow(tab, data, callback, ...)
     vals = vals:sub(1, #vals - 2);
 
     query = Format("%s) %s);", query, vals);
-    self:Query(query, callback or function(results)
-        MsgLog(LOG_DB, "New row inserted into table '%s'.", tab);
-    end, unpack({...}));
-end
+    local args = {...};
+    self:Query(query, function(results)
+        --MsgLog(LOG_DB, "New row inserted into table '%s'.", tab);
 
-function SVC:GetRow(tab, cols, cond, callback, ...)
-    if !tab then
-        MsgErr("NilArgs", "tab");
-        return;
-    end
-    if !tables[tab] then
-        MsgErr("NilEntry", tab);
-        return;
-    end
-
-    cols = cols or "*";
-    local query = Format("SELECT %s FROM %s", cols, tab);
-    if cond and cond != "" then
-        query = query .. Format(" WHERE %s;", cond);
-    else
-        query = query .. ";";
-    end
-
-    self:Query(query, callback or function(results)
-        MsgLog(LOG_DB, "Fetched from row in table '%s'.", tab);
-    end, unpack({...}));
+        if callback then
+            args[#args + 1] = results;
+            callback(unpack(args));
+        end
+    end);
 end
 
 function SVC:UpdateRow(tab, data, cond, callback, ...)
@@ -353,9 +374,15 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
         query = query .. ";";
     end
 
-    self:Query(query, callback or function(results)
-        MsgLog(LOG_DB, "Row updated in table '%s'.", tab);
-    end, unpack({...}));
+    local args = {...};
+    self:Query(query, function(results)
+        --MsgLog(LOG_DB, "Row updated in table '%s'.", tab);
+
+        if callback then
+            args[#args + 1] = results;
+            callback(unpack(args));
+        end
+    end);
 end
 
 -- Custom errors.
@@ -366,7 +393,7 @@ addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery:
 addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
 
 -- Hooks.
-hook.Add("InitService_Base", "CDatabase_OnInit", function()
+hook.Add("bash_InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db:IsConnected() then
         MsgLog(LOG_DB, "Database still connected, skipping.");

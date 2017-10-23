@@ -6,6 +6,9 @@ SVC.Author = "LilSumac";
 SVC.Desc = "A framework for creating, networking, and adding persistant variables to tables and objects.";
 SVC.Depends = {"CDatabase"};
 
+-- Constants.
+LOG_TABNET = {pre = "[TABNET]", col = color_darkgreen};
+
 -- Custom errors.
 addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
 addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
@@ -172,7 +175,7 @@ function SVC:AddDomain(domain)
         return {};
     end
 
-    MsgLog(LOG_INIT, "Registering domain: %s", domain.ID);
+    MsgLog(LOG_TABNET, "Registering domain: %s", domain.ID);
     domains[domain.ID] = domain;
     vars[domain.ID] = {};
 end
@@ -232,7 +235,7 @@ function SVC:AddVariable(var)
         -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
     end
 
-    MsgLog(LOG_INIT, "Registering netvar %s in domain %s.", var.ID, var.Domain);
+    MsgLog(LOG_TABNET, "Registering netvar %s in domain %s.", var.ID, var.Domain);
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
@@ -263,6 +266,18 @@ function SVC:GetDomainVars(domain)
     end
 
     return vars[domain];
+end
+
+function SVC:GetRegistry()
+    return registry;
+end
+
+function SVC:IsRegistered(id)
+    return registry[id] != nil and registry[id] != NULL;
+end
+
+function SVC:IsRegistryEmpty()
+    return table.IsEmpty(registry);
 end
 
 function SVC:NewTable(domain, data, obj, regID)
@@ -296,8 +311,6 @@ function SVC:NewTable(domain, data, obj, regID)
     data = data or {};
     local _data = {};
     for id, var in pairs(vars[domain]) do
-        if CLIENT and !var.Public then continue; end
-
         if data[id] != nil then
             _data[id] = data[id];
         elseif SERVER and var.OnGenerate then
@@ -312,10 +325,11 @@ function SVC:NewTable(domain, data, obj, regID)
         tab.RegistryID = regID;
         registry[regID] = tab;
     elseif !tab.RegistryID then
-        local id = string.random(8, CHAR_ALL);
+        local id = string.random(8, CHAR_ALPHANUM);
         while registry[id] do
-            id = string.random(8, CHAR_ALL);
+            id = string.random(8, CHAR_ALPHANUM);
         end
+        id = domain .. "_" .. id;
         tab.RegistryID = id;
         registry[id] = tab;
     end
@@ -324,7 +338,7 @@ function SVC:NewTable(domain, data, obj, regID)
         singlesMade[domain] = tab.RegistryID;
     end
 
-    MsgLog(LOG_DEF, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
+    MsgLog(LOG_TABNET, "Registering table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain); end
     runInits(tab, domain);
@@ -358,6 +372,8 @@ function SVC:RemoveTable(id, domain)
         end
     end
 
+    MsgLog(LOG_TABNET, "Removing '%s' from registry.", id);
+
     if SERVER then
         local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");
         removePck:String(id);
@@ -367,17 +383,12 @@ function SVC:RemoveTable(id, domain)
 
     tab.TableNet[domain] = nil;
     if table.IsEmpty(tab.TableNet) then
-        MsgN("REMOVING " .. id);
         registry[id] = nil;
     end
 
     if singlesMade[domain] then
         singlesMade[domain] = nil;
     end
-end
-
-function SVC:IsRegistered(id)
-    return registry[id] != nil and registry[id] != NULL;
 end
 
 function SVC:GetNetVars(domain, ids)
@@ -462,35 +473,6 @@ if SERVER then
     util.AddNetworkString("CTableNet_Net_ClientInit");
     util.AddNetworkString("CTableNet_Net_ObjUpdate");
     util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
-
-    local function sendPlyTables(ply)
-        local tablenet = getService("CTableNet");
-        if table.IsEmpty(registry) then
-            MsgN("Empty registry!");
-            -- jump past this step
-            return;
-        end
-
-        local delay = 0.1;
-        for id, obj in pairs(registry) do
-            if obj == NULL then continue; end
-
-            for dom, vars in pairs(obj.TableNet) do
-                timer.Simple(delay, function()
-                    -- Prevent sending tables that were removed during delay.
-                    if !tablenet:IsRegistered(id) then return; end
-
-                    tablenet:SendTable(ply, id, dom);
-                end);
-                delay = delay + 0.1;
-            end
-        end
-
-        timer.Simple(delay, function()
-            local oninit = ply.OnInitTask;
-            oninit:Update("WaitForTableNet", 1);
-        end);
-    end
 
     -- Functions.
     function SVC:NetworkTable(id, domain, ids)
@@ -586,7 +568,7 @@ if SERVER then
             privPack:Bool(false);
         end
 
-        local excluded = player.GetAllAsKeys();
+        local excluded = player.GetInitializedAsKeys();
 
         if table.IsEmpty(pubRecip) then
             pubPack:Discard();
@@ -657,14 +639,14 @@ if SERVER then
         local data = {};
         local recip;
         local isRecip, isPrivate = false, false;
-        recip = domInfo:GetRecipients();
+        recip = domInfo:GetRecipients(tab);
         isRecip = recip and recip[ply] or false;
         if !isRecip and !force then
-            MsgErr("UnauthorizedSend", id, domain, tostring(ply));
+            --MsgErr("UnauthorizedSend", id, domain, tostring(ply));
             return;
         end
 
-        recip = domInfo:GetPrivateRecipients();
+        recip = domInfo:GetPrivateRecipients(tab);
         isPrivate = recip and recip[ply] or false;
         if sendVars then
             for _, _id in pairs(sendVars) do
@@ -699,17 +681,6 @@ if SERVER then
         sendPck:Send();
     end
 
-    -- Hooks.
-    hook.Add("GatherPrelimData_Base", "CTableNet_AddTasks", function()
-        local ctask = getService("CTask");
-        ctask:AddTaskCondition("bash_PlayerOnInit", "WaitForTableNet", TASK_NUMERIC, 0, 1);
-        ctask:AddTaskOnStart("bash_PlayerOnInit", function(task)
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-            sendPlyTables(data["Player"]);
-        end);
-    end);
-
 elseif CLIENT then
 
     -- Network hooks.
@@ -738,7 +709,7 @@ elseif CLIENT then
         if firstSend then
             tablenet.Received = tablenet.Received + 1;
             if tablenet.Received == tablenet.WaitingOn then
-                MsgLog(LOG_INIT, "Received all networked objects!");
+                MsgLog(LOG_TABNET, "Received all networked objects!");
             end
         end
     end);

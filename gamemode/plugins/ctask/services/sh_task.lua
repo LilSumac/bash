@@ -106,7 +106,7 @@ function SVC:AddNextTask(id, nextID)
     task.NextTasks[#task.NextTasks + 1] = nextID;
 end
 
-function SVC:NewTask(id)
+function SVC:NewTask(id, passed)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -116,6 +116,7 @@ function SVC:NewTask(id)
     local tabnet = getService("CTableNet");
     local newTask = tabnet:NewTable("Task");
     newTask.TaskID = id;
+    newTask.InScope = true;
     newTask:Initialize();
     activeTasks[newTask.RegistryID] = newTask;
     return newTask;
@@ -140,7 +141,7 @@ function SVC:RemoveActiveTask(id)
     local taskID = task.TaskID;
     local status = task:GetNetVar("Task", "Status");
     local passed = task:GetNetVar("Task", "PassedData");
-    MsgLog(LOG_DEF, "Task '%s->%s' has finished with status %d! Finishing up...", regID, taskID, status);
+    MsgLog(LOG_TASK, "Task '%s->%s' has finished with status %d! Finishing up...", regID, taskID, status);
 
     local taskInfo = tasks[taskID];
     for _, func in ipairs(taskInfo.OnFinishes) do
@@ -164,7 +165,7 @@ function SVC:RemoveActiveTask(id)
 end
 
 -- Hooks.
-hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
+hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
     local tabnet = getService("CTableNet");
     tabnet:AddDomain{
         ID = "Task",
@@ -212,88 +213,6 @@ hook.Add("GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         Type = "table",
         Public = true
     };
-
-    local ctask = getService("CTask");
-    ctask:AddTask("bash_PlayerPreInit");
-    ctask:AddTask("bash_PlayerOnInit");
-    ctask:AddTask("bash_PlayerPostInit");
-    ctask:AddNextTask("bash_PlayerPreInit", "bash_PlayerOnInit");
-    ctask:AddNextTask("bash_PlayerOnInit", "bash_PlayerPostInit");
-
-    if SERVER then
-        ctask:AddTaskOnBorn("bash_PlayerPreInit", function(task)
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-            data["Player"].PreInitTask = task;
-        end);
-        ctask:AddTaskOnFinish("bash_PlayerPreInit", function(status, task)
-            if status == STATUS_FAILED then return; end
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-
-            local ply = data["Player"];
-            -- Handle player affairs.
-            ply:Initialize();
-            ply.PreInitTask = nil;
-        end);
-
-        ctask:AddTaskOnBorn("bash_PlayerOnInit", function(task)
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-            data["Player"].OnInitTask = task;
-        end);
-        ctask:AddTaskOnFinish("bash_PlayerOnInit", function(status, task)
-            if status == STATUS_FAILED then return; end
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-
-            local ply = data["Player"];
-            -- Handle player affairs.
-            ply:PostInitialize();
-            ply.OnInitTask = nil;
-        end);
-
-        ctask:AddTaskOnBorn("bash_PlayerOnInit", function(task)
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-            data["Player"].PostInitTask = task;
-        end);
-        ctask:AddTaskOnFinish("bash_PlayerPostInit", function(status, task)
-            if status == STATUS_FAILED then return; end
-            local data = task:GetPassedData();
-            if !isplayer(data["Player"]) then return; end
-
-            local ply = data["Player"];
-            -- Handle player affairs.
-            MsgCon(color_def, "Initialize process finished for player '%s'.", ply:Name());
-            ply.PostInitTask = nil;
-        end);
-    end
 end);
-
-if SERVER then
-
-    -- Hooks.
-    hook.Add("PrePlayerInit", "bash_Hook_StartPlyTasks", function(ply)
-        if !isplayer(ply) then return; end
-
-        local ctask = getService("CTask");
-        local preinit = ctask:NewTask("bash_PlayerPreInit");
-        -- add listener to task
-        preinit:PassData("Player", ply);
-        preinit:Start();
-    end);
-
-elseif CLIENT then
-
-    vnet.Watch("CTask_Net_SendTask", function(pck)
-        local data = pck:Table();
-
-    end);
-    -- watch for new tasks (added listener)
-
-    -- watch for updated tasks (already listening)
-
-end
 
 defineService_end();

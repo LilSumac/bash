@@ -42,7 +42,7 @@ function SVC:Instantiate(id, refresh)
         MsgLog(LOG_CHAR, "Instantiating character: %s", id);
 
         local tablenet = getService("CTableNet");
-        local char = tablenet:NewTable("Char", cachedData[id]);
+        local char = tablenet:NewTable("CChar", cachedData[id]);
         cachedChars[id] = char;
         return char;
     end
@@ -65,10 +65,10 @@ function SVC:PostDBFetch(data)
 end
 
 -- Hooks.
-hook.Add("GatherPrelimData_Base", "CChar_DefaultVars", function()
+hook.Add("bash_GatherPrelimData_Base", "CChar_DefaultVars", function()
     local tablenet = getService("CTableNet");
     tablenet:AddDomain{
-        ID = "Char",
+        ID = "CChar",
         ParentMeta = getMeta("CChar"),
         StoredInSQL = true,
         SQLTable = "bash_chars"
@@ -76,7 +76,7 @@ hook.Add("GatherPrelimData_Base", "CChar_DefaultVars", function()
 
     tablenet:AddVariable{
         ID = "CharID",
-        Domain = "Char",
+        Domain = "CChar",
         Type = "string",
         MaxLength = 17,
         Public = true,
@@ -87,7 +87,7 @@ hook.Add("GatherPrelimData_Base", "CChar_DefaultVars", function()
     };
     tablenet:AddVariable{
         ID = "Name",
-        Domain = "Char",
+        Domain = "CChar",
         Type = "string",
         MaxLength = 32,
         Public = true,
@@ -98,9 +98,9 @@ end);
 if SERVER then
 
     -- Hooks.
-    hook.Add("OnDBConnected", "CChar_OnDBConnected", function()
+    hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
         local db = getService("CDatabase");
-        db:GetRow("bash_chars", "*", "", function(results)
+        db:SelectRow("bash_chars", "CharID", "", function(results)
             results = results[1];
 
             local cchar = getService("CChar");
@@ -108,7 +108,7 @@ if SERVER then
             for index, data in pairs(results.data) do
                 ids[data.CharID] = true;
             end
-            MsgCon(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
+            MsgLog(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
             cachedIDs = ids;
         end);
     end);
@@ -117,7 +117,7 @@ if SERVER then
 
     concommand.Add("testchar", function(ply, cmd, args)
         local tabnet = getService("CTableNet");
-        bash.testchar = tabnet:NewTable("Char", {
+        bash.testchar = tabnet:NewTable("CChar", {
             CharID = "dood",
             Name = "dooder"
         });
