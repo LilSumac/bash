@@ -146,6 +146,10 @@ function SVC:AddDomain(domain)
                 return;
             end
 
+            if CLIENT then
+                return;
+            end
+
             local ids = {};
             local varData;
             for id, val in pairs(data) do
@@ -162,9 +166,7 @@ function SVC:AddDomain(domain)
                 end
             end
 
-            if SERVER then
-                tablenet:NetworkTable(_self.RegistryID, domain, ids);
-            end
+            tablenet:NetworkTable(_self.RegistryID, domain, ids);
         end
     end
 
@@ -504,12 +506,17 @@ if SERVER then
         local privRecip = domInfo:GetPrivateRecipients(tab) or {};
         if pubRecip and privRecip and table.IsEmpty(pubRecip) and table.IsEmpty(privRecip) then return; end
 
-        local pubPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
-        local privPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
-        pubPack:String(tab.RegistryID);
-        pubPack:String(domain);
-        privPack:String(tab.RegistryID);
-        privPack:String(domain);
+        local pubPack, privPack;
+        if !table.IsEmpty(pubRecip) then
+            pubPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
+            pubPack:String(tab.RegistryID);
+            pubPack:String(domain);
+        end
+        if !table.IsEmpty(privPack) then
+            privPack = vnet.CreatePacket("CTableNet_Net_ObjUpdate");
+            privPack:String(tab.RegistryID);
+            privPack:String(domain);
+        end
 
         local public = {};
         local private = {};
@@ -525,8 +532,8 @@ if SERVER then
                     end
 
                     val = tab.TableNet[domain][id];
-                    private[id] = val;
-                    if varData.Public then
+                    if privPack then private[id] = val; end
+                    if pubPack and varData.Public then
                         public[id] = val;
                     end
                 end
@@ -536,8 +543,8 @@ if SERVER then
                     MsgErr("NilEntry", ids);
                 else
                     val = tab.TableNet[domain][ids];
-                    private[ids] = val;
-                    if varData.Public then
+                    if privPack then private[ids] = val; end
+                    if pubPack and varData.Public then
                         public[ids] = val;
                     end
                 end
@@ -546,33 +553,36 @@ if SERVER then
             for _id, _var in pairs(vars[domain]) do
                 val = tab.TableNet[domain][_id];
                 if val != nil then
-                    private[_id] = val;
-                    if _var.Public then
+                    if privPack then private[_id] = val; end
+                    if pubPack and _var.Public then
                         public[_id] = val;
                     end
                 end
             end
         end
 
-        pubPack:Table(public);
-        pubPack:Bool(false);
-        privPack:Table(private);
-        privPack:Bool(false);
         if isentity(tab) or isplayer(tab) then
-            pubPack:Bool(true);
-            pubPack:Entity(tab);
-            privPack:Bool(true);
-            privPack:Entity(tab);
+            if pubPack then
+                pubPack:Table(public);
+                pubPack:Bool(false);
+                pubPack:Bool(true);
+                pubPack:Entity(tab);
+            end
+
+            if privPack then
+                privPack:Table(private);
+                privPack:Bool(false);
+                privPack:Bool(true);
+                privPack:Entity(tab);
+            end
         else
-            pubPack:Bool(false);
-            privPack:Bool(false);
+            if pubPack then pubPack:Bool(false); end
+            if privPack then privPack:Bool(false); end
         end
 
         local excluded = player.GetInitializedAsKeys();
 
-        if table.IsEmpty(pubRecip) then
-            pubPack:Discard();
-        else
+        if pubPack then
             pubPack:AddTargets(pubRecip);
             pubPack:Send();
 
@@ -581,9 +591,7 @@ if SERVER then
             end
         end
 
-        if table.IsEmpty(privRecip) then
-            privPack:Discard();
-        else
+        if privPack then
             privPack:AddTargets(privRecip);
             privPack:Send();
 

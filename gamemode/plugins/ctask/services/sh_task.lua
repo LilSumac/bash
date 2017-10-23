@@ -181,8 +181,7 @@ hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         Domain = "Task",
         Type = "number",
         Public = true,
-        OnGenerate = STATUS_PAUSED,
-        OnSetClient
+        OnGenerate = STATUS_PAUSED
     };
 
     tabnet:AddVariable{
