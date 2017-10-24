@@ -61,7 +61,6 @@ function SVC:AddDomain(domain)
     -- Domain fields.
     -- domain.ID = domain.ID; (Redundant, no default)
     -- domain.ParentMeta = domain.ParentMeta; (Redundant, no default);
-    domain.Secure = domain.Secure == nil and true or domain.Secure;
     domain.StoredInSQL = domain.StoredInSQL or false;
     if SERVER and domain.StoredInSQL then
         if !domain.SQLTable then
@@ -115,7 +114,7 @@ function SVC:AddDomain(domain)
             return unpack(results);
         end
     end
-    if (SERVER or domain.Secure) and meta and !meta.SetNetVar then
+    if meta and !meta.SetNetVar then
         meta.SetNetVar = function(_self, domain, id, val)
             _self:SetNetVars(domain, {[id] = val});
         end
@@ -147,6 +146,7 @@ function SVC:AddDomain(domain)
             end
 
             if CLIENT then
+                local requestPck = vnet.CreatePacket("")
                 return;
             end
 
@@ -210,6 +210,7 @@ function SVC:AddVariable(var)
     var.Type = var.Type or "string";
     -- var.MaxLength = var.MaxLength;
     var.Public = var.Public or false;
+    var.Secure = var.Secure == nil and true or var.Secure;
 
     -- var.OnGen
     -- var.OnInit
