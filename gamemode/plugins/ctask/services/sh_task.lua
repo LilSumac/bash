@@ -141,7 +141,7 @@ function SVC:RemoveActiveTask(id)
     local taskID = task.TaskID;
     local status = task:GetNetVar("Task", "Status");
     local passed = task:GetNetVar("Task", "PassedData");
-    MsgLog(LOG_TASK, "Task '%s->%s' has finished with status %d! Finishing up...", regID, taskID, status);
+    MsgDebug(LOG_TASK, "Task '%s->%s' has finished with status %d! Finishing up...", regID, taskID, status);
 
     local taskInfo = tasks[taskID];
     for _, func in ipairs(taskInfo.OnFinishes) do

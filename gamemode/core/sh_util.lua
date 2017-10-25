@@ -19,6 +19,13 @@ function MsgLog(log, text, ...)
     -- if verbose logging enabled, log text
 end
 
+function MsgDebug(log, text, ...)
+    if !bash.debug then return; end
+
+    local args = {...};
+    MsgLog(log, text, unpack(args));
+end
+
 function MsgErr(errType, ...)
     if !errType then
         MsgErr("NilArgs", "errType");
@@ -56,6 +63,8 @@ function MsgErr(errType, ...)
     local srcStr = Format("%s -> %s line %d", srcFunc, srcFile, fromInfo.currentline);
 
     MsgLog(LOG_ERR, "[From %s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
+
+    -- log to file
 end
 
 function addErrType(name, str)
@@ -242,7 +251,7 @@ function defineMeta_end()
         pre = Format("(In Plugin %s ->) ", plug.Name);
     end
 
-    MsgLog(LOG_INIT, "%sRegistered metatable: %s", pre, meta.ID);
+    MsgDebug(LOG_INIT, "%sRegistered metatable: %s", pre, meta.ID);
     bash.meta[meta.ID] = meta;
     _G["META"] = nil;
 end
@@ -300,7 +309,7 @@ function defineService_end()
         pre = Format("(In Plugin %s ->) ", plug.Name);
     end
 
-    MsgLog(LOG_INIT, "%sRegistered service: %s", pre, svc.ID);
+    MsgDebug(LOG_INIT, "%sRegistered service: %s", pre, svc.ID);
     bash.services[svc.ID] = svc;
     _G["SVC"] = nil;
 end
@@ -354,7 +363,7 @@ function definePlugin_end()
         return;
     end
 
-    MsgLog(LOG_INIT, "Registered plugin: %s", plug.ID);
+    MsgDebug(LOG_INIT, "Registered plugin: %s", plug.ID);
     bash.plugins[plug.ID] = plug;
     _G["PLUG"] = nil;
 end

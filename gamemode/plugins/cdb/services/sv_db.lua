@@ -108,7 +108,7 @@ function SVC:AddTable(name)
 
     tables[name] = tab;
 
-    MsgLog(LOG_DB, "Database table registered with name '%s'.", name);
+    MsgDebug(LOG_DB, "Database table registered with name '%s'.", name);
 end
 
 function SVC:AddColumn(tab, col, primary)
@@ -143,11 +143,11 @@ function SVC:AddColumn(tab, col, primary)
     col.NotNull = col.NotNull or false;
     col.Field = col.Field or "";
 
-    MsgLog(LOG_DB, "Database column '%s' registered in table '%s'.", col.Name, tab);
+    MsgDebug(LOG_DB, "Database column '%s' registered in table '%s'.", col.Name, tab);
 
     if primary then
         tabData.PrimaryKey = col.Name;
-        MsgLog(LOG_DB, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
+        MsgDebug(LOG_DB, "Primary key in table '%s' set to column '%s'.", tabData.Name, col.Name);
     end
 
     tabData.Columns[col.Name] = col;
@@ -234,7 +234,7 @@ end
 
 function SVC:CheckTables()
     if table.IsEmpty(tables) then
-        MsgLog(LOG_DB, "No tables registered in database. Skipping...");
+        MsgDebug(LOG_DB, "No tables registered in database. Skipping...");
         return;
     end
 
@@ -260,7 +260,7 @@ function SVC:CheckTables()
     end
 
     self:Query(query, function(results)
-        MsgLog(LOG_DB, "Table check complete.");
+        MsgDebug(LOG_DB, "Table check complete.");
         local db = getService("CDatabase");
         db:CheckColumns();
     end);
@@ -291,7 +291,7 @@ function SVC:SelectRow(tab, cols, conds, callback, ...)
     local args = {...};
     self:Query(query, function(results)
         local db = getService("CDatabase");
-        --MsgLog(LOG_DB, "Selected row from table '%s'.", tab);
+        --MsgDebug(LOG_DB, "Selected row from table '%s'.", tab);
 
         for _, subQuery in pairs(results) do
             if !subQuery.status then return; end
@@ -339,7 +339,7 @@ function SVC:InsertRow(tab, data, callback, ...)
     query = Format("%s) %s);", query, vals);
     local args = {...};
     self:Query(query, function(results)
-        --MsgLog(LOG_DB, "New row inserted into table '%s'.", tab);
+        --MsgDebug(LOG_DB, "New row inserted into table '%s'.", tab);
 
         if callback then
             args[#args + 1] = results;
@@ -382,13 +382,17 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
 
     local args = {...};
     self:Query(query, function(results)
-        --MsgLog(LOG_DB, "Row updated in table '%s'.", tab);
+        --MsgDebug(LOG_DB, "Row updated in table '%s'.", tab);
 
         if callback then
             args[#args + 1] = results;
             callback(unpack(args));
         end
     end);
+end
+
+function SVC:RemoveRow()
+    -- todo
 end
 
 defineService_end();

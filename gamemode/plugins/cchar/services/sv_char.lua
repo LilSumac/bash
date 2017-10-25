@@ -16,7 +16,7 @@ function SVC:Instantiate(id, refresh)
 
     local data;
     if refresh or (!cachedChars[id] and !cachedData[id]) then
-        MsgLog(LOG_CHAR, "Hooking character fetch: %s", id);
+        MsgDebug(LOG_CHAR, "Hooking character fetch: %s", id);
 
         local name = "CChar_Hook_CharFetch_" .. id;
         hook.Add(name, id, self.Instantiate);
@@ -31,7 +31,7 @@ function SVC:Instantiate(id, refresh)
         -- data has already been fetched
         -- take data and push to new instance
 
-        MsgLog(LOG_CHAR, "Instantiating character: %s", id);
+        MsgDebug(LOG_CHAR, "Instantiating character: %s", id);
 
         local tablenet = getService("CTableNet");
         local char = tablenet:NewTable("CChar", cachedData[id]);
@@ -39,7 +39,7 @@ function SVC:Instantiate(id, refresh)
         return char;
     end
 
-    MsgLog(LOG_CHAR, "Removing character fetch hook: %s", id);
+    MsgDebug(LOG_CHAR, "Removing character fetch hook: %s", id);
     local name = "CChar_Hook_CharFetch_" .. id;
     hook.Remove(name, id);
 end
@@ -49,7 +49,7 @@ function SVC:DBFetch(id)
 end
 
 function SVC:PostDBFetch(data)
-    MsgLog(LOG_CHAR, "Completed character fetch: %s", data.CharID);
+    MsgDebug(LOG_CHAR, "Completed character fetch: %s", data.CharID);
 
     cachedData[data.CharID] = data;
     local name = "CChar_Hook_CharFetch_" .. data.CharID;

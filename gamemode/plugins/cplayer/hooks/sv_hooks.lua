@@ -86,7 +86,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
 
         local ply = data["Player"];
         -- Handle player affairs.
-        MsgLog(LOG_INIT, "Initialize process finished for player '%s'.", ply:Name());
+        MsgDebug(LOG_INIT, "Initialize process finished for player '%s'.", ply:Name());
         ply.PostInitTask = nil;
     end);
 end);

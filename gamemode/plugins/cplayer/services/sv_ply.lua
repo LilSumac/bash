@@ -34,7 +34,7 @@ local function createPlyData(ply)
 end
 
 local function getPlyData(ply)
-    MsgLog(LOG_DB, "Gathering player data for '%s'...", ply:Name());
+    MsgDebug(LOG_DB, "Gathering player data for '%s'...", ply:Name());
 
     local db = getService("CDatabase");
     db:SelectRow(
@@ -55,7 +55,7 @@ local function getPlyData(ply)
 
                 end
 
-                MsgLog(LOG_DB, "Found row for player '%s'.", _ply:Name());
+                MsgDebug(LOG_DB, "Found row for player '%s'.", _ply:Name());
                 local preinit = ply.PreInitTask;
                 if !preinit then return; end
                 --PrintTable(results);
@@ -72,9 +72,7 @@ end
 local function sendPlyTables(ply)
     local tabnet = getService("CTableNet");
     if tabnet:IsRegistryEmpty() then
-        -- DEBUG
-        --MsgN("Empty registry!");
-        -- jump past this step
+        MsgDebug(LOG_DEF, "Empty registry! Not sending to %s.", ply:Name());
         return;
     end
 

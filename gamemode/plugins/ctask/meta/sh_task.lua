@@ -16,7 +16,7 @@ function META:Initialize()
 
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
-        MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.RegistryID, self.TaskID);
+        MsgDebug(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.RegistryID, self.TaskID);
     else
         local startVals = {};
         for condID, cond in pairs(self.TaskInfo.Conditions) do
@@ -35,7 +35,7 @@ function META:Initialize()
 end
 
 function META:Start()
-    MsgLog(LOG_TASK, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
+    MsgDebug(LOG_TASK, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
     self:SetNetVars("Task", {
         ["Status"] = STATUS_RUNNING,
         ["StartTime"] = os.time()

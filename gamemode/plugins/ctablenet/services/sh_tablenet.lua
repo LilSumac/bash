@@ -283,7 +283,7 @@ function SVC:AddDomain(domain)
     end
     ]]
 
-    MsgLog(LOG_TABNET, "Registered domain: %s", domain.ID);
+    MsgDebug(LOG_TABNET, "Registered domain: %s", domain.ID);
     domains[domain.ID] = domain;
     vars[domain.ID] = {};
 end
@@ -345,7 +345,7 @@ function SVC:AddVariable(var)
         -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
     end
 
-    MsgLog(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
+    MsgDebug(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
@@ -463,7 +463,7 @@ function SVC:NewTable(domain, data, obj, regID)
         singlesMade[domain] = tab.RegistryID;
     end
 
-    MsgLog(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
+    MsgDebug(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     runInits(tab, domain);
     --if SERVER then self:NetworkTable(tab.RegistryID, domain); end
@@ -499,7 +499,7 @@ function SVC:RemoveTable(id, domain)
         end
     end
 
-    MsgLog(LOG_TABNET, "Removing '%s' from registry.", id);
+    MsgDebug(LOG_TABNET, "Removing '%s' from registry.", id);
 
     if SERVER then
         local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");

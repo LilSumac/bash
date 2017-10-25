@@ -9,7 +9,7 @@ hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
         for index, data in pairs(results.data) do
             ids[data.CharID] = true;
         end
-        MsgLog(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
+        MsgDebug(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
         cachedIDs = ids;
     end);
 end);

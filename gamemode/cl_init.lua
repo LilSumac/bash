@@ -26,6 +26,7 @@ MsgC(Color(0, 255, 255), "======================== BASE STARTED ================
 bash = bash or {};
 bash.IsValid = function() return true; end
 bash.startTime = SysTime();
+bash.debug = true;
 bash.nonVolatile = bash.nonVolatile or {};
 
 -- Refresh global table on restart.
