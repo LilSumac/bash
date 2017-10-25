@@ -3,7 +3,7 @@ definePlugin_start("CTask");
 PLUG.Name = "Core Task";
 PLUG.Author = "LilSumac";
 PLUG.Desc = "Simple framework for implementing code-based tasks with progress, feedback, and callbacks.";
-PLUG.Depends = {};
+PLUG.Depends = {"CTableNet"};
 
 -- Constants.
 LOG_TASK = {pre = "[TASK]", col = Color(151, 0, 151, 255)};
@@ -29,6 +29,7 @@ if SERVER then
 end
 
 -- Process plugin files.
+processDir("hooks");
 processDir("meta");
 processDir("services");
 

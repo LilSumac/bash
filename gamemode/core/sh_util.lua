@@ -118,6 +118,20 @@ function processPlugins()
             MsgErr("NoPluginFile", plugin);
         end
     end
+
+    checkDependencies();
+end
+
+function checkDependencies()
+    for id, plug in pairs(bash.plugins) do
+        for _, dep in pairs(plug.Depends) do
+            if !bash.plugins[dep] then
+                MsgLog(LOG_WARN, "Plugin %s is missing dependency %s! This WILL cause errors! Resolve this immediately!", plug.Name, dep);
+            end
+        end
+    end
+
+    MsgLog(LOG_INIT, "All %s plugins have met their dependencies.", table.Count(bash.plugins));
 end
 
 function getClientData(ply, id)
@@ -329,6 +343,7 @@ function definePlugin_start(id)
     plug.Desc = "A custom plugin.";
     plug.Metas = {};
     plug.Services = {};
+    plug.Depends = {};
     plug.IsValid = function() return true; end
 end
 

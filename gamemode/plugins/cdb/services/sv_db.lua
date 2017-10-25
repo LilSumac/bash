@@ -15,10 +15,32 @@ defineService_start("CDatabase");
 SVC.Name = "Core Database";
 SVC.Author = "LilSumac";
 SVC.Desc = "The core interface between /bash/ and the external database.";
-SVC.Depends = {"CPlayer", "CCharacter"};
 
 -- Constants.
 LOG_DB = {pre = "[DB]", col = Color(0, 151, 151, 255)};
+
+CAST_IN = 1;
+CAST_OUT = 2;
+
+SQL_DEF = {};
+SQL_DEF["boolean"] = false;
+SQL_DEF["number"] = 0;
+SQL_DEF["string"] = "";
+SQL_DEF["table"] = {};
+
+SQL_TYPE = {};
+SQL_TYPE["counter"] = "INT";
+SQL_TYPE["boolean"] = "BIT"
+SQL_TYPE["number"] = "DECIMAL(%d)";
+SQL_TYPE["string"] = "VARCHAR(%d)";
+SQL_TYPE["table"] = "VARCHAR(%d)";
+
+-- Custom errors.
+addErrType("NoDBModule", "No tmysql4 module found! This is required and must be resolved.");
+addErrType("NoDBConnect", "Unable to connect to MySQL server! (%s)");
+addErrType("QueryFailed", "The SQL query failed!\nQuery: %s\nError: %s");
+addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s");
+addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
 
 -- Service storage.
 local dbObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
@@ -32,22 +54,6 @@ local user = "tester";
 local pass = "testpass";
 local data = "srp_db";
 local port = 3306;
-
-local CAST_IN = 1;
-local CAST_OUT = 2;
-
-local SQL_DEF = {};
-SQL_DEF["boolean"] = false;
-SQL_DEF["number"] = 0;
-SQL_DEF["string"] = "";
-SQL_DEF["table"] = {};
-
-local SQL_TYPE = {};
-SQL_TYPE["counter"] = "INT";
-SQL_TYPE["boolean"] = "BIT"
-SQL_TYPE["number"] = "DECIMAL(%d)";
-SQL_TYPE["string"] = "VARCHAR(%d)";
-SQL_TYPE["table"] = "VARCHAR(%d)";
 
 function SVC:IsConnected()
     return dbObject and connected;
@@ -384,23 +390,5 @@ function SVC:UpdateRow(tab, data, cond, callback, ...)
         end
     end);
 end
-
--- Custom errors.
-addErrType("NoDBModule", "No tmysql4 module found! This is required and must be resolved.");
-addErrType("NoDBConnect", "Unable to connect to MySQL server! (%s)");
-addErrType("QueryFailed", "The SQL query failed!\nQuery: %s\nError: %s");
-addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s");
-addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
-
--- Hooks.
-hook.Add("bash_InitService_Base", "CDatabase_OnInit", function()
-    local db = getService("CDatabase");
-    if db:IsConnected() then
-        MsgLog(LOG_DB, "Database still connected, skipping.");
-        return;
-    end
-
-    db:Connect();
-end);
 
 defineService_end();
