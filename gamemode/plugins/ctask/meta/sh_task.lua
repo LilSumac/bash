@@ -14,10 +14,6 @@ function META:Initialize()
 
     self.Timers = {};
 
-    if SERVER then
-        self.Listeners = {};
-    end
-
     local timerID;
     if table.IsEmpty(self.TaskInfo.Conditions) then
         MsgLog(LOG_WARN, "The task '%s->%s' has no conditions! Starting it will automatically complete it in 0.1s.", self.RegistryID, self.TaskID);
@@ -185,16 +181,6 @@ function META:CheckConditions()
         end
     end
     return true;
-end
-
-if SERVER then
-
-    function META:AddListener(ply)
-        self.Listeners[ply] = true;
-        local tabnet = getService("CTableNet");
-        tabnet:SendTable(ply, self.RegistryID, "Task");
-    end
-
 end
 
 defineMeta_end();

@@ -279,6 +279,12 @@ if SERVER then
             -- Handle player affairs.
             tabnet:NewTable("CPlayer", data["SQLData"], data["Player"]);
             cplayer:Initialize(ply);
+
+            ply:AddListener("CPlayer", player.GetInitialized(), LISTEN_PUBLIC); -- Add everyone else as public listeners.
+            ply:AddListener("CPlayer", ply, LISTEN_PRIVATE, true);              -- Add player as private listener.
+
+            tabnet:NetworkTable(ply.RegistryID, "CPlayer");
+
             ply.PreInitTask = nil;
         end);
 

@@ -45,6 +45,27 @@ local function runInits(tab, domain)
     end
 end
 
+local function checkListenerTable(tab, domain)
+    if !tab.TableNet then
+        MsgErr("TableNotRegistered", tostring(tab));
+        return;
+    end
+    if !tab.TableNet[domain] then
+        MsgErr("NoDomainInTable", tostring(tab), domain);
+        return;
+    end
+
+    local list = tab.TableNet[domain].Listeners;
+    if !list then
+        tab.TableNet[domain].Listeners = {};
+        tab.TableNet[domain].Listeners.Public = {};
+        tab.TableNet[domain].Listeners.Private = {};
+        list = tab.TableNet[domain].Listeners;
+    end
+
+    return list;
+end
+
 -- Service functions.
 function SVC:AddDomain(domain)
     if !domain then
@@ -193,17 +214,60 @@ function SVC:AddDomain(domain)
         end
 
         -- Listener functions.
-        meta.AddListener = function(_self, listener, domain, mode)
+        meta.AddListener = function(_self, domain, listener, mode)
+            local list = checkListenerTable(_self, domain);
 
+            if mode == LISTEN_PUBLIC then
+                if type(listener) == "table" then
+                    for key, val in pairs(listener) do
+                        if isplayer(key) then
+                            list.Public[key] = true;
+                        end
+                        if isplayer(val) then
+                            list.Public[val] = true;
+                        end
+                    end
+                else
+                    list.Public[listener] = true;
+                end
+            elseif mode == LISTEN_PRIVATE then
+                if type(listener) == "table" then
+                    for key, val in pairs(listener) do
+                        if isplayer(key) then
+                            list.Private[key] = true;
+                        end
+                        if isplayer(val) then
+                            list.Private[val] = true;
+                        end
+                    end
+                else
+                    list.Public[listener] = true;
+                end
+            end
         end
         meta.GetListeners = function(_self, domain)
-
+            return checkListenerTable(_self, domain);
         end
-        meta.RemoveListener = function(_self, listener, domain)
-
+        meta.RemoveListener = function(_self, domain, listener)
+            local list = checkListenerTable(_self, domain);
+            list.Public[listener] = nil;
+            list.Private[listener] = nil;
         end
         meta.ClearListeners = function(_self, domain)
+            if !domain then
+                local list;
+                for _domain, _ in pairs(_self.TableNet) do
+                    list = checkListenerTable(_self, _domain);
+                    list.Public = {};
+                    list.Private = {};
+                end
 
+                return;
+            end
+
+            local list = checkListenerTable(_self, domain);
+            list.Public = {};
+            list.Private = {};
         end
 
         meta.TableNetFuncsAdded = true;
@@ -401,7 +465,7 @@ function SVC:NewTable(domain, data, obj, regID)
     MsgLog(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     runInits(tab, domain);
-    if SERVER then self:NetworkTable(tab.RegistryID, domain); end
+    --if SERVER then self:NetworkTable(tab.RegistryID, domain); end
     return tab;
 end
 
