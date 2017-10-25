@@ -193,13 +193,16 @@ function SVC:AddDomain(domain)
         end
 
         -- Listener functions.
-        meta.AddListener = function(_self, listener, mode)
+        meta.AddListener = function(_self, listener, domain, mode)
 
         end
-        meta.GetListeners = function(_self)
+        meta.GetListeners = function(_self, domain)
 
         end
-        meta.RemoveListener = function(_self, listener)
+        meta.RemoveListener = function(_self, listener, domain)
+
+        end
+        meta.ClearListeners = function(_self, domain)
 
         end
 
@@ -314,8 +317,16 @@ function SVC:GetRegistry()
     return registry;
 end
 
-function SVC:IsRegistered(id)
-    return registry[id] != nil and registry[id] != NULL;
+function SVC:GetTable(id)
+    return registry[id];
+end
+
+function SVC:IsRegistered(id, domain)
+    if domain then
+        return registry[id] != nil and registry[id] != NULL and registry[id].TableNet[domain] != nil;
+    else
+        return registry[id] != nil and registry[id] != NULL;
+    end
 end
 
 function SVC:IsRegistryEmpty()
@@ -433,8 +444,10 @@ function SVC:RemoveTable(id, domain)
     end
 
     tab.TableNet[domain] = nil;
+    tab:ClearListeners(domain);
     if table.IsEmpty(tab.TableNet) then
         registry[id] = nil;
+        tab.RegistryID = nil;
     end
 
     if singlesMade[domain] then
@@ -536,7 +549,7 @@ end
 if SERVER then
 
     -- Network pool.
-    util.AddNetworkString("CTableNet_Net_ClientInit");
+    util.AddNetworkString("CTableNet_Net_RegSend");
     util.AddNetworkString("CTableNet_Net_ObjUpdate");
     util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
 
@@ -566,7 +579,7 @@ if SERVER then
             return;
         end
 
-        local list = tab:GetListeners();
+        local list = tab:GetListeners(domain);
         if !list or (table.IsEmpty(list.Public) and table.IsEmpty(list.Private)) then return; end
 
         local pubPack, privPack;
@@ -697,7 +710,7 @@ if SERVER then
         end
 
         local data = {};
-        local list = tab:GetListeners();
+        local list = tab:GetListeners(domain);
         if !list.Public[ply] and !list.Private[ply] and !force then
             -- DEBUG
             -- Remove old error msg.
@@ -751,9 +764,74 @@ if SERVER then
         sendPck:Send();
     end
 
+    function SVC:SendRegistry(ply)
+        if !isplayer(ply) then
+            MsgErr("InvalidPly");
+            return;
+        end
+
+        if self:IsRegistryEmpty() then return; end
+
+        local regPck = vnet.CreatePacket("CTableNet_Net_RegSend");
+        local data = {};
+        local list;
+        for regID, tab in pairs(registry) do
+            for domain, tabData in pairs(tab.TableNet) do
+                list = tab:GetListeners(domain);
+                if !list or (!list.Public[ply] and !list.Private[ply]) then continue; end
+
+                data[regID] = data[regID] or {};
+                data[regID][domain] = tabData.Public;
+                if list.Private[ply] then
+                    table.Merge(data[regID][domain], tabData.Private);
+                end
+                if isentity(tab) or isplayer(tab) then
+                    data[regID]._RegObg = tab;
+                end
+            end
+        end
+
+        regPck:Table(data);
+        regPck:AddTargets(ply);
+        regPck:Send();
+    end
+
 elseif CLIENT then
 
     -- Network hooks.
+    vnet.Watch("CTableNet_Net_RegSend", function(pck)
+        local reg = pck:Table();
+        local tabnet = getService("CTableNet");
+        local count = 0;
+        local tab, varData;
+        for regID, regData in pairs(reg) do
+            for domain, data in pairs(regData) do
+                if domain == "_RegObg" then continue; end
+
+                if tabnet:IsRegistered(regID, domain) then
+                    tab = tabnet:GetTable(regID);
+                    for id, val in pairs(data) do
+                        varData = tabnet:GetVariable(domain, id);
+                        if !varData then continue; end
+
+                        if varData.Public then
+                            tab.TableNet[domain].Public[id] = val;
+                        else
+                            tab.TableNet[domain].Private[id] = val;
+                        end
+                    end
+                else
+                    tabnet:NewTable(domain, data, regData._RegObg, regID);
+                end
+                count = count + 1;
+            end
+        end
+
+        -- Acknowledge registry send (maybe)
+        -- DEBUG
+        -- Show count
+    end);
+
     vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
         local regID = pck:String();
         local domain = pck:String();
@@ -782,15 +860,6 @@ elseif CLIENT then
         else
             tab = tabnet:NewTable(domain, data, obj, regID);
         end
-
-        --[[ Figure out how to send an object count initially.
-        if firstSend then
-            tablenet.Received = tablenet.Received + 1;
-            if tablenet.Received == tablenet.WaitingOn then
-                MsgLog(LOG_TABNET, "Received all networked objects!");
-            end
-        end
-        ]]
     end);
 
     vnet.Watch("CTableNet_Net_ObjOutOfScope", function(pck)
