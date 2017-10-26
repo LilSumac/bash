@@ -1,3 +1,7 @@
+--[[
+    Global shared utility functions.
+]]
+
 local bash = bash;
 
 function handleFunc(var, ...)
@@ -7,6 +11,10 @@ function handleFunc(var, ...)
     else
         return var;
     end
+end
+
+function isplayer(ply)
+    return ply and IsValid(ply) and ply.IsPlayer and ply:IsPlayer();
 end
 
 function MsgLog(log, text, ...)
@@ -141,6 +149,46 @@ function checkDependencies()
     end
 
     MsgLog(LOG_INIT, "All %s plugins have met their dependencies.", table.Count(bash.plugins));
+end
+
+function processMeta(id)
+    local from = debug.getinfo(2);
+    local src = from.short_src;
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. "meta/";
+
+    if _G["PLUG"] then
+        id = id or _G["PLUG"].ID;
+    end
+
+    defineMeta_start(id);
+    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
+    for _, file in pairs(singles) do
+        file = src .. file;
+        processFile(file);
+    end
+    defineMeta_end();
+end
+
+function processService(id)
+    local from = debug.getinfo(2);
+    local src = from.short_src;
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. "services/";
+
+    if _G["PLUG"] then
+        id = id or _G["PLUG"].ID;
+    end
+
+    defineService_start(id);
+    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
+    for _, file in pairs(singles) do
+        file = src .. file;
+        processFile(file);
+    end
+    defineService_end();
 end
 
 function getClientData(ply, id)
@@ -289,9 +337,9 @@ function defineService_start(id)
     _G["SVC"] = {};
     local svc = _G["SVC"];
     svc.ID = id;
-    svc.Name = id;
-    svc.Author = "Unknown";
-    svc.Desc = "A bash service.";
+    --svc.Name = id;
+    --svc.Author = "Unknown";
+    --svc.Desc = "A bash service.";
     svc.IsValid = function() return true; end
 end
 
@@ -379,8 +427,4 @@ function getPlugin(id)
     end
 
     return bash.plugins[id];
-end
-
-function isplayer(ply)
-    return ply and IsValid(ply) and ply.IsPlayer and ply:IsPlayer();
 end

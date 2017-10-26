@@ -1,13 +1,13 @@
--- Hooks.
+--[[
+    CTask shared hooks.
+]]
+
+-- Gamemode hooks.
 hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
     local tabnet = getService("CTableNet");
     tabnet:AddDomain{
         ID = "Task",
-        ParentMeta = getMeta("CTask"),
-        Secure = false,
-        GetRecipients = function(_self, task)
-            return task.Listeners;
-        end
+        ParentMeta = getMeta("CTask")
     };
 
     tabnet:AddVariable{

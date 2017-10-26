@@ -1,5 +1,10 @@
+--[[
+    CTask plugin file.
+]]
+
 definePlugin_start("CTask");
 
+-- Plugin info.
 PLUG.Name = "Core Task";
 PLUG.Author = "LilSumac";
 PLUG.Desc = "Simple framework for implementing code-based tasks with progress, feedback, and callbacks.";
@@ -22,15 +27,9 @@ addErrType("TaskNotActive", "No task with that ID is active! (%s)");
 addErrType("TaskNotValid", "This task does not have a RegistryID! Use the library create function! (%s)");
 addErrType("TaskAlreadyRunning", "Only one instance of this task can be active at a time! (%s running on %s)");
 
-if SERVER then
-    -- Network pool.
-    util.AddNetworkString("CTask_Net_SendTask");
-    util.AddNetworkString("CTask_Net_UpdateTask");
-end
-
--- Process plugin files.
+-- Process plugin contents.
 processDir("hooks");
-processDir("meta");
-processDir("services");
+processMeta();
+processService();
 
 definePlugin_end();

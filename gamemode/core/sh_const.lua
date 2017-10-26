@@ -1,4 +1,8 @@
--- Global constants. See Documentation for more info.
+--[[
+    Global constant variables.
+    See documentation for more info.
+]]
+
 BASE_NAME = "/bash/";
 
 CHAR_ALPHANUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

@@ -1,4 +1,6 @@
-
+--[[
+    Shared base gamemode hooks.
+]]
 
 gameevent.Listen("player_connect");
 hook.Add("player_connect", "bash_ReportConnect", function(data)

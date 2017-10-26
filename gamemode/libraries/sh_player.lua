@@ -1,3 +1,7 @@
+--[[
+    Base 'player' library extentions.
+]]
+
 local player = player;
 
 function player.GetInitialized()

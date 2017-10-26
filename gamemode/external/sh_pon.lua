@@ -1,4 +1,7 @@
 --[[
+    External object encoding library.
+	Credits below.
+
 RECOMMENDED VERSION
 
 VERSION 1.2.1

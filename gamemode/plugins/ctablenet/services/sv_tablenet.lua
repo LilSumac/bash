@@ -1,11 +1,13 @@
+--[[
+    CTableNet server service.
+]]
+
 -- Network pool.
 util.AddNetworkString("CTableNet_Net_RegSend");
 util.AddNetworkString("CTableNet_Net_ObjUpdate");
 util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
 
-processFile("sv_tablenet.lua");
-
--- Functions.
+-- Service functions.
 function SVC:NetworkTable(id, domain, vars)
     if !id or !domain then
         MsgErr("NilArgs", "id/domain");

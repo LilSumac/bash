@@ -1,9 +1,6 @@
-defineService_start("CTask");
-
--- Service info.
-SVC.Name = "CTask";
-SVC.Author = "LilSumac";
-SVC.Desc = "Core Task service.";
+--[[
+    CTask shared service.
+]]
 
 -- Service storage.
 local tasks = {};
@@ -163,5 +160,3 @@ function SVC:RemoveActiveTask(id)
         newTask:Start();
     end
 end
-
-defineService_end();

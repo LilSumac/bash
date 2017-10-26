@@ -1,4 +1,8 @@
--- Hooks.
+--[[
+    CPlayer server hooks.
+]]
+
+-- Gamemode hooks.
 gameevent.Listen("player_disconnect");
 hook.Add("player_disconnect", "CPlayer_RemovePlayer", function(ply)
     if ply.RegistryID then
@@ -91,7 +95,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
     end);
 end);
 
-hook.Add("bash_OnReceiveClientData", "bash_Hook_StartPlyTasks", function(ply, data)
+hook.Add("bash_OnReceiveClientData", "CPlayer_StartPlyTasks", function(ply, data)
     if !isplayer(ply) then return; end
     if ply.Initialized then return; end
 

@@ -1,4 +1,8 @@
--- Hooks.
+--[[
+    CDatabase server hooks.
+]]
+
+-- Gamemode hooks.
 hook.Add("bash_InitService_Base", "CDatabase_OnInit", function()
     local db = getService("CDatabase");
     if db:IsConnected() then

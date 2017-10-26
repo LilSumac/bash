@@ -1,4 +1,8 @@
---[[    vNet 1.1.9
+--[[
+    External packet-based networking library.
+    Credits below.
+
+    vNet 1.1.9
 
     Copyright 2014 Alexandru-Mihai Maftei
                aka Vercas

@@ -1,2 +1,5 @@
--- All bash network strings are pooled here.
+--[[
+    Base network strings.
+]]
+
 util.AddNetworkString("bash_Net_SendClientData");

@@ -1,7 +1,11 @@
--- Hooks
+--[[
+    CPlayer shared hooks.
+]]
+
+-- Gamemode hooks.
 hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
-    local tablenet = getService("CTableNet");
-    tablenet:AddDomain{
+    local tabnet = getService("CTableNet");
+    tabnet:AddDomain{
         ID = "CPlayer",
         ParentMeta = FindMetaTable("Player"),
         StoredInSQL = true,
@@ -11,7 +15,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "Name",
         Domain = "CPlayer",
         Type = "string",
@@ -26,7 +30,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "SteamID",
         Domain = "CPlayer",
         Type = "string",
@@ -39,7 +43,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "Addresses",
         Domain = "CPlayer",
         Type = "table",
@@ -54,7 +58,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "FirstLogin",
         Domain = "CPlayer",
         Type = "number",
@@ -66,7 +70,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "NewPlayer",
         Domain = "CPlayer",
         Type = "boolean",
@@ -81,7 +85,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "Playtime",
         Domain = "CPlayer",
         Type = "number",

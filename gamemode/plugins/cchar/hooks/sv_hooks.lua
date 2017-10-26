@@ -1,4 +1,8 @@
--- Hooks.
+--[[
+    CChar server hooks.
+]]
+
+-- Gamemode hooks.
 hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
     local db = getService("CDatabase");
     db:SelectRow("bash_chars", "CharID", "", function(results)
@@ -15,7 +19,7 @@ hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
 end);
 
 
-
+-- TESTING
 concommand.Add("testchar", function(ply, cmd, args)
     local tabnet = getService("CTableNet");
     bash.testchar = tabnet:NewTable("CChar", {

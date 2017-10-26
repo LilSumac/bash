@@ -1,3 +1,7 @@
+--[[
+    Base 'draw' library extentions.
+]]
+
 local draw = draw;
 
 -- Constants.

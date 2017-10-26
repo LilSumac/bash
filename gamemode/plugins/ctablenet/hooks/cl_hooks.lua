@@ -1,3 +1,7 @@
+--[[
+    CTableNet client hooks.
+]]
+
 -- Network hooks.
 vnet.Watch("CTableNet_Net_RegSend", function(pck)
     local reg = pck:Table();

@@ -1,22 +1,6 @@
-defineService_start("CTableNet");
-
--- Service info.
-SVC.Name = "Core TableNet";
-SVC.Author = "LilSumac";
-SVC.Desc = "A framework for creating, networking, and adding persistant variables to tables and objects.";
-
--- Constants.
-LOG_TABNET = {pre = "[TABNET]", col = color_darkgreen};
-LISTEN_PUBLIC = 1;
-LISTEN_PRIVATE = 2;
-
--- Custom errors.
-addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
-addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
-addErrType("UnauthorizedSend", "Tried sending a table to an unauthorized recipient! To force, use the 'force' argument. (%s:%s -> %s)");
-addErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
-
-processFile("sv_tablenet.lua");
+--[[
+    CTableNet main service.
+]]
 
 -- Service storage.
 local domains = {};
@@ -214,61 +198,63 @@ function SVC:AddDomain(domain)
             tablenet:NetworkTable(_self.RegistryID, domain, ids);
         end
 
-        -- Listener functions.
-        meta.AddListener = function(_self, domain, listener, mode)
-            local list = checkListenerTable(_self, domain);
+        if SERVER then
+            -- Listener functions.
+            meta.AddListener = function(_self, domain, listener, mode)
+                local list = checkListenerTable(_self, domain);
 
-            if mode == LISTEN_PUBLIC then
-                if type(listener) == "table" then
-                    for key, val in pairs(listener) do
-                        if isplayer(key) then
-                            list.Public[key] = true;
+                if mode == LISTEN_PUBLIC then
+                    if type(listener) == "table" then
+                        for key, val in pairs(listener) do
+                            if isplayer(key) then
+                                list.Public[key] = true;
+                            end
+                            if isplayer(val) then
+                                list.Public[val] = true;
+                            end
                         end
-                        if isplayer(val) then
-                            list.Public[val] = true;
-                        end
+                    else
+                        list.Public[listener] = true;
                     end
-                else
-                    list.Public[listener] = true;
-                end
-            elseif mode == LISTEN_PRIVATE then
-                if type(listener) == "table" then
-                    for key, val in pairs(listener) do
-                        if isplayer(key) then
-                            list.Private[key] = true;
+                elseif mode == LISTEN_PRIVATE then
+                    if type(listener) == "table" then
+                        for key, val in pairs(listener) do
+                            if isplayer(key) then
+                                list.Private[key] = true;
+                            end
+                            if isplayer(val) then
+                                list.Private[val] = true;
+                            end
                         end
-                        if isplayer(val) then
-                            list.Private[val] = true;
-                        end
+                    else
+                        list.Public[listener] = true;
                     end
-                else
-                    list.Public[listener] = true;
                 end
             end
-        end
-        meta.GetListeners = function(_self, domain)
-            return checkListenerTable(_self, domain);
-        end
-        meta.RemoveListener = function(_self, domain, listener)
-            local list = checkListenerTable(_self, domain);
-            list.Public[listener] = nil;
-            list.Private[listener] = nil;
-        end
-        meta.ClearListeners = function(_self, domain)
-            if !domain then
-                local list;
-                for _domain, _ in pairs(_self.TableNet) do
-                    list = checkListenerTable(_self, _domain);
-                    list.Public = {};
-                    list.Private = {};
+            meta.GetListeners = function(_self, domain)
+                return checkListenerTable(_self, domain);
+            end
+            meta.RemoveListener = function(_self, domain, listener)
+                local list = checkListenerTable(_self, domain);
+                list.Public[listener] = nil;
+                list.Private[listener] = nil;
+            end
+            meta.ClearListeners = function(_self, domain)
+                if !domain then
+                    local list;
+                    for _domain, _ in pairs(_self.TableNet) do
+                        list = checkListenerTable(_self, _domain);
+                        list.Public = {};
+                        list.Private = {};
+                    end
+
+                    return;
                 end
 
-                return;
+                local list = checkListenerTable(_self, domain);
+                list.Public = {};
+                list.Private = {};
             end
-
-            local list = checkListenerTable(_self, domain);
-            list.Public = {};
-            list.Private = {};
         end
 
         meta.TableNetFuncsAdded = true;
@@ -324,6 +310,8 @@ function SVC:AddVariable(var)
     -- var.OnDeinit
     -- var.OnSet
 
+
+    -- FIX THIS UGLINESS.
     if SERVER then
         var.InSQL = var.InSQL or false;
 
@@ -349,10 +337,10 @@ function SVC:AddVariable(var)
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
-        local cdb = getService("CDatabase");
+        local db = getService("CDatabase");
         local domInfo = domains[var.Domain];
         if !domInfo.StoredInSQL then return; end
-        cdb:AddColumn(domInfo.SQLTable, {
+        db:AddColumn(domInfo.SQLTable, {
             Name = var.ID,
             Type = var.Type,
             MaxLength = var.MaxLength

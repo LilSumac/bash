@@ -1,4 +1,6 @@
--- Server-side Gamemode Hooks
+--[[
+    Server base gamemode hooks.
+]]
 
 -- Network hooks.
 vnet.Watch("bash_Net_SendClientData", function(pck)

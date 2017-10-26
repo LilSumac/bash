@@ -1,3 +1,7 @@
+--[[
+    Base 'string' library extentions.
+]]
+
 local string = string;
 
 function string.random(len, chars, pre)

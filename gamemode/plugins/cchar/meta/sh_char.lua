@@ -1,5 +1,8 @@
-defineMeta_start("CChar");
+--[[
+    CChar main metatable.
+]]
 
+-- Meta functions.
 function META:SetData(data)
     self.Data = {};
     for key, val in pairs(data) do
@@ -101,5 +104,3 @@ end
 function META:OnSave()
     // hook for saving
 end
-
-defineMeta_end();

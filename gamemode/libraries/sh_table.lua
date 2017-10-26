@@ -1,3 +1,7 @@
+--[[
+    Base 'table' library extentions.
+]]
+
 local table = table;
 
 function table.IsEmpty(tab)

@@ -1,4 +1,6 @@
--- Client-side Gamemode Hooks
+--[[
+    Client base gamemode hooks.
+]]
 
 -- Handle sending initial client data.
 hook.Add("InitPostEntity", "bash_Hook_DelayedClientInit", function()

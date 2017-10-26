@@ -1,3 +1,7 @@
+--[[
+    Global client utility functions.
+]]
+
 local bash = bash;
 
 function addClientData(id, generate)

@@ -1,8 +1,13 @@
+--[[
+    CChar server service.
+]]
+
 -- Service storage.
 local cachedData = getNonVolatileEntry("CChar_DataCache", EMPTY_TABLE);
 local cachedChars = getNonVolatileEntry("CChar_CharCache", EMPTY_TABLE);
 local cachedIDs = {};
 
+-- Service functions.
 function SVC:Instantiate(id, refresh)
     -- look for data from id in cache
     -- if there, create new char obj and return

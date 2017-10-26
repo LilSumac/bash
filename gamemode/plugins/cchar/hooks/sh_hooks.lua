@@ -1,14 +1,18 @@
--- Hooks.
-hook.Add("bash_GatherPrelimData_Base", "CChar_DefaultVars", function()
-    local tablenet = getService("CTableNet");
-    tablenet:AddDomain{
+--[[
+    CChar shared hooks.
+]]
+
+-- Gamemode hooks.
+hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
+    local tabnet = getService("CTableNet");
+    tabnet:AddDomain{
         ID = "CChar",
         ParentMeta = getMeta("CChar"),
         StoredInSQL = true,
         SQLTable = "bash_chars"
     };
 
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "CharID",
         Domain = "CChar",
         Type = "string",
@@ -19,7 +23,7 @@ hook.Add("bash_GatherPrelimData_Base", "CChar_DefaultVars", function()
             return string.random(12, CHAR_ALPHANUM, "char_");
         end
     };
-    tablenet:AddVariable{
+    tabnet:AddVariable{
         ID = "Name",
         Domain = "CChar",
         Type = "string",

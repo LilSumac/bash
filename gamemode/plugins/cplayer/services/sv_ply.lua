@@ -1,5 +1,6 @@
--- Custom errors.
-addErrType("MultiPlyRows", "Player '%s' has multiple player rows, using the first one. This can cause conflicts! Remove all duplicate rows ASAP!");
+--[[
+    CPlayer server service.
+]]
 
 -- Network pool.
 util.AddNetworkString("CPlayer_Net_RespondClient");
@@ -44,7 +45,7 @@ local function getPlyData(ply)
 
         function(_ply, results)                             -- Callback function upon completion.
             if #results > 1 then
-                MsgErr("MultiPlyRows", ply:Name());
+                MsgLog(LOG_WARN, "Multiple rows found for %s [%s]! Remove duplicate rows ASAP.", ply:Name(), ply:SteamID());
             end
 
             results = results[1];

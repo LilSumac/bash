@@ -1,3 +1,7 @@
+--[[
+    CDatabase main service.
+]]
+
 -- tmysql4 is the required SQL module.
 if !tmysql4 then
     local status, mod = pcall(require, "tmysql4");
@@ -8,13 +12,6 @@ if !tmysql4 then
         MsgLog(LOG_INIT, "tmysql4 module loaded.");
     end
 end
-
-defineService_start("CDatabase");
-
--- Service info.
-SVC.Name = "Core Database";
-SVC.Author = "LilSumac";
-SVC.Desc = "The core interface between /bash/ and the external database.";
 
 -- Constants.
 LOG_DB = {pre = "[DB]", col = Color(0, 151, 151, 255)};
@@ -42,11 +39,6 @@ addErrType("QueryFailed", "The SQL query failed!\nQuery: %s\nError: %s");
 addErrType("QueryNumFailed", "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s");
 addErrType("KeyExists", "A key already exists in this table! (Column %s in table %s)");
 
--- Service storage.
-local dbObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
-local connected = getNonVolatileEntry("CDatabase_Connected", false);
-local tables = {};
-
 -- Local storage.
 -- DB connection info.
 local host = "45.55.218.30";
@@ -55,6 +47,37 @@ local pass = "testpass";
 local data = "srp_db";
 local port = 3306;
 
+-- Casting tables.
+local castIn = {
+    ["boolean"] = function(bool)
+        if bool then return 1;
+        else return 0; end
+    end,
+    ["number"] = tonumber,
+    ["string"] = function(str)
+        local db = getService("CDatabase");
+        return Format("\'%s\'", dbObject:Escape(tostring(str)));
+    end,
+    ["table"] = function(tab)
+        local db = getService("CDatabase");
+        return Format("\'%s\'", dbObject:Escape(pon.encode(tab)));
+    end
+};
+local castOut = {
+    ["boolean"] = tobool,
+    ["number"] = tonumber,
+    ["string"] = tostring,
+    ["table"] = function(str)
+        return pon.decode(tostring(str));
+    end
+};
+
+-- Service storage.
+local dbObject = getNonVolatileEntry("CDatabase_DBObject", EMPTY_TABLE);
+local connected = getNonVolatileEntry("CDatabase_Connected", false);
+local tables = {};
+
+-- Service functions.
 function SVC:IsConnected()
     return dbObject and connected;
 end
@@ -176,29 +199,6 @@ function SVC:Query(query, callback, ...)
     end
 end
 
-local castIn = {
-    ["boolean"] = function(bool)
-        if bool then return 1;
-        else return 0; end
-    end,
-    ["number"] = tonumber,
-    ["string"] = function(str)
-        local db = getService("CDatabase");
-        return Format("\'%s\'", dbObject:Escape(tostring(str)));
-    end,
-    ["table"] = function(tab)
-        local db = getService("CDatabase");
-        return Format("\'%s\'", dbObject:Escape(pon.encode(tab)));
-    end
-};
-local castOut = {
-    ["boolean"] = tobool,
-    ["number"] = tonumber,
-    ["string"] = tostring,
-    ["table"] = function(str)
-        return pon.decode(tostring(str));
-    end
-};
 function SVC:CastValue(tab, col, val, inout)
     if !tab then
         MsgErr("NilArgs", "tab");
@@ -394,5 +394,3 @@ end
 function SVC:RemoveRow()
     -- todo
 end
-
-defineService_end();

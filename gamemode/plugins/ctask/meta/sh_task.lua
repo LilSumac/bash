@@ -1,5 +1,8 @@
-defineMeta_start("CTask");
+--[[
+    CTask main metatable.
+]]
 
+-- Meta functions.
 function META:Initialize()
     if !self.RegistryID then
         MsgErr("TaskNotValid", tostring(self));
@@ -182,5 +185,3 @@ function META:CheckConditions()
     end
     return true;
 end
-
-defineMeta_end();
