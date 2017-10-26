@@ -8,7 +8,7 @@ definePlugin_start("CChar");
 PLUG.Name = "Core Character";
 PLUG.Author = "LilSumac";
 PLUG.Desc = "";
-PLUG.Depends = {"CDatabase", "CTableNet"};
+PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 
 -- Constants.
 LOG_CHAR = {pre = "[CHAR]", col = Color(151, 0, 151, 255)};
