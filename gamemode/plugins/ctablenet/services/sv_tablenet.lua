@@ -240,7 +240,7 @@ function SVC:SendRegistry(ply)
                 table.Merge(data[regID][domain], tabData.Private);
             end
             if isentity(tab) or isplayer(tab) then
-                data[regID]._RegObg = tab;
+                data[regID]._RegObj = tab;
             end
         end
     end

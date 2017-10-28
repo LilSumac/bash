@@ -164,12 +164,16 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            --[[ Working on it.
-            if CLIENT then
-                local requestPck = vnet.CreatePacket("")
+            if CLIENT then  
+                local requestPck = vnet.CreatePacket("CTableNet_Net_ObjRequest");
+                requestPck:String(_self.RegistryID);
+                requestPck:String(domain);
+                requestPck:Table(data);
+                requestPck:AddServer();
+                requestPck:Send();
+
                 return;
             end
-            ]]
 
             local ids = {};
             local index = 1;

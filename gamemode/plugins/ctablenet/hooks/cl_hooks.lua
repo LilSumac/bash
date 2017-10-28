@@ -10,7 +10,7 @@ vnet.Watch("CTableNet_Net_RegSend", function(pck)
     local tab, varData;
     for regID, regData in pairs(reg) do
         for domain, data in pairs(regData) do
-            if domain == "_RegObg" then continue; end
+            if domain == "_RegObj" then continue; end
 
             if tabnet:IsRegistered(regID, domain) then
                 tab = tabnet:GetTable(regID);
@@ -25,7 +25,7 @@ vnet.Watch("CTableNet_Net_RegSend", function(pck)
                     end
                 end
             else
-                tabnet:NewTable(domain, data, regData._RegObg, regID);
+                tabnet:NewTable(domain, data, regData._RegObj, regID);
             end
             count = count + 1;
         end
