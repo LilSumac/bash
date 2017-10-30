@@ -77,6 +77,10 @@ function SVC:AddDomain(domain)
             MsgErr("NilField", "SQLTable", "domain");
             return;
         end
+        if !domain.GetRowCondition then
+            MsgErr("NilField", "GetRowCondition", "domain");
+            return;
+        end
 
         local cdb = getService("CDatabase");
         cdb:AddTable(domain.SQLTable);
@@ -180,6 +184,7 @@ function SVC:AddDomain(domain)
             local ids = {};
             local index = 1;
             local varData;
+            local sqlData = {};
             for id, val in pairs(data) do
                 varData = tablenet:GetVariable(domain, id);
                 if !varData then continue; end
@@ -192,6 +197,10 @@ function SVC:AddDomain(domain)
                 ids[index] = id;
                 index = index + 1;
 
+                if varData.InSQL then
+                    sqlData[id] = val;
+                end
+
                 --[[ This also needs to be changed.
                 if SERVER and varData.OnSetServer then
                     varData:OnSetServer(_self, val);
@@ -202,6 +211,14 @@ function SVC:AddDomain(domain)
             end
 
             tablenet:NetworkTable(_self.RegistryID, domain, ids);
+
+            if domInfo.StoredInSQL then
+                local db = getService("CDatabase");
+                local steamID = _self:SteamID();
+                db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(ply, results)
+
+                end, _self);
+            end
         end
 
         if SERVER then
@@ -460,7 +477,7 @@ function SVC:NewTable(domain, data, obj, regID)
     MsgDebug(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     runInits(tab, domain);
-    --if SERVER then self:NetworkTable(tab.RegistryID, domain); end
+    hook.Run("CTableNet_Hook_OnTableCreate", tab, domain);
     return tab;
 end
 
@@ -494,6 +511,8 @@ function SVC:RemoveTable(id, domain)
     end
 
     MsgDebug(LOG_TABNET, "Removing '%s' from registry.", id);
+
+    hook.Run("CTableNet_Hook_OnTableRemove", tab, domain);
 
     if SERVER then
         local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");

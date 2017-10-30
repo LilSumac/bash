@@ -230,7 +230,6 @@ function SVC:SendRegistry(ply, getAck)
     local data = {};
     local list;
     local registry = self:GetRegistry();
-    PrintTable(registry);
     for regID, tab in pairs(registry) do
         for domain, tabData in pairs(tab.TableNet) do
             list = tab:GetListeners(domain);

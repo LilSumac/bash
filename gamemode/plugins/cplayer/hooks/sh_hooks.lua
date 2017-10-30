@@ -12,6 +12,9 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         SQLTable = "bash_plys",
         GetPrivateRecipients = function(_self, ply)
             return {[ply] = true};
+        end,
+        GetRowCondition = function(_self, ply)
+            return Format("SteamID = '%s'", ply:SteamID());
         end
     };
 

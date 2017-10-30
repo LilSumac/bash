@@ -5,7 +5,7 @@
 -- Service storage.
 local cachedData = getNonVolatileEntry("CChar_DataCache", EMPTY_TABLE);
 local cachedChars = getNonVolatileEntry("CChar_CharCache", EMPTY_TABLE);
-local cachedIDs = {};
+local cachedIDs = getNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
 
 -- Service functions.
 function SVC:Instantiate(id, refresh)

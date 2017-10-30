@@ -8,6 +8,7 @@ hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
     db:SelectRow("bash_chars", "CharID", "", function(results)
         results = results[1];
 
+        local cachedIDs = getNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
         local cchar = getService("CChar");
         local ids = {};
         for index, data in pairs(results.data) do
@@ -16,6 +17,12 @@ hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
         MsgDebug(LOG_CHAR, "Fetched Character IDs. (%d entries)", table.Count(ids));
         cachedIDs = ids;
     end);
+end);
+
+hook.Add("CTableNet_Hook_OnTableCreate", "CChar_CacheCharID", function(tab, domain)
+    if domain
+    local cachedIDs = getNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
+    --cachedIDs[] finish this
 end);
 
 

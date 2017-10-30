@@ -15,7 +15,6 @@ vnet.Watch("CTableNet_Net_RegSend", function(pck)
     local registry = tabnet:GetRegistry();
 
     local reg = pck:Table();
-    PrintTable(reg);
     local count = 0;
     local tab, varData;
     for regID, regData in pairs(reg) do
@@ -41,13 +40,12 @@ vnet.Watch("CTableNet_Net_RegSend", function(pck)
         end
     end
 
+    MsgLog(LOG_TABNET, "Received %d objects from registry!", count);
+
     local ack = pck:Bool();
     if ack then
         sendRegAck();
     end
-    -- Acknowledge registry send (maybe)
-    -- DEBUG
-    -- Show count
 end);
 
 vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)

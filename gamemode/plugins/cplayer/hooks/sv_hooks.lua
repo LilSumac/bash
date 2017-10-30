@@ -65,9 +65,21 @@ end
 
 -- Gamemode hooks.
 hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
+    local tabnet = getService("CTableNet");
     if ply.RegistryID then
-        local tabnet = getService("CTableNet");
         tabnet:RemoveTable(ply.RegistryID, "Player");
+    end
+    if ply.PreInitTask then
+        tabnet:RemoveTable(ply.PreInitTask.RegistryID, "Task");
+        ply.PreInitTask = nil;
+    end
+    if ply.OnInitTask then
+        tabnet:RemoveTable(ply.OnInitTask.RegistryID, "Task");
+        ply.OnInitTask = nil;
+    end
+    if ply.PostInitTask then
+        tabnet:RemoveTable(ply.PostInitTask.RegistryID, "Task");
+        ply.PostInitTask = nil;
     end
 end);
 
@@ -104,9 +116,8 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         tabnet:NewTable("Player", data["SQLData"], data["Player"]);
         cplayer:Initialize(ply);
 
-        ply:AddListener("Player", player.GetInitialized(), LISTEN_PUBLIC); -- Add everyone else as public listeners.
-        ply:AddListener("Player", ply, LISTEN_PRIVATE);              -- Add player as private listener.
-
+        ply:AddListener("Player", player.GetInitialized(), LISTEN_PUBLIC);  -- Add everyone else as public listeners.
+        ply:AddListener("Player", ply, LISTEN_PRIVATE);                     -- Add player as private listener.
         tabnet:NetworkTable(ply.RegistryID, "Player");
 
         ply.PreInitTask = nil;
