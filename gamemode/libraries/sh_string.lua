@@ -2,6 +2,7 @@
     Base 'string' library extentions.
 ]]
 
+local math = math;
 local string = string;
 
 function string.random(len, chars, pre)

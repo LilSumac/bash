@@ -3,6 +3,7 @@
 ]]
 
 local draw = draw;
+local surface = surface;
 
 -- Constants.
 GRADIENT_LEFT = 0;

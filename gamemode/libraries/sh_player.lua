@@ -2,6 +2,7 @@
     Base 'player' library extentions.
 ]]
 
+local pairs = pairs;
 local player = player;
 
 function player.GetInitialized()
