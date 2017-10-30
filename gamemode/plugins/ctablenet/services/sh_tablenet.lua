@@ -316,13 +316,6 @@ function SVC:AddVariable(var)
     var.Public = var.Public or false;
     var.Secure = var.Secure == nil and true or var.Secure;
 
-    -- var.OnGen
-    -- var.OnInit
-    -- var.OnDeinit
-    -- var.OnSet
-
-
-    -- FIX THIS UGLINESS.
     if SERVER then
         var.InSQL = var.InSQL or false;
 
@@ -332,6 +325,7 @@ function SVC:AddVariable(var)
         -- var.OnDeinit = var.OnDeinit; (Redundant, no default)
         -- var.OnSet = var.OnSet; (Redundant, no default)
     elseif CLIENT then
+        -- Client does NOT need to know about these.
         var.OnGenerate = nil;
         var.OnInit = nil;
         var.OnDeinit = nil;
