@@ -12,8 +12,12 @@ PLUG.Depends = {"CDatabase"};
 
 -- Constants.
 LOG_TABNET = {pre = "[TABNET]", col = color_darkgreen};
+
 LISTEN_PUBLIC = 1;
 LISTEN_PRIVATE = 2;
+
+TAB_INIT = 1;
+TAB_DEINIT = 2;
 
 -- Custom errors.
 addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");

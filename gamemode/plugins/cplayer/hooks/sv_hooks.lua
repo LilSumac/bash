@@ -40,12 +40,12 @@ local function getPlyData(ply)
         "*",                                                -- Columns to get.
         Format("WHERE SteamID = \'%s\'", ply:SteamID()),    -- Condition to compare against.
 
-        function(_ply, results)                             -- Callback function upon completion.
-            if #results > 1 then
+        function(_ply, results)
+            results = results[1];                          -- Callback function upon completion.
+            if #results.data > 1 then
                 MsgLog(LOG_WARN, "Multiple rows found for %s [%s]! Remove duplicate rows ASAP.", ply:Name(), ply:SteamID());
             end
 
-            results = results[1];
             if table.IsEmpty(results.data) then
                 createPlyData(_ply);
             else
@@ -54,7 +54,7 @@ local function getPlyData(ply)
                 if !preinit then return; end
                 --PrintTable(results);
                 -- UPDATE THIS
-                preinit:PassData("SQLData", {});
+                preinit:PassData("SQLData", results.data[1]);
                 preinit:Update("WaitForSQL", 1);
             end
         end,
@@ -63,8 +63,7 @@ local function getPlyData(ply)
     );
 end
 
--- Gamemode hooks.
-hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
+local function removePly(ply)
     local tabnet = getService("CTableNet");
     if ply.RegistryID then
         tabnet:RemoveTable(ply.RegistryID, "Player");
@@ -80,6 +79,17 @@ hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
     if ply.PostInitTask then
         tabnet:RemoveTable(ply.PostInitTask.RegistryID, "Task");
         ply.PostInitTask = nil;
+    end
+end
+
+-- Gamemode hooks.
+hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
+    removePly(ply);
+end);
+
+hook.Add("ShutDown", "CPlayer_RemoveAllPlayers", function()
+    for _, ply in pairs(player.GetAll()) do
+        removePly(ply);
     end
 end);
 
@@ -111,6 +121,8 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         local ply = data["Player"];
         local tabnet = getService("CTableNet");
         local cplayer = getService("CPlayer");
+
+        PrintTable(data["SQLData"]);
 
         -- Handle player affairs.
         tabnet:NewTable("Player", data["SQLData"], data["Player"]);

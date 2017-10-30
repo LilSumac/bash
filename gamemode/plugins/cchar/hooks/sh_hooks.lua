@@ -6,15 +6,18 @@
 hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
     local tabnet = getService("CTableNet");
     tabnet:AddDomain{
-        ID = "CChar",
+        ID = "Char",
         ParentMeta = getMeta("CChar"),
         StoredInSQL = true,
-        SQLTable = "bash_chars"
+        SQLTable = "bash_chars",
+        GetRowCondition = function(_self, char)
+            return Format("CharID = '%s'", char:GetNetVar("Char", "CharID"));
+        end
     };
 
     tabnet:AddVariable{
         ID = "CharID",
-        Domain = "CChar",
+        Domain = "Char",
         Type = "string",
         MaxLength = 17,
         Public = true,
@@ -25,7 +28,7 @@ hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
     };
     tabnet:AddVariable{
         ID = "Name",
-        Domain = "CChar",
+        Domain = "Char",
         Type = "string",
         MaxLength = 32,
         Public = true,

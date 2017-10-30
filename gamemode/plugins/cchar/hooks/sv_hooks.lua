@@ -20,9 +20,10 @@ hook.Add("CDatabase_Hook_OnConnected", "CChar_OnDBConnected", function()
 end);
 
 hook.Add("CTableNet_Hook_OnTableCreate", "CChar_CacheCharID", function(tab, domain)
-    if domain
+    if domain != "Char" then return; end
+
     local cachedIDs = getNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
-    --cachedIDs[] finish this
+    cachedIDs[tab:GetNetVar("Char", "CharID")] = true;
 end);
 
 

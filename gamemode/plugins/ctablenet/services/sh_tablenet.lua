@@ -9,27 +9,22 @@ local registry = getNonVolatileEntry("CTableNet_Registry", EMPTY_TABLE);
 local singlesMade = {};
 
 -- Local functions.
-local function runInits(tab, domain)
-    --[[ Remove this later, server only.
-    local tablenet = getService("CTableNet");
+local function runInits(tab, domain, init)
+    if !init then return; end
+
+    local data = tab.TableNet[domain].Public;
+    table.Merge(data, tab.TableNet[domain].Private);
     local varInfo, initFunc;
-    for id, val in pairs(tab.TableNet[domain]) do
+    for id, val in pairs(data) do
         varInfo = vars[domain][id];
         if !varInfo then continue; end
 
-        if CLIENT and varInfo.OnInitClient then
-            initFunc = varInfo.OnInitClient;
-        elseif SERVER and varInfo.OnInitServer then
-            initFunc = varInfo.OnInitServer;
-        else
-            initFunc = nil;
-        end
-
-        if initFunc then
-            initFunc(varInfo, tab, val);
+        if init == TAB_INIT and varInfo.OnInit then
+            varInfo:OnInit(tab, val);
+        elseif init == TAB_DEINIT and varInfo.OnDeinit then
+            varInfo:OnDeinit(tab, val);
         end
     end
-    ]]
 end
 
 local function checkListenerTable(tab, domain)
@@ -201,23 +196,20 @@ function SVC:AddDomain(domain)
                     sqlData[id] = val;
                 end
 
-                --[[ This also needs to be changed.
-                if SERVER and varData.OnSetServer then
-                    varData:OnSetServer(_self, val);
-                elseif CLIENT and varData.OnSetClient then
-                    varData:OnSetClient(_self, val);
+                if varData.OnSet then
+                    varData:OnSet(_self, val);
                 end
-                ]]
             end
 
             tablenet:NetworkTable(_self.RegistryID, domain, ids);
 
             if domInfo.StoredInSQL then
                 local db = getService("CDatabase");
-                local steamID = _self:SteamID();
-                db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(ply, results)
-
-                end, _self);
+                MsgN(_self);
+                db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(regID, results)
+                    PrintTable(results);
+                    MsgLog(LOG_DB, "Updated rows for table %s.", regID);
+                end, _self.RegistryID);
             end
         end
 
@@ -336,20 +328,14 @@ function SVC:AddVariable(var)
 
         -- Charvar functions/hooks.
         var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
-        var.OnInitClient = nil;
-        var.OnDeinitClient = nil;
-        var.OnSetClient  = nil;
-        -- var.OnSetServer = var.OnSetServer; (Redundant, no default)
-        -- var.OnInitServer = var.OnInitServer; (Redundant, no default)
-        -- var.OnDeinitServer = var.OnDeinitServer; (Redundant, no default)
+        -- var.OnInit = var.OnInit; (Redundant, no default)
+        -- var.OnDeinit = var.OnDeinit; (Redundant, no default)
+        -- var.OnSet = var.OnSet; (Redundant, no default)
     elseif CLIENT then
         var.OnGenerate = nil;
-        var.OnInitServer = nil;
-        var.OnDeinitServer = nil;
-        var.OnSetServer = nil;
-        -- var.OnSetClient = var.OnSetClient; (Redundant, no default)
-        -- var.OnInitClient = var.OnInitClient; (Redundant, no default)
-        -- var.OnDeinitClient = var.OnDeinitClient; (Redundant, no default)
+        var.OnInit = nil;
+        var.OnDeinit = nil;
+        var.OnSet = nil;
     end
 
     MsgDebug(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
@@ -438,11 +424,13 @@ function SVC:NewTable(domain, data, obj, regID)
     end
 
     data = data or {};
+    PrintTable(data);
     local public = {};
     local private = {};
     local gen;
     for id, var in pairs(vars[domain]) do
         if data[id] != nil then
+            MsgN("FOUND ", tostring(data[id]));
             if var.Public then public[id] = data[id];
             else private[id] = data[id]; end
         elseif SERVER and var.OnGenerate then
@@ -476,7 +464,8 @@ function SVC:NewTable(domain, data, obj, regID)
 
     MsgDebug(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
-    runInits(tab, domain);
+    PrintTable(tab.TableNet);
+    if SERVER then runInits(tab, domain, TAB_INIT); end
     hook.Run("CTableNet_Hook_OnTableCreate", tab, domain);
     return tab;
 end
@@ -496,22 +485,9 @@ function SVC:RemoveTable(id, domain)
     if !tab.TableNet then return; end
     if !tab.TableNet[domain] then return; end
 
-    local data = tab.TableNet[domain].Public;
-    table.Merge(data, tab.TableNet[domain].Private);
-    local varData;
-    for id, val in pairs(data) do
-        varData = self:GetVariable(domain, id);
-        if !varData then continue; end
+    MsgDebug(LOG_TABNET, "Removing table from TableNet with domain %s. (%s)", domain, id);
 
-        if SERVER and varData.OnDeinitServer then
-            varData:OnDeinitServer(tab, val);
-        elseif CLIENT and varData.OnDeinitClient then
-            varData:OnDeinitClient(tab, val);
-        end
-    end
-
-    MsgDebug(LOG_TABNET, "Removing '%s' from registry.", id);
-
+    if SERVER then runInits(tab, domain, TAB_DEINIT); end
     hook.Run("CTableNet_Hook_OnTableRemove", tab, domain);
 
     if SERVER then
