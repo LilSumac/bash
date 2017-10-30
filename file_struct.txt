@@ -2,7 +2,6 @@
 -(Object Info)
 -(Constants/Enums)
 -(Misc. Traits - [Network strings, custom errors, etc.])
--(Custom Errors)
 -(Process Files)
 -(Local Storage - [Optimizations, local vars, etc.])
 -(Object Storage)
