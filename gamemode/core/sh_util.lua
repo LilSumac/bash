@@ -14,7 +14,7 @@ function handleFunc(var, ...)
 end
 
 function isplayer(ply)
-    return ply and IsValid(ply) and ply.IsPlayer and ply:IsPlayer();
+    return ply and type(ply) == "Player" and ply.IsPlayer and ply:IsPlayer();
 end
 
 function MsgLog(log, text, ...)

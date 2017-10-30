@@ -10,6 +10,7 @@ local singlesMade = {};
 
 -- Local functions.
 local function runInits(tab, domain)
+    --[[ Remove this later, server only.
     local tablenet = getService("CTableNet");
     local varInfo, initFunc;
     for id, val in pairs(tab.TableNet[domain]) do
@@ -28,6 +29,7 @@ local function runInits(tab, domain)
             initFunc(varInfo, tab, val);
         end
     end
+    ]]
 end
 
 local function checkListenerTable(tab, domain)
@@ -36,7 +38,7 @@ local function checkListenerTable(tab, domain)
         return;
     end
     if !tab.TableNet[domain] then
-        MsgErr("NoDomainInTable", tostring(tab), domain);
+        MsgErr("NoDomainInTable", tab.RegistryID, domain);
         return;
     end
 
@@ -164,7 +166,7 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            if CLIENT then  
+            if CLIENT then
                 local requestPck = vnet.CreatePacket("CTableNet_Net_ObjRequest");
                 requestPck:String(_self.RegistryID);
                 requestPck:String(domain);
@@ -278,10 +280,6 @@ function SVC:AddDomain(domain)
     vars[domain.ID] = {};
 end
 
-function SVC:GetDomain(dom)
-    return domains[dom];
-end
-
 -- Do something about editing variables (adding callbacks).
 function SVC:AddVariable(var)
     if !var then
@@ -350,6 +348,10 @@ function SVC:AddVariable(var)
             MaxLength = var.MaxLength
         }, var.PrimaryKey or false);
     end
+end
+
+function SVC:GetDomain(dom)
+    return domains[dom];
 end
 
 function SVC:GetVariable(domain, var)
@@ -498,10 +500,10 @@ function SVC:RemoveTable(id, domain)
         removePck:String(id);
         removePck:String(domain);
         removePck:Broadcast();
+        tab:ClearListeners(domain);
     end
 
     tab.TableNet[domain] = nil;
-    tab:ClearListeners(domain);
     if table.IsEmpty(tab.TableNet) then
         registry[id] = nil;
         tab.RegistryID = nil;
@@ -602,5 +604,3 @@ function SVC:SetNetVars(domain, data)
 
     if SERVER then self:NetworkTable(tab.RegistryID, domain, ids); end
 end
-
-defineService_end();

@@ -1,8 +1,13 @@
 --[[
-    CTableNet client hooks.
+    CTableNet server hooks.
 ]]
 
 -- Network hooks.
+vnet.Watch("CTableNet_Net_RegSendAck", function(pck)
+    local ply = pck.Source;
+    hook.Run("CTableNet_Hook_RegSendAck", ply);
+end);
+
 vnet.Watch("CTableNet_Net_ObjRequest", function(pck)
     local ply = pck.Source;
     local regID = pck:String();

@@ -6,7 +6,7 @@
 hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
     local tabnet = getService("CTableNet");
     tabnet:AddDomain{
-        ID = "CPlayer",
+        ID = "Player",
         ParentMeta = FindMetaTable("Player"),
         StoredInSQL = true,
         SQLTable = "bash_plys",
@@ -17,7 +17,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
 
     tabnet:AddVariable{
         ID = "Name",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "string",
         MaxLength = 32,
         Public = true,
@@ -32,7 +32,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
 
     tabnet:AddVariable{
         ID = "SteamID",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "string",
         MaxLength = 18,
         Public = true,
@@ -45,7 +45,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
 
     tabnet:AddVariable{
         ID = "Addresses",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "table",
         MaxLength = 255,
         InSQL = true,
@@ -60,7 +60,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
 
     tabnet:AddVariable{
         ID = "FirstLogin",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "number",
         MaxLength = 10,
         Public = true,
@@ -72,22 +72,22 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
 
     tabnet:AddVariable{
         ID = "NewPlayer",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "boolean",
         Public = true,
         InSQL = true,
         OnGenerate = true,
         OnInitServer = function(_self, ply, oldVal)
-            local playtime = ply:GetNetVar("CPlayer", "Playtime");
+            local playtime = ply:GetNetVar("Player", "Playtime");
             if playtime > 21600 then
-                ply:SetNetVar("CPlayer", "NewPlayer", false);
+                ply:SetNetVar("Player", "NewPlayer", false);
             end
         end
     };
 
     tabnet:AddVariable{
         ID = "Playtime",
-        Domain = "CPlayer",
+        Domain = "Player",
         Type = "number",
         MaxLength = 10,
         Public = true,
@@ -100,7 +100,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             local startTime = ply.StartTime or CurTime();
             local played = CurTime() - startTime;
             local newTime = oldVal + played;
-            ply:SetNetVar("CPlayer", "Playtime", newTime);
+            ply:SetNetVar("Player", "Playtime", newTime);
         end
     };
 end);

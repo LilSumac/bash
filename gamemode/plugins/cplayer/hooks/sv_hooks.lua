@@ -2,12 +2,72 @@
     CPlayer server hooks.
 ]]
 
+-- Local functions.
+local function createPlyData(ply)
+    MsgLog(LOG_DB, "Creating new row for '%s'...", ply:Name());
+
+    local tablenet = getService("CTableNet");
+    local vars = tablenet:GetDomainVars("Player");
+    local data = {};
+    for id, var in pairs(vars) do
+        data[id] = handleFunc(var.OnGenerate, var, ply);
+    end
+
+    local db = getService("CDatabase");
+    db:InsertRow(
+        "bash_plys",            -- Table to query.
+        data,                   -- Data to insert.
+
+        function(_ply, results) -- Callback function upon completion.
+            local preinit = ply.PreInitTask;
+            if !preinit then return; end
+
+            MsgLog(LOG_DB, "Created row for player '%s'.", ply:Name());
+            preinit:PassData("SQLData", data);
+            preinit:Update("WaitForSQL", 1);
+        end,
+
+        ply                     -- Argument #1 for callback.
+    );
+end
+
+local function getPlyData(ply)
+    MsgDebug(LOG_DB, "Gathering player data for '%s'...", ply:Name());
+
+    local db = getService("CDatabase");
+    db:SelectRow(
+        "bash_plys",                                        -- Table to query.
+        "*",                                                -- Columns to get.
+        Format("WHERE SteamID = \'%s\'", ply:SteamID()),    -- Condition to compare against.
+
+        function(_ply, results)                             -- Callback function upon completion.
+            if #results > 1 then
+                MsgLog(LOG_WARN, "Multiple rows found for %s [%s]! Remove duplicate rows ASAP.", ply:Name(), ply:SteamID());
+            end
+
+            results = results[1];
+            if table.IsEmpty(results.data) then
+                createPlyData(_ply);
+            else
+                MsgDebug(LOG_DB, "Found row for player '%s'.", _ply:Name());
+                local preinit = ply.PreInitTask;
+                if !preinit then return; end
+                --PrintTable(results);
+                -- UPDATE THIS
+                preinit:PassData("SQLData", {});
+                preinit:Update("WaitForSQL", 1);
+            end
+        end,
+
+        ply                                                 -- Argument #1 for callback.
+    );
+end
+
 -- Gamemode hooks.
-gameevent.Listen("player_disconnect");
-hook.Add("player_disconnect", "CPlayer_RemovePlayer", function(ply)
+hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
     if ply.RegistryID then
         local tabnet = getService("CTableNet");
-        tabnet:RemoveTable(ply.RegistryID, "CPlayer");
+        tabnet:RemoveTable(ply.RegistryID, "Player");
     end
 end);
 
@@ -41,13 +101,13 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         local cplayer = getService("CPlayer");
 
         -- Handle player affairs.
-        tabnet:NewTable("CPlayer", data["SQLData"], data["Player"]);
+        tabnet:NewTable("Player", data["SQLData"], data["Player"]);
         cplayer:Initialize(ply);
 
-        ply:AddListener("CPlayer", player.GetInitialized(), LISTEN_PUBLIC); -- Add everyone else as public listeners.
-        ply:AddListener("CPlayer", ply, LISTEN_PRIVATE, true);              -- Add player as private listener.
+        ply:AddListener("Player", player.GetInitialized(), LISTEN_PUBLIC); -- Add everyone else as public listeners.
+        ply:AddListener("Player", ply, LISTEN_PRIVATE);              -- Add player as private listener.
 
-        tabnet:NetworkTable(ply.RegistryID, "CPlayer");
+        tabnet:NetworkTable(ply.RegistryID, "Player");
 
         ply.PreInitTask = nil;
     end);
@@ -62,7 +122,12 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
     ctask:AddTaskOnStart("bash_PlayerOnInit", function(task)
         local data = task:GetPassedData();
         if !isplayer(data["Player"]) then return; end
-        sendPlyTables(data["Player"]);
+
+        local ply = data["Player"];
+        local tabnet = getService("CTableNet");
+
+        -- Handle player affairs.
+        tabnet:SendRegistry(ply, true);
     end);
     ctask:AddTaskOnFinish("bash_PlayerOnInit", function(status, task)
         if status == STATUS_FAILED then return; end
@@ -104,4 +169,10 @@ hook.Add("bash_OnReceiveClientData", "CPlayer_StartPlyTasks", function(ply, data
     -- add listener to task
     preinit:PassData("Player", ply);
     preinit:Start();
+end);
+
+hook.Add("CTableNet_Hook_RegSendAck", "CPlayer_UpdateOnInit", function(ply)
+    if ply.OnInitTask then
+        ply.OnInitTask:Update("WaitForTableNet", 1);
+    end
 end);

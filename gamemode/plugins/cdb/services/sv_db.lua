@@ -56,11 +56,11 @@ local castIn = {
     ["number"] = tonumber,
     ["string"] = function(str)
         local db = getService("CDatabase");
-        return Format("\'%s\'", dbObject:Escape(tostring(str)));
+        return Format("\'%s\'", db:EscapeStr(tostring(str)));
     end,
     ["table"] = function(tab)
         local db = getService("CDatabase");
-        return Format("\'%s\'", dbObject:Escape(pon.encode(tab)));
+        return Format("\'%s\'", db:EscapeStr(pon.encode(tab)));
     end
 };
 local castOut = {
@@ -196,6 +196,14 @@ function SVC:Query(query, callback, ...)
             args[#args + 1] = resultsTab;
             callback(unpack(args));
         end);
+    end
+end
+
+function SVC:EscapeStr(str)
+    if self:IsConnected() then
+        return dbObject:Escape(str);
+    else
+        return str;
     end
 end
 

@@ -2,26 +2,24 @@
     CTableNet server service.
 ]]
 
--- Network pool.
-util.AddNetworkString("CTableNet_Net_RegSend");
-util.AddNetworkString("CTableNet_Net_ObjUpdate");
-util.AddNetworkString("CTableNet_Net_ObjOutOfScope");
-
 -- Service functions.
-function SVC:NetworkTable(id, domain, vars)
+function SVC:NetworkTable(id, domain, _vars)
     if !id or !domain then
         MsgErr("NilArgs", "id/domain");
         return;
     end
+
+    local registry = self:GetRegistry();
     if !registry[id] then
         MsgErr("NilEntry", id);
         return;
     end
-    if !domains[domain] then
+
+    local domInfo = self:GetDomain(domain);
+    if !domInfo then
         MsgErr("NilEntry", "domain");
         return;
     end
-    local domInfo = domains[domain];
 
     local tab = registry[id];
     if !tab.RegistryID or !tab.TableNet then
@@ -50,11 +48,12 @@ function SVC:NetworkTable(id, domain, vars)
 
     local public = {};
     local private = {};
+    local vars = self:GetDomainVars(domain);
     local varData, val;
-    if vars then
-        if type(vars) == "table" then
-            for _, id in ipairs(vars) do
-                varData = vars[domain][id];
+    if _vars then
+        if type(_vars) == "table" then
+            for _, id in ipairs(_vars) do
+                varData = vars[id];
                 if !varData then continue; end
 
                 if privPack then
@@ -64,14 +63,14 @@ function SVC:NetworkTable(id, domain, vars)
                     public[id] = tab.TableNet[domain].Public[id];
                 end
             end
-        elseif type(vars) == "string" then
-            varData = vars[domain][vars];
+        elseif type(_vars) == "string" then
+            varData = vars[_vars];
             if varData then
                 if privPack then
-                    private[vars] = tab.TableNet[domain].Private[vars];
+                    private[_vars] = tab.TableNet[domain].Private[_vars];
                 end
                 if varData.Public and pubPack then
-                    public[vars] = tab.TableNet[domain].Public[vars];
+                    public[_vars] = tab.TableNet[domain].Public[_vars];
                 end
             end
         end
@@ -148,6 +147,7 @@ function SVC:SendTable(ply, id, domain, _vars, force)
         return;
     end
 
+    local registry = self:GetRegistry();
     if !registry[id] then
         MsgErr("NilEntry", id);
         return;
@@ -218,7 +218,7 @@ function SVC:SendTable(ply, id, domain, _vars, force)
     sendPck:Send();
 end
 
-function SVC:SendRegistry(ply)
+function SVC:SendRegistry(ply, getAck)
     if !isplayer(ply) then
         MsgErr("InvalidPly");
         return;
@@ -229,6 +229,8 @@ function SVC:SendRegistry(ply)
     local regPck = vnet.CreatePacket("CTableNet_Net_RegSend");
     local data = {};
     local list;
+    local registry = self:GetRegistry();
+    PrintTable(registry);
     for regID, tab in pairs(registry) do
         for domain, tabData in pairs(tab.TableNet) do
             list = tab:GetListeners(domain);
@@ -246,6 +248,8 @@ function SVC:SendRegistry(ply)
     end
 
     regPck:Table(data);
+    getAck = getAck or false;
+    regPck:Bool(getAck);
     regPck:AddTargets(ply);
     regPck:Send();
 end
