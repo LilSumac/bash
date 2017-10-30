@@ -317,6 +317,10 @@ function getMeta(id)
     return bash.meta[id];
 end
 
+function hasMeta(id)
+    return bash.meta[id] != nil;
+end
+
 function defineService_start(id)
     if !id then
         MsgErr("NilArgs", "id");
@@ -375,6 +379,10 @@ function getService(id)
     return bash.services[id];
 end
 
+function hasService(id)
+    return bash.services[id] != nil;
+end
+
 function definePlugin_start(id)
     if !id then
         MsgErr("NilArgs", "id");
@@ -427,4 +435,8 @@ function getPlugin(id)
     end
 
     return bash.plugins[id];
+end
+
+function hasPlugin(id)
+    return bash.plugins[id] != nil;
 end
