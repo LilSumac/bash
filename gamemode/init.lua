@@ -1,3 +1,5 @@
+FProfiler.start();
+
 -- Things that should be done, regardless of restart or JIT or whatever.
 local function miscInit()
     -- Random seed!

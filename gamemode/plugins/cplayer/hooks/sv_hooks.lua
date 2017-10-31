@@ -52,8 +52,7 @@ local function getPlyData(ply)
                 MsgDebug(LOG_DB, "Found row for player '%s'.", _ply:Name());
                 local preinit = ply.PreInitTask;
                 if !preinit then return; end
-                --PrintTable(results);
-                -- UPDATE THIS
+
                 preinit:PassData("SQLData", results.data[1]);
                 preinit:Update("WaitForSQL", 1);
             end
@@ -121,8 +120,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         local ply = data["Player"];
         local tabnet = getService("CTableNet");
         local cplayer = getService("CPlayer");
-
-        PrintTable(data["SQLData"]);
 
         -- Handle player affairs.
         tabnet:NewTable("Player", data["SQLData"], data["Player"]);

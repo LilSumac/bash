@@ -205,9 +205,7 @@ function SVC:AddDomain(domain)
 
             if domInfo.StoredInSQL then
                 local db = getService("CDatabase");
-                MsgN(_self);
                 db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(regID, results)
-                    PrintTable(results);
                     MsgLog(LOG_DB, "Updated rows for table %s.", regID);
                 end, _self.RegistryID);
             end
@@ -418,13 +416,11 @@ function SVC:NewTable(domain, data, obj, regID)
     end
 
     data = data or {};
-    PrintTable(data);
     local public = {};
     local private = {};
     local gen;
     for id, var in pairs(vars[domain]) do
         if data[id] != nil then
-            MsgN("FOUND ", tostring(data[id]));
             if var.Public then public[id] = data[id];
             else private[id] = data[id]; end
         elseif SERVER and var.OnGenerate then
@@ -458,7 +454,6 @@ function SVC:NewTable(domain, data, obj, regID)
 
     MsgDebug(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
-    PrintTable(tab.TableNet);
     if SERVER then runInits(tab, domain, TAB_INIT); end
     hook.Run("CTableNet_Hook_OnTableCreate", tab, domain);
     return tab;
