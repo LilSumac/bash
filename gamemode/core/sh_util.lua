@@ -192,8 +192,16 @@ function processService(id)
 end
 
 function getClientData(ply, id)
-    if !ply then
-        MsgErr("NilArgs", "ply");
+    if CLIENT then
+        if ply then
+            return bash.clientData[ply];
+        else
+            return bash.clientData;
+        end
+    end
+
+    if !isplayer(ply) then
+        MsgErr("InvalidPlayer", "ply");
         return;
     end
 
