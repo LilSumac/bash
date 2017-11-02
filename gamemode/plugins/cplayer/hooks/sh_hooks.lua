@@ -16,23 +16,20 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
     };
 
     tabnet:AddVariable{
-        ID = "Name",
         Domain = "Player",
+        ID = "Name",
         Type = "string",
         MaxLength = 32,
         Public = true,
         InSQL = true,
         OnGenerate = function(_self, ply)
             return ply:Name();
-        end,
-        OnInit = function(_self, ply, oldVal)
-            return ply:Name();
         end
     };
 
     tabnet:AddVariable{
-        ID = "SteamID",
         Domain = "Player",
+        ID = "SteamID",
         Type = "string",
         MaxLength = 18,
         Public = true,
@@ -44,8 +41,8 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
     };
 
     tabnet:AddVariable{
-        ID = "Addresses",
         Domain = "Player",
+        ID = "Addresses",
         Type = "table",
         MaxLength = 255,
         InSQL = true,
@@ -54,13 +51,13 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end,
         OnInit = function(_self, ply, oldVal)
             oldVal[ply:IPAddress()] = true;
-            return oldVal;
+            ply:SetNetVar("Player", "Addresses", oldVal);
         end
     };
 
     tabnet:AddVariable{
-        ID = "FirstLogin",
         Domain = "Player",
+        ID = "FirstLogin",
         Type = "number",
         MaxLength = 10,
         Public = true,
@@ -71,8 +68,8 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
     };
 
     tabnet:AddVariable{
-        ID = "NewPlayer",
         Domain = "Player",
+        ID = "NewPlayer",
         Type = "boolean",
         Public = true,
         InSQL = true,
@@ -86,8 +83,8 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
     };
 
     tabnet:AddVariable{
-        ID = "Playtime",
         Domain = "Player",
+        ID = "Playtime",
         Type = "number",
         MaxLength = 10,
         Public = true,
@@ -101,6 +98,16 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             local played = CurTime() - startTime;
             local newTime = oldVal + played;
             ply:SetNetVar("Player", "Playtime", newTime);
+        end
+    };
+
+    tabnet:AddVariable{
+        Domain = "Player",
+        ID = "Country",
+        Type = "string",
+        Public = true,
+        OnGenerate = function(_self, ply)
+            return getClientData(ply, "Country");
         end
     };
 end);

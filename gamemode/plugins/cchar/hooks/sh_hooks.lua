@@ -16,8 +16,8 @@ hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
     };
 
     tabnet:AddVariable{
-        ID = "CharID",
         Domain = "Char",
+        ID = "CharID",
         Type = "string",
         MaxLength = 17,
         Public = true,
@@ -27,8 +27,8 @@ hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
         end
     };
     tabnet:AddVariable{
-        ID = "Name",
         Domain = "Char",
+        ID = "Name",
         Type = "string",
         MaxLength = 32,
         Public = true,

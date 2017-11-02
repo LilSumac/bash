@@ -11,38 +11,38 @@ hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
     };
 
     tabnet:AddVariable{
-        ID = "Status",
         Domain = "Task",
+        ID = "Status",
         Type = "number",
         Public = true,
         OnGenerate = STATUS_PAUSED
     };
 
     tabnet:AddVariable{
-        ID = "StartTime",
         Domain = "Task",
+        ID = "StartTime",
         Type = "number",
         Public = true,
         OnGenerate = -1
     };
 
     tabnet:AddVariable{
+        Domain = "Task",
         ID = "Values",
-        Domain = "Task",
         Type = "table",
         Public = true
     };
 
     tabnet:AddVariable{
+        Domain = "Task",
         ID = "SavedValues",
-        Domain = "Task",
         Type = "table",
         Public = true
     };
 
     tabnet:AddVariable{
-        ID = "PassedData",
         Domain = "Task",
+        ID = "PassedData",
         Type = "table",
         Public = true
     };
