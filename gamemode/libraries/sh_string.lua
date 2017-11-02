@@ -2,17 +2,32 @@
     Base 'string' library extentions.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
 local math = math;
 local string = string;
 
+--
+-- Library functions.
+--
+
+-- Generate a random string from a table of characters.
 function string.random(len, chars, pre)
+    if len < 0 then return; end
+    if len == 0 then return ""; end
+    
     len = len or 8;
     chars = chars or CHAR_ALPHANUM;
     pre = pre or "";
 
-    local ran = "";
-    while #ran != len do
-        ran = ran .. chars[math.random(1, #chars)];
+    local lenChars = #chars;
+    local ran, index = {}, 0;
+    while index != len do
+        ran[index + 1] = math.random(1, lenChars);
+        index = index + 1;
     end
-    return pre .. ran;
+    return pre .. table.concat(ran);
 end

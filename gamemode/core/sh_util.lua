@@ -1,22 +1,58 @@
 --[[
-    Global shared utility functions.
+    Shared utility functions.
 ]]
 
-local bash = bash;
+--
+-- Local storage.
+--
 
-function handleFunc(var, ...)
-    if var == nil then return; end
-    if type(var) == "function" then
-        return var(unpack({...}));
+-- Micro-optimizations.
+local AddCSLuaFile  = AddCSLuaFile;
+local bash          = bash;
+local debug         = debug;
+local file          = file;
+local Format        = Format;
+local include       = include;
+local MsgC          = MsgC;
+local pairs         = pairs;
+local string        = string;
+local table         = table;
+local type          = type;
+local unpack        = unpack;
+
+--
+-- Local functions.
+--
+
+-- Make sure all plugins have their dependencies met.
+local function checkDependencies()
+    local allMet, count, total = true, 0, 0;
+    for id, plug in pairs(bash.Plugins) do
+        for _, dep in pairs(plug.Depends) do
+            if !bash.Plugins[dep] then
+                MsgLog(LOG_WARN, "Plugin %s is missing dependency %s! This WILL cause errors! Resolve this immediately!", plug.Name, dep);
+                allMet = false;
+                count = count + 1;
+            end
+
+            total = total + 1;
+        end
+    end
+
+    if !allMet then
+        MsgLog(LOG_WARN, "There was %d/%d plugin(s) with unmet dependencies. Please see earlier errors for more info.", count, total);
     else
-        return var;
+        MsgLog(LOG_INIT, "All %s plugins have met their dependencies.", total);
     end
 end
 
-function isplayer(ply)
-    return ply and type(ply) == "Player" and ply.IsPlayer and ply:IsPlayer();
-end
+--
+-- Global utility functions.
+-- Functions that are simple enough that they can be their own
+-- global variable.
+--
 
+-- Send something to the output and log if verbose mode is enabled.
 function MsgLog(log, text, ...)
     log = log or LOG_DEF;
     if !text then text = ""; end
@@ -27,28 +63,22 @@ function MsgLog(log, text, ...)
     -- if verbose logging enabled, log text
 end
 
+-- Send something to the output if debug mode is enabled.
 function MsgDebug(log, text, ...)
-    if !bash.debug then return; end
+    if !bash.DebugMode then return; end
 
     local args = {...};
     MsgLog(log, text, unpack(args));
 end
 
+-- Send something to the output as an error with a trace and log.
 function MsgErr(errType, ...)
-    if !errType then
-        MsgErr("NilArgs", "errType");
-        return;
-    end
-    if !ERR_TYPES[errType] then
-        MsgErr("NilEntry", errType);
-        return;
-    end
-
+    errType = errType or "Generic";
+    local errMsg = ERR_TYPES[errType] or ERR_TYPES["Generic"];
     local args = {...};
-    local errMsg = ERR_TYPES[errType];
     local _, count = errMsg:gsub("%%", "");
-    if #args < count then
-        MsgErr("InsufVarArgs");
+    if #args != count then
+        MsgErr("InvalidVarArgs");
         return;
     end
 
@@ -62,237 +92,49 @@ function MsgErr(errType, ...)
 
     local gm = (GM and GM.Name) or (GAMEMODE and GAMEMODE.Name);
     if _G["PLUG"] then
-        gm = gm .. " Plugin: " .. _G["PLUG"].Name;
+        gm = gm .. " > " .. _G["PLUG"].Name;
     end
 
     local src = fromInfo.short_src;
     local srcFile = string.GetFileFromFilename(src);
     local srcFunc = (funcInfo.name != "" and funcInfo.name) or "In File";
-    local srcStr = Format("%s -> %s line %d", srcFunc, srcFile, fromInfo.currentline);
+    local srcStr = Format("%s (%s line %d) ", srcFunc, srcFile, fromInfo.currentline);
 
-    MsgLog(LOG_ERR, "[From %s] (%s) %s", gm, srcStr, Format(errMsg, unpack(args)));
+    MsgLog(LOG_ERR, "[%s > %s] %s", gm, srcStr, Format(errMsg, unpack(args)));
 
     -- log to file
 end
 
-function addErrType(name, str)
-    if !name or !str or ERR_TYPES[name] then return; end
-    ERR_TYPES[name] = str;
-end
-
-function processFile(file)
-    if !file then
-        MsgErr("NilArgs", "file");
-        return;
-    end
-
-    local pre = file:GetFileFromFilename();
-    pre = pre:sub(1, pre:find('_', 1));
-    if PREFIXES_CLIENT[pre] then
-        if CLIENT then include(file);
-        else AddCSLuaFile(file); end
-    elseif PREFIXES_SERVER[pre] then
-        if SERVER then include(file); end
-    elseif PREFIXES_SHARED[pre] then
-        if CLIENT then include(file)
-        else AddCSLuaFile(file); include(file); end
-    end
-end
-
-function processDir(dir)
-    local from = debug.getinfo(2);
-    local src = from.short_src;
-    src = src:GetPathFromFilename();
-    src = src:Replace("gamemodes/", "");
-    src = src .. dir .. "/";
-
-    local files, dirs = file.Find(src .. "*", "LUA", nameasc);
-    for _, file in pairs(files) do
-        file = src .. file;
-        processFile(file);
-    end
-end
-
-function processPlugins()
-    local from = debug.getinfo(2);
-    local src = from.short_src;
-    src = src:GetPathFromFilename();
-    src = src:Replace("gamemodes/", "");
-    src = src .. "plugins/";
-
-    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
-    for _, file in pairs(singles) do
-        file = src .. file;
-        processFile(file);
-    end
-
-    local plugFiles;
-    for _, plugin in pairs(plugins) do
-        plugFiles = file.Find(src .. plugin .. "/*.lua", "LUA", nameasc);
-        if table.HasValue(plugFiles, "sh_plugin.lua") then
-            processFile(src .. plugin .. "/sh_plugin.lua");
-        else
-            MsgErr("NoPluginFile", plugin);
-        end
-    end
-
-    checkDependencies();
-end
-
-function checkDependencies()
-    for id, plug in pairs(bash.plugins) do
-        for _, dep in pairs(plug.Depends) do
-            if !bash.plugins[dep] then
-                MsgLog(LOG_WARN, "Plugin %s is missing dependency %s! This WILL cause errors! Resolve this immediately!", plug.Name, dep);
-            end
-        end
-    end
-
-    MsgLog(LOG_INIT, "All %s plugins have met their dependencies.", table.Count(bash.plugins));
-end
-
-function processMeta(id)
-    local from = debug.getinfo(2);
-    local src = from.short_src;
-    src = src:GetPathFromFilename();
-    src = src:Replace("gamemodes/", "");
-    src = src .. "meta/";
-
-    if _G["PLUG"] then
-        id = id or _G["PLUG"].ID;
-    end
-
-    defineMeta_start(id);
-    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
-    for _, file in pairs(singles) do
-        file = src .. file;
-        processFile(file);
-    end
-    defineMeta_end();
-end
-
-function processService(id)
-    local from = debug.getinfo(2);
-    local src = from.short_src;
-    src = src:GetPathFromFilename();
-    src = src:Replace("gamemodes/", "");
-    src = src .. "services/";
-
-    if _G["PLUG"] then
-        id = id or _G["PLUG"].ID;
-    end
-
-    defineService_start(id);
-    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
-    for _, file in pairs(singles) do
-        file = src .. file;
-        processFile(file);
-    end
-    defineService_end();
-end
-
-function getClientData(ply, id)
-    if CLIENT then
-        if ply then
-            return bash.clientData[ply];
-        else
-            return bash.clientData;
-        end
-    end
-
-    if !isplayer(ply) then
-        MsgErr("InvalidPlayer", "ply");
-        return;
-    end
-
-    local index = ply:EntIndex();
-    if !bash.clientData[index] then
-        MsgErr("NilEntry", index);
-        return;
-    end
-
-    if id then
-        if bash.clientData[index][id] == nil then
-            MsgErr("NilEntry", id);
-            return;
-        end
-
-        return bash.clientData[index][id];
+-- Interpret a variable as either its value or function return value.
+function handleFunc(var, ...)
+    if var == nil then return; end
+    if type(var) == "function" then
+        return var(unpack({...}));
     else
-        return bash.clientData[index];
+        return var;
     end
 end
 
-function getNonVolatileEntry(id, def)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-
-    bash.nonVolatile = bash.nonVolatile or {};
-    local val = bash.nonVolatile[id];
-    if val == nil then
-        val = handleFunc(def);
-        if val == nil then
-            MsgErr("NilNVEntry", id);
-            return;
-        end
-
-        bash.nonVolatile[id] = val;
-        return val;
-    else
-        return handleFunc(val);
-    end
+-- Check to see if a variable is a player and a valid one.
+function isplayer(ply)
+    return ply and type(ply) == "Player" and ply.IsPlayer and ply:IsPlayer();
 end
 
-function setNonVolatileEntry(id, val)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if val == nil then
-        MsgErr("UnsafeNVEntry", id);
-        return;
-    end
-
-    bash.nonVolatile = bash.nonVolatile or {};
-    bash.nonVolatile[id] = handleFunc(val);
-end
-
-function removeNonVolatileEntry(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-
-    bash.nonVolatile = bash.nonVolatile or {};
-    bash.nonVolatile[id] = nil;
-end
-
+-- Start a definition of a metatable struct.
 function defineMeta_start(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
     if _G["META"] then
         MsgErr("DefStarted", _G["META"].ID, id);
         return;
     end
 
-    bash.meta = bash.meta or {};
-
-    if bash.meta[id] then
-        MsgErr("DupEntry", id);
-        return;
-    end
-
+    bash.Meta = bash.Meta or {};
     _G["META"] = {};
     local meta = _G["META"];
     meta.ID = id;
     meta.__index = meta;
-    meta.IsValid = function() return true; end
 end
 
+-- End a definition of a metatable struct.
 function defineMeta_end()
     local meta = _G["META"];
     if !meta then
@@ -303,123 +145,34 @@ function defineMeta_end()
     local pre = "";
     local plug = _G["PLUG"];
     if plug then
-        plug.Metas[meta.ID] = meta;
+        plug.Meta[meta.ID] = true;
         pre = Format("(In Plugin %s ->) ", plug.Name);
     end
 
     MsgDebug(LOG_INIT, "%sRegistered metatable: %s", pre, meta.ID);
-    bash.meta[meta.ID] = meta;
+    bash.Meta[meta.ID] = meta;
     _G["META"] = nil;
 end
 
-function getMeta(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if !bash.meta[id] then
-        MsgErr("NilEntry", id);
-        return;
-    end
-
-    return bash.meta[id];
-end
-
-function hasMeta(id)
-    return bash.meta[id] != nil;
-end
-
-function defineService_start(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if _G["SVC"] then
-        MsgErr("DefStarted", _G["SVC"].ID, id);
-        return;
-    end
-
-    bash.services = bash.services or {};
-
-    if bash.services[id] then
-        MsgErr("DupEntry", id);
-        return;
-    end
-
-    _G["SVC"] = {};
-    local svc = _G["SVC"];
-    svc.ID = id;
-    --svc.Name = id;
-    --svc.Author = "Unknown";
-    --svc.Desc = "A bash service.";
-    svc.IsValid = function() return true; end
-end
-
-function defineService_end()
-    local svc = _G["SVC"];
-    if !svc then
-        MsgErr("NoDefStarted");
-        return;
-    end
-
-    local pre = "";
-    local plug = _G["PLUG"];
-    if plug then
-        plug.Services[svc.ID] = svc;
-        pre = Format("(In Plugin %s ->) ", plug.Name);
-    end
-
-    MsgDebug(LOG_INIT, "%sRegistered service: %s", pre, svc.ID);
-    bash.services[svc.ID] = svc;
-    _G["SVC"] = nil;
-end
-
-function getService(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if !bash.services[id] then
-        MsgErr("NilEntry", id);
-        return;
-    end
-
-    return bash.services[id];
-end
-
-function hasService(id)
-    return bash.services[id] != nil;
-end
-
+-- Start a definition of a plugin struct.
 function definePlugin_start(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
     if _G["PLUG"] then
         MsgErr("DefStarted", _G["PLUG"].ID, id);
         return;
     end
 
-    bash.plugins = bash.plugins or {};
-
-    if bash.plugins[id] then
-        MsgErr("DupEntry", id);
-        return;
-    end
-
+    bash.Plugins = bash.Plugins or {};
     _G["PLUG"] = {};
     local plug = _G["PLUG"];
     plug.ID = id;
     plug.Name = id;
     plug.Author = "Unknown";
     plug.Desc = "A custom plugin.";
-    plug.Metas = {};
-    plug.Services = {};
+    plug.Meta = {};
     plug.Depends = {};
-    plug.IsValid = function() return true; end
 end
 
+-- End a definition of a plugin struct.
 function definePlugin_end()
     local plug = _G["PLUG"];
     if !plug then
@@ -428,23 +181,113 @@ function definePlugin_end()
     end
 
     MsgDebug(LOG_INIT, "Registered plugin: %s", plug.ID);
-    bash.plugins[plug.ID] = plug;
+    bash.PLugins[plug.ID] = plug;
     _G["PLUG"] = nil;
 end
 
-function getPlugin(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if !bash.plugins[id] then
-        MsgErr("NilEntry", id);
-        return;
-    end
+--
+-- Utility functions.
+--
 
-    return bash.plugins[id];
+-- Add/edit an error message struct.
+function bash.Util.AddErrType(name, str)
+    ERR_TYPES[name] = str;
 end
 
-function hasPlugin(id)
-    return bash.plugins[id] != nil;
+-- Process a file based on its prefix.
+function bash.Util.ProcessFile(file)
+    local pre = file:GetFileFromFilename();
+    pre = pre:sub(1, pre:find('_', 1));
+    if PREFIXES_CLIENT[pre] then
+        if CLIENT then include(file);
+        else AddCSLuaFile(file); end
+    elseif PREFIXES_SERVER[pre] then
+        if SERVER then include(file); end
+    elseif PREFIXES_SHARED[pre] then
+        if CLIENT then include(file);
+        else AddCSLuaFile(file); include(file); end
+    end
+end
+
+-- Process all files in a directory based on working directory.
+function bash.Util.ProcessDir(dir)
+    local from = debug.getinfo(2);
+    local src = from.short_src;
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. dir .. "/";
+
+    local files, dirs = file.Find(src .. "*", "LUA", nameasc);
+    for _, file in pairs(files) do
+        file = src .. file;
+        bash.Util.ProcessFile(file);
+    end
+end
+
+-- Process all plugins located in the working directory.
+function bash.Util.ProcessPlugins()
+    local from = debug.getinfo(2);
+    local src = from.short_src;
+    src = src:GetPathFromFilename();
+    src = src:Replace("gamemodes/", "");
+    src = src .. "plugins/";
+
+    local singles, plugins = file.Find(src .. "*", "LUA", nameasc);
+    -- Process plugins located in a single file.
+    for _, file in pairs(singles) do
+        file = src .. file;
+        bash.Util.ProcessFile(file);
+    end
+
+    -- Process plugins located in a directory.
+    local plugFiles;
+    for _, plugin in pairs(plugins) do
+        plugFiles = file.Find(src .. plugin .. "/*.lua", "LUA", nameasc);
+        if table.HasValue(plugFiles, "sh_plugin.lua") then
+            bash.Util.ProcessFile(src .. plugin .. "/sh_plugin.lua");
+        else
+            MsgErr("NoPluginFile", plugin);
+        end
+    end
+
+    checkDependencies();
+end
+
+-- Fetch a non-volatile memory entry, or a default value.
+function bash.Util.GetNonVolatileEntry(id, def)
+    bash.NonVolatile = bash.NonVolatile or {};
+    local val = bash.NonVolatile[id];
+    if val == nil then
+        val = handleFunc(def);
+        bash.NonVolatile[id] = val;
+        return val;
+    else
+        return handleFunc(val);
+    end
+end
+
+-- Sets the value of a non-volatile memory entry.
+function bash.Util.SetNonVolatileEntry(id, val)
+    bash.NonVolatile = bash.NonVolatile or {};
+    bash.NonVolatile[id] = handleFunc(val);
+end
+
+-- Check to see if a metatable struct has been registered.
+function bash.Util.HasMeta(id)
+    return bash.Meta[id] != nil;
+end
+
+-- Fetch a registered metatable struct.
+function bash.Util.GetMeta(id)
+    return bash.Meta[id];
+end
+
+-- Check to see if a plugin struct has been registered.
+function bash.Util.HasPlugin(id)
+    return bash.Plugins[id] != nil;
+end
+
+-- Fetch a registered plugin struct.
+function bash.Util.GetPlugin(id)
+    return bash.Plugins[id];
 end

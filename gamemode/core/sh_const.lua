@@ -42,6 +42,7 @@ EMPTY_TABLE = function() return {}; end
 DEFAULTS["table"] = EMPTY_TABLE;
 
 ERR_TYPES = {};
+ERR_TYPES["Generic"] = "An error has occured!";
 ERR_TYPES["NilArgs"] = "Argument cannot be nil! (%s)";
 ERR_TYPES["NilEntry"] = "A table entry with that identifier does not exist! (%s)";
 ERR_TYPES["DupEntry"] = "A table entry with that identifier already exists! (%s)";
@@ -50,7 +51,7 @@ ERR_TYPES["EmptyTable"] = "Table cannot be empty! (%s)";
 ERR_TYPES["InvalidDataType"] = "This data type is not supported! (%s)";
 ERR_TYPES["InvalidEnt"] = "Invalid entity argument!";
 ERR_TYPES["InvalidPly"] = "Invalid player argument!";
-ERR_TYPES["InsufVarArgs"] = "Insufficient varible arguments!";
+ERR_TYPES["InvalidVarArgs"] = "Invalid number of varible arguments!";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";
@@ -72,9 +73,6 @@ PREFIXES_CLIENT = {["cl_"] = true, ["vgui"] = true};
 PREFIXES_SERVER = {["sv_"] = true};
 PREFIXES_SHARED = {["sh_"] = true};
 
-PROCESS_DIRS = {["core"] = true, ["services"] = true};
-PROCESS_IGNORE = {["sh_const.lua"] = true, ["sh_util.lua"] = true};
-
 if SERVER then
 
     -- SQL constants were here. Now, they are defined inside the service.
@@ -87,22 +85,5 @@ elseif CLIENT then
 
     SCRW = ScrW();
     SCRH = ScrH();
-
-    local resChanged = false;
-    hook.Add("HUDPaint", "bash_resChanged", function()
-        if SCRW != ScrW() then
-            SCRW = ScrW();
-            resChanged = true;
-        end
-        if SCRH != ScrH() then
-            SCRH = ScrH();
-            resChanged = true;
-        end
-        if resChanged then
-            CENTER_X = SCRW / 2;
-            CENTER_Y = SCRH / 2;
-            resChanged = false;
-        end
-    end);
 
 end

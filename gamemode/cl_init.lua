@@ -1,4 +1,4 @@
--- Things that should be done, regardless of restart or JIT or whatever.
+-- Things that should be done, regardless of refresh or not.
 local function miscInit()
     -- Random seed!
     math.randomseed(os.time());
@@ -19,38 +19,34 @@ end
 -- Base relies on sandbox elements.
 DeriveGamemode("sandbox");
 
--- For now, we wil not be supporting JIT updates. However,
--- there is an OnReload hook to use.
-if bash and bash.started then
-    miscInit();
-    hook.Run("bash_OnReload", bash);
-    return;
+-- If there's a refresh, let 'em know.
+if bash and bash.Started then
+    MsgCon()
+    hook.Run("OnReload");
 end
 
+-- Report base startup.
 MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
 miscInit();
 
 -- Global table for bash elements.
 bash = bash or {};
-bash.IsValid = function() return true; end
-bash.startTime = SysTime();
-bash.debug = true;
-bash.nonVolatile = bash.nonVolatile or {};
+bash.StartTime = SysTime();
+bash.DebugMode = true;
+bash.NonVolatile = bash.NonVolatile or {};
 
--- Refresh global table on restart.
-bash.meta = {};
-bash.services = {};
-bash.plugins = {};
-
--- Include required base files.
-include("core/cl_util.lua");
+-- Refresh/init util table.
+bash.Util = {};
 include("core/sh_const.lua");
+include("core/cl_util.lua");
 include("core/sh_util.lua");
-include("shared.lua");
+
+-- Materials should persist.
+bash.Materials = bash.Util.GetNonVolatileEntry("CachedMaterials", EMPTY_TABLE);
 
 -- Add default client data.
-addClientData("Country", system.GetCountry);
-addClientData("OS", function()
+bash.Util.AddClientData("Country", system.GetCountry);
+bash.Util.AddClientData("OS", function()
     if system.IsWindows() then
         return OS_WIN;
     elseif system.IsWindows() then
@@ -62,23 +58,29 @@ addClientData("OS", function()
     end
 end);
 
+-- Refresh/init main components.
+bash.Meta = {};
+bash.Plugins = {};
+include("shared.lua");
+
 -- Hooks for init process.
 MsgLog(LOG_INIT, "Gathering base preliminary data...");
-hook.Run("bash_GatherPrelimData_Base");
+hook.Run("GatherPrelimData_Base");
 MsgLog(LOG_INIT, "Initializing base services...");
-hook.Run("bash_InitService_Base");
+hook.Run("InitService_Base");
 
 -- Report startup time.
-local len = math.Round(SysTime() - bash.startTime, 8);
+local len = math.Round(SysTime() - bash.StartTime, 8);
 MsgLog(LOG_INIT, "Successfully initialized base client-side. Startup: %fs", len);
-bash.started = true;
+bash.Started = true;
 
 MsgLog(LOG_DEF, "Doing base post-init calls...");
-hook.Run("bash_PostInit_Base");
+hook.Run("PostInit_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
 
 
+// testing
 local str = "The quick brown fox jumps over the lazy dog.";
 hook.Add("HUDPaint", "asdf", function()
     surface.SetFont("bash-regular");

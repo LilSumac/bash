@@ -2,9 +2,28 @@
     Base 'player' library extentions.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
 local pairs = pairs;
 local player = player;
 
+--
+-- Library functions.
+--
+
+-- Get a table of all players as keys.
+function player.GetAllAsKeys()
+    local plys = {};
+    for _, ply in pairs(player.GetAll()) do
+        plys[ply] = true;
+    end
+    return plys;
+end
+
+-- Get a table of all initialized players as values.
 function player.GetInitialized()
     local plys = {};
     for _, ply in pairs(player.GetAll()) do
@@ -15,14 +34,7 @@ function player.GetInitialized()
     return plys;
 end
 
-function player.GetAllAsKeys()
-    local plys = {};
-    for _, ply in pairs(player.GetAll()) do
-        plys[ply] = true;
-    end
-    return plys;
-end
-
+-- Get a table of all initialized players as keys.
 function player.GetInitializedAsKeys()
     local plys = {};
     for _, ply in pairs(player.GetAll()) do

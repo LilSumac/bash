@@ -12,7 +12,6 @@ PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 
 if SERVER then
     -- Network pool.
-    util.AddNetworkString("CPlayer_Net_RespondClient");
 end
 
 -- Process plugin contents.

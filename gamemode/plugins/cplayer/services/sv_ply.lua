@@ -37,9 +37,7 @@ function SVC:Initialize(ply)
 
     ply.Initialized = true;
 
-    local respondPck = vnet.CreatePacket("CPlayer_Net_RespondClient");
-    respondPck:AddTargets(ply);
-    respondPck:Send();
+    bash.Util.RespondToClient(ply);
 
     hook.Run("bash_PlayerOnInit", ply);
 end

@@ -2,18 +2,34 @@
     Base 'draw' library extentions.
 ]]
 
-local draw = draw;
-local surface = surface;
-
+--
 -- Constants.
+--
+
+-- Gradient directions.
 GRADIENT_LEFT = 0;
 GRADIENT_RIGHT = 1;
 GRADIENT_TOP = 2;
 GRADIENT_BOTTOM = 3;
 
--- Materials.
-local gradH = getMaterial("gui/gradient");
-local gradV = getMaterial("gui/gradient_down");
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash = bash;
+local draw = draw;
+local surface = surface;
+
+-- Gradient materials.
+local gradH = bash.Util.GetMaterial("gui/gradient");
+local gradV = bash.Util.GetMaterial("gui/gradient_down");
+
+--
+-- Library functions.
+--
+
+-- Draw a box with a vertical or horizontal gradient.
 function draw.GradientBox(x, y, w, h, color, dir)
     surface.SetMaterial(dir < 2 and gradH or gradV);
     surface.SetDrawColor(color);

@@ -1,28 +1,34 @@
 --[[
-    Global client utility functions.
+    Client utility functions.
 ]]
 
-local bash = bash;
+--
+-- Local storage.
+--
 
-function addClientData(id, generate)
-    if !id or !generate then
-        MsgErr("NilArgs", "id/generate");
-        return;
-    end
+-- Micro-optimizations.
+local bash          = bash;
+local handleFunc    = handleFunc;
+local Material      = Material;
+local MsgErr        = MsgErr;
+local pairs         = pairs;
+local vnet          = vnet;
 
-    bash.clientData = bash.clientData or {};
-    if bash.clientData[id] then
-        MsgErr("DupEntry", id);
-        return;
-    end
+--
+-- Utility functions.
+--
 
-    bash.clientData[id] = generate;
+-- Store all client data in a global table.
+function bash.Util.AddClientData(id, generate)
+    bash.ClientData = bash.ClientData or {};
+    bash.ClientData[id] = generate;
 end
 
-function sendClientData()
+-- Send stored client data to server.
+function bash.Util.SendClientData()
     local send = vnet.CreatePacket("bash_Net_SendClientData");
     local data = {};
-    for id, generate in pairs(bash.clientData) do
+    for id, generate in pairs(bash.ClientData) do
         data[id] = handleFunc(generate);
     end
 
@@ -31,8 +37,8 @@ function sendClientData()
     send:Send();
 end
 
-local cachedMaterials = {};
-function getMaterial(mat)
-    cachedMaterials[mat] = cachedMaterials[mat] or Material(mat);
-    return cachedMaterials[mat];
+-- Store and cache used materials for optimization.
+function bash.Util.GetMaterial(mat)
+    bash.Materials[mat] = bash.Materials[mat] or Material(mat);
+    return bash.Materials[mat];
 end

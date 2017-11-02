@@ -8,5 +8,6 @@
 -(Local Functions)
 -(Object Functions)
 -(Gamemode Hooks)
+-(bash Hooks)
 -(Network Hooks)
 -(Define End)
