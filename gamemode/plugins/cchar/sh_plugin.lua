@@ -2,6 +2,7 @@
     CChar plugin file.
 ]]
 
+-- Start plugin definition.
 definePlugin_start("CChar");
 
 -- Plugin info.
@@ -14,8 +15,8 @@ PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 LOG_CHAR = {pre = "[CHAR]", col = Color(151, 0, 151, 255)};
 
 -- Process plugin contents.
-processDir("hooks");
-processMeta();
-processService();
+bash.Util.ProcessFile("sv_char.lua");
+bash.Util.ProcessDir("hooks");
 
+-- End plugin definition.
 definePlugin_end();

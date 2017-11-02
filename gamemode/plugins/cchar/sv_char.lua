@@ -1,14 +1,28 @@
 --[[
-    CChar server service.
+    CChar server functionality.
 ]]
 
--- Service storage.
-local cachedData = getNonVolatileEntry("CChar_DataCache", EMPTY_TABLE);
-local cachedChars = getNonVolatileEntry("CChar_CharCache", EMPTY_TABLE);
-local cachedIDs = getNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
+--
+-- Local storage.
+--
 
--- Service functions.
-function SVC:Instantiate(id, refresh)
+-- Micro-optimizations.
+local bash      = bash;
+local hook      = hook;
+local MsgDebug  = MsgDebug;
+local MsgErr    = MsgErr;
+
+-- Fetch non-volatile character caches.
+local cachedData = bash.Util.GetNonVolatileEntry("CChar_DataCache", EMPTY_TABLE);
+local cachedChars = bash.Util.GetNonVolatileEntry("CChar_CharCache", EMPTY_TABLE);
+local cachedIDs = bash.Util.GetNonVolatileEntry("CChar_IDCache", EMPTY_TABLE);
+
+--
+-- Plugin functions.
+--
+
+-- Try to make an instance of a character from a CharID.
+function PLUG:Instantiate(id, refresh)
     -- look for data from id in cache
     -- if there, create new char obj and return
     -- else, fetch and hook to id
@@ -38,8 +52,8 @@ function SVC:Instantiate(id, refresh)
 
         MsgDebug(LOG_CHAR, "Instantiating character: %s", id);
 
-        local tablenet = getService("CTableNet");
-        local char = tablenet:NewTable("CChar", cachedData[id]);
+        local tabnet = bash.Util.GetPlugin("CTableNet");
+        local char = tabnet:NewTable("CChar", cachedData[id]);
         cachedChars[id] = char;
         return char;
     end
@@ -49,11 +63,13 @@ function SVC:Instantiate(id, refresh)
     hook.Remove(name, id);
 end
 
-function SVC:DBFetch(id)
+-- Fetch character data linked to CharID from database.
+function PLUG:DBFetch(id)
 
 end
 
-function SVC:PostDBFetch(data)
+-- Handle character data post-fetch from database.
+function PLUG:PostDBFetch(data)
     MsgDebug(LOG_CHAR, "Completed character fetch: %s", data.CharID);
 
     cachedData[data.CharID] = data;

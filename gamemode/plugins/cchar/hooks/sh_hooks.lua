@@ -2,12 +2,25 @@
     CChar shared hooks.
 ]]
 
--- Gamemode hooks.
-hook.Add("bash_GatherPrelimData_Base", "CChar_AddCharVars", function()
-    local tabnet = getService("CTableNet");
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash      = bash;
+local Format    = Format;
+local string    = string;
+
+--
+-- bash hooks.
+--
+
+-- Add character variables to tablenet.
+hook.Add("GatherPrelimData_Base", "CChar_AddCharVars", function()
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     tabnet:AddDomain{
         ID = "Char",
-        ParentMeta = getMeta("CChar"),
+        ParentMeta = bash.Util.GetMeta("CChar"),
         StoredInSQL = true,
         SQLTable = "bash_chars",
         GetRowCondition = function(_self, char)

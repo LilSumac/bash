@@ -1,3 +1,0 @@
---[[
-    CChar shared service.
-]]
