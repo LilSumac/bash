@@ -16,6 +16,7 @@ LOG_CHAR = {pre = "[CHAR]", col = Color(151, 0, 151, 255)};
 
 -- Process plugin contents.
 bash.Util.ProcessFile("sv_char.lua");
+bash.Util.ProcessDir("meta");
 bash.Util.ProcessDir("hooks");
 
 -- End plugin definition.
