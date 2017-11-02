@@ -7,6 +7,13 @@ local function miscInit()
     timer.Remove("HintSystem_OpeningMenu");
     timer.Remove("HintSystem_Annoy1");
     timer.Remove("HintSystem_Annoy2");
+
+    -- Create default fonts.
+    surface.CreateFont("bash-regular", {
+		font = "Aileron Thin",
+		size = 36
+        --weight = 300
+	});
 end
 
 -- Base relies on sandbox elements.
@@ -21,6 +28,7 @@ if bash and bash.started then
 end
 
 MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
+miscInit();
 
 -- Global table for bash elements.
 bash = bash or {};
@@ -69,3 +77,16 @@ MsgLog(LOG_DEF, "Doing base post-init calls...");
 hook.Run("bash_PostInit_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
+
+
+local str = "The quick brown fox jumps over the lazy dog.";
+hook.Add("HUDPaint", "asdf", function()
+    surface.SetFont("bash-regular");
+    local x, y = surface.GetTextSize(str);
+    draw.RoundedBox(0, CENTER_X, CENTER_Y, x + 8, y + 8, color_black);
+    draw.SimpleText(
+        str, "bash-regular",
+        CENTER_X + 4, CENTER_Y + 4, color_white,
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_white
+    );
+end);

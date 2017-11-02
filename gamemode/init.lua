@@ -1,4 +1,4 @@
-FProfiler.start();
+--FProfiler.start();
 
 -- Things that should be done, regardless of restart or JIT or whatever.
 local function miscInit()
@@ -19,6 +19,7 @@ if bash and bash.started then
 end
 
 MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
+miscInit();
 
 -- Global table for bash elements.
 bash = bash or {};
@@ -42,6 +43,7 @@ AddCSLuaFile("shared.lua");
 -- Include required base files.
 include("core/sh_const.lua");
 include("core/sh_util.lua");
+include("core/sv_resources.lua");
 include("core/sv_netpool.lua");
 include("shared.lua");
 
@@ -63,3 +65,10 @@ MsgLog(LOG_DEF, "Doing base post-init calls...");
 hook.Run("bash_PostInit_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
+
+concommand.Add("bench", function(ply, cmd, args)
+    local tabnet = getService("CTableNet");
+    for i = 1, 100 do
+        tabnet:NewTable("Char");
+    end
+end);
