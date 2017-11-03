@@ -2,6 +2,7 @@
     CTableNet plugin file.
 ]]
 
+-- Start plugin definition.
 definePlugin_start("CTableNet");
 
 -- Plugin info.
@@ -10,12 +11,14 @@ PLUG.Author = "LilSumac";
 PLUG.Desc = "A framework for networking data tied to metatables across multiple variable domains.";
 PLUG.Depends = {"CDatabase"};
 
+--
 -- Constants.
+--
+
+-- Logging option.
 LOG_TABNET = {pre = "[TABNET]", col = color_darkgreen};
 
-LISTEN_PUBLIC = 1;
-LISTEN_PRIVATE = 2;
-
+-- Table status flags.
 TAB_INIT = 1;
 TAB_DEINIT = 2;
 

@@ -39,3 +39,11 @@ function bash.Util.GetClientData(ply, id)
         return bash.ClientData[index];
     end
 end
+
+function bash.Util.PlayerInit(ply)
+
+end
+
+function bash.Util.PlayerPostInit(ply)
+
+end

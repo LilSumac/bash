@@ -11,7 +11,11 @@ PLUG.Author = "LilSumac";
 PLUG.Desc = "";
 PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 
+--
 -- Constants.
+--
+
+-- Logging option.
 LOG_CHAR = {pre = "[CHAR]", col = Color(151, 0, 151, 255)};
 
 -- Process plugin contents.

@@ -31,23 +31,9 @@ local function sendPlyTables(ply)
 end
 ]]
 
--- Service functions.
-function SVC:Initialize(ply)
-    if ply.Initialized then return; end
-
-    ply.Initialized = true;
-
-    bash.Util.RespondToClient(ply);
-
-    hook.Run("bash_PlayerOnInit", ply);
-end
-
-function SVC:PostInitialize(ply)
-    if ply.PostInitialized then return; end
-
-    ply.PostInitialized = true;
-    hook.Run("bash_PlayerPostInit", ply);
-end
+--
+-- Plugins functions.
+--
 
 function SVC:KickPlayer(ply, reason, kicker)
 

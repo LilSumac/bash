@@ -2,9 +2,25 @@
     CPlayer shared hooks.
 ]]
 
--- Gamemode hooks.
-hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
-    local tabnet = getService("CTableNet");
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash          = bash;
+local CurTime       = CurTime;
+local os            = os;
+local FindMetaTable = FindMetaTable;
+local Format        = Format;
+
+--
+-- bash hooks.
+--
+
+-- Add player variables to TableNet.
+hook.Add("GatherPrelimData_Base", "CPlayer_AddTableNet", function()
+    local tabnet = bash.Util.GetPlugin("CTableNet");
+    -- Domain.
     tabnet:AddDomain{
         ID = "Player",
         ParentMeta = FindMetaTable("Player"),
@@ -15,6 +31,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         end
     };
 
+    -- Variables.
     tabnet:AddVariable{
         Domain = "Player",
         ID = "Name",
@@ -26,7 +43,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             return ply:Name();
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "SteamID",
@@ -39,7 +55,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             return ply:SteamID();
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "Addresses",
@@ -54,7 +69,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             ply:SetNetVar("Player", "Addresses", oldVal);
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "FirstLogin",
@@ -66,7 +80,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             return os.time();
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "NewPlayer",
@@ -81,7 +94,6 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             end
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "Playtime",
@@ -100,14 +112,22 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTableNet", function()
             ply:SetNetVar("Player", "Playtime", newTime);
         end
     };
-
     tabnet:AddVariable{
         Domain = "Player",
         ID = "Country",
         Type = "string",
         Public = true,
         OnGenerate = function(_self, ply)
-            return getClientData(ply, "Country");
+            return bash.Util.GetClientData(ply, "Country");
+        end
+    };
+    tabnet:AddVariable{
+        Domain = "Player",
+        ID = "OS",
+        Type = "number",
+        Public = true,
+        OnGenerate = function(_self, ply)
+            return bash.Util.GetClientData(ply, "OS");
         end
     };
 end);

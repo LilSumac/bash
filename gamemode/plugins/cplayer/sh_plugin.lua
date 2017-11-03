@@ -2,6 +2,7 @@
     CPlayer plugin file.
 ]]
 
+-- Start plugin definition.
 definePlugin_start("CPlayer");
 
 -- Plugin info.
@@ -10,12 +11,9 @@ PLUG.Author = "LilSumac";
 PLUG.Desc = "A framework that handles all player-related functionalities.";
 PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 
-if SERVER then
-    -- Network pool.
-end
-
 -- Process plugin contents.
-processDir("hooks");
-processService();
+bash.util.ProcessFile("sv_ply.lua");
+bash.util.ProcessDir("hooks");
 
+-- End plugin definition.
 definePlugin_end();

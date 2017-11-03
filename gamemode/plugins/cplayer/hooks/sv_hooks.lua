@@ -2,7 +2,24 @@
     CPlayer server hooks.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash          = bash;
+local handleFunc    = handleFunc;
+local isplayer      = isplayer;
+local MsgDebug      = MsgDebug;
+local MsgLog        = MsgLog;
+local pairs         = pairs;
+local player        = player;
+
+--
 -- Local functions.
+--
+
+-- Create a row for a new player in the database.
 local function createPlyData(ply)
     MsgLog(LOG_DB, "Creating new row for '%s'...", ply:Name());
 
@@ -31,6 +48,7 @@ local function createPlyData(ply)
     );
 end
 
+-- Search for a row for a player in the database.
 local function getPlyData(ply)
     MsgDebug(LOG_DB, "Gathering player data for '%s'...", ply:Name());
 
@@ -41,7 +59,7 @@ local function getPlyData(ply)
         Format("WHERE SteamID = \'%s\'", ply:SteamID()),    -- Condition to compare against.
 
         function(_ply, results)
-            results = results[1];                          -- Callback function upon completion.
+            results = results[1];                           -- Callback function upon completion.
             if #results.data > 1 then
                 MsgLog(LOG_WARN, "Multiple rows found for %s [%s]! Remove duplicate rows ASAP.", ply:Name(), ply:SteamID());
             end
@@ -62,6 +80,7 @@ local function getPlyData(ply)
     );
 end
 
+-- Remove all tasks and registry traces from a player on disconnect.
 local function removePly(ply)
     local tabnet = getService("CTableNet");
     if ply.RegistryID then
@@ -81,19 +100,30 @@ local function removePly(ply)
     end
 end
 
+--
 -- Gamemode hooks.
+--
+
+-- Remove player on disconnect.
 hook.Add("PlayerDisconnected", "CPlayer_RemovePlayer", function(ply)
     removePly(ply);
 end);
 
+-- Remove all players on shutdown.
 hook.Add("ShutDown", "CPlayer_RemoveAllPlayers", function()
     for _, ply in pairs(player.GetAll()) do
         removePly(ply);
     end
 end);
 
-hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
-    local ctask = getService("CTask");
+--
+-- bash hooks.
+--
+
+-- Create initialization process tasks.
+hook.Add("GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
+    local ctask = bash.Util.GetPlugin("CTask");
+    -- Create initialization process.
     ctask:AddTask("bash_PlayerPreInit");
     ctask:AddTask("bash_PlayerOnInit");
     ctask:AddTask("bash_PlayerPostInit");
@@ -118,12 +148,12 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         if !isplayer(data["Player"]) or !data["SQLData"] then return; end
 
         local ply = data["Player"];
-        local tabnet = getService("CTableNet");
-        local cplayer = getService("CPlayer");
+        local tabnet = bash.Util.GetPlugin("CTableNet");
+        local cplayer = bash.Util.GetPlugin("CPlayer");
 
         -- Handle player affairs.
         tabnet:NewTable("Player", data["SQLData"], data["Player"]);
-        cplayer:Initialize(ply);
+        bash.Util.PlayerInit(ply);
 
         ply:AddListener("Player", player.GetInitialized(), LISTEN_PUBLIC);  -- Add everyone else as public listeners.
         ply:AddListener("Player", ply, LISTEN_PRIVATE);                     -- Add player as private listener.
@@ -144,7 +174,7 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         if !isplayer(data["Player"]) then return; end
 
         local ply = data["Player"];
-        local tabnet = getService("CTableNet");
+        local tabnet = bash.Util.GetPlugin("CTableNet");
 
         -- Handle player affairs.
         tabnet:SendRegistry(ply, true);
@@ -155,10 +185,10 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         if !isplayer(data["Player"]) then return; end
 
         local ply = data["Player"];
-        local cplayer = getService("CPlayer");
+        local cplayer = bash.Util.GetPlugin("CPlayer");
 
         -- Handle player affairs.
-        cplayer:PostInitialize(ply);
+        bash.Util.PlayerPostInit(ply);
         ply.OnInitTask = nil;
     end);
 
@@ -174,24 +204,27 @@ hook.Add("bash_GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
         if !isplayer(data["Player"]) then return; end
 
         local ply = data["Player"];
+
         -- Handle player affairs.
         MsgDebug(LOG_INIT, "Initialize process finished for player '%s'.", ply:Name());
         ply.PostInitTask = nil;
     end);
 end);
 
-hook.Add("bash_OnReceiveClientData", "CPlayer_StartPlyTasks", function(ply, data)
+-- Start the initialization process when player is ready.
+hook.Add("OnReceiveClientData", "CPlayer_StartPlyTasks", function(ply, data)
     if !isplayer(ply) then return; end
     if ply.Initialized then return; end
 
-    local ctask = getService("CTask");
+    local ctask = bash.Util.GetPlugin("CTask");
     local preinit = ctask:NewTask("bash_PlayerPreInit");
     -- add listener to task
     preinit:PassData("Player", ply);
     preinit:Start();
 end);
 
-hook.Add("CTableNet_Hook_RegSendAck", "CPlayer_UpdateOnInit", function(ply)
+-- Update OnInit when the player has received the registry.
+hook.Add("CTableNet_RegSendAck", "CPlayer_UpdateOnInit", function(ply)
     if ply.OnInitTask then
         ply.OnInitTask:Update("WaitForTableNet", 1);
     end

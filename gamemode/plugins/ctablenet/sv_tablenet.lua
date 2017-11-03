@@ -2,7 +2,18 @@
     CTableNet server service.
 ]]
 
--- Service functions.
+--
+-- Constants
+--
+
+-- Listening flags.
+LISTEN_PUBLIC = 1;
+LISTEN_PRIVATE = 2;
+
+--
+-- Plugin functions.
+--
+
 function SVC:NetworkTable(id, domain, _vars)
     if !id or !domain then
         MsgErr("NilArgs", "id/domain");

@@ -1,3 +1,0 @@
---[[
-    CPlayer shared service.
-]]

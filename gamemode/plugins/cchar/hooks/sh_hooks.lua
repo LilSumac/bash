@@ -15,9 +15,10 @@ local string    = string;
 -- bash hooks.
 --
 
--- Add character variables to tablenet.
+-- Add character variables to TableNet.
 hook.Add("GatherPrelimData_Base", "CChar_AddCharVars", function()
     local tabnet = bash.Util.GetPlugin("CTableNet");
+    -- Domain.
     tabnet:AddDomain{
         ID = "Char",
         ParentMeta = bash.Util.GetMeta("CChar"),
@@ -28,6 +29,7 @@ hook.Add("GatherPrelimData_Base", "CChar_AddCharVars", function()
         end
     };
 
+    -- Variables.
     tabnet:AddVariable{
         Domain = "Char",
         ID = "CharID",
