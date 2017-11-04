@@ -2,16 +2,36 @@
     CTableNet client hooks.
 ]]
 
+--
+-- Loacl storage.
+--
+
+-- Micro-optimizations.
+local bash      = bash;
+local Format    = Format;
+local hook      = hook;
+local MsgLog    = MsgLog;
+local pairs     = pairs;
+local vnet      = vnet;
+
+--
 -- Local functions.
+--
+
+-- Send back an acknowledgement of registry reciept.
 local function sendRegAck()
     local ackPck = vnet.CreatePacket("CTableNet_Net_RegSendAck");
     ackPck:AddServer();
     ackPck:Send();
 end
 
+--
 -- Network hooks.
+--
+
+-- Receive the entire registry.
 vnet.Watch("CTableNet_Net_RegSend", function(pck)
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     local registry = tabnet:GetRegistry();
 
     local reg = pck:Table();
@@ -48,8 +68,9 @@ vnet.Watch("CTableNet_Net_RegSend", function(pck)
     end
 end);
 
+-- Receive object updates.
 vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     local registry = tabnet:GetRegistry();
 
     local regID = pck:String();
@@ -74,15 +95,17 @@ vnet.Watch("CTableNet_Net_ObjUpdate", function(pck)
             else
                 tab.TableNet[domain].Private[id] = val;
             end
+            hook.Run(Format("CTableNet_OnUpdate_%s_%s", domain, id), tab);
         end
     else
         tab = tabnet:NewTable(domain, data, obj, regID);
     end
 end);
 
+-- Receive a table deletion.
 vnet.Watch("CTableNet_Net_ObjOutOfScope", function(pck)
     local regID = pck:String();
     local domain = pck:String();
-    local tablenet = getService("CTableNet");
+    local tablenet = bash.Util.GetPlugin("CTableNet");
     tablenet:RemoveTable(regID, domain);
 end);

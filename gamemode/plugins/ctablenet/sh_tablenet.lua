@@ -2,13 +2,42 @@
     CTableNet main service.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash          = bash;
+local Format        = Format;
+local hook          = hook;
+local ipairs        = ipairs;
+local isplayer      = isplayer;
+local MsgDebug      = MsgDebug;
+local MsgErr        = MsgErr;
+local MsgLog        = MsgLog;
+local pairs         = pairs;
+local setmetatable  = setmetatable;
+local table         = table;
+local tostring      = tostring;
+local type          = type;
+local unpack        = unpack;
+local vnet          = vnet;
+
+--
 -- Service storage.
+--
+
+-- TableNet objects.
 local domains = {};
 local vars = {};
-local registry = getNonVolatileEntry("CTableNet_Registry", EMPTY_TABLE);
+local registry = bash.Util.GetNonVolatileEntry("CTableNet_Registry", EMPTY_TABLE);
 local singlesMade = {};
 
+--
 -- Local functions.
+--
+
+-- Run all appropriate init functions on a table.
 local function runInits(tab, domain, init)
     if !init then return; end
 
@@ -27,6 +56,7 @@ local function runInits(tab, domain, init)
     end
 end
 
+-- Initialize a table's listeners struct.
 local function checkListenerTable(tab, domain)
     if !tab.TableNet then
         MsgErr("TableNotRegistered", tostring(tab));
@@ -48,39 +78,47 @@ local function checkListenerTable(tab, domain)
     return list;
 end
 
--- Service functions.
-function SVC:AddDomain(domain)
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
+--
+-- Plugins functions.
+--
+
+-- Add/edit a domain struct.
+function PLUG:AddDomain(domain)
     if !domain.ID then
         MsgErr("NilField", "ID", "domain");
         return;
     end
+
+    --[[
     if domains[domain.ID] then
         MsgErr("DupEntry", domain.ID);
         return;
     end
+    ]]
 
     -- Domain fields.
     -- domain.ID = domain.ID; (Redundant, no default)
     -- domain.ParentMeta = domain.ParentMeta; (Redundant, no default);
+
+    -- If the domain has elements stored in the database.
     domain.StoredInSQL = domain.StoredInSQL or false;
     if SERVER and domain.StoredInSQL then
+        -- The name of the table the domain stores its fields in.
         if !domain.SQLTable then
             MsgErr("NilField", "SQLTable", "domain");
             return;
         end
+        -- The function called when a table needs to know its row. (x = y)
         if !domain.GetRowCondition then
             MsgErr("NilField", "GetRowCondition", "domain");
             return;
         end
 
-        local cdb = getService("CDatabase");
+        local cdb = bash.Util.GetPlugin("CDatabase");
         cdb:AddTable(domain.SQLTable);
     end
 
+    -- Whether or not the table can only have one instance active.
     domain.SingleTable = domain.SingleTable or false;
 
     local meta = domain.ParentMeta;
@@ -91,15 +129,6 @@ function SVC:AddDomain(domain)
             return _self:GetNetVars(domain, {id});
         end
         meta.GetNetVars = function(_self, domain, ids)
-            if !domain then
-                MsgErr("NilArgs", "domain");
-                return;
-            end
-            if !ids then
-                MsgErr("NilArgs", "ids");
-                return;
-            end
-
             if !_self.RegistryID or !_self.TableNet then
                 MsgErr("TableNotRegistered", tostring(_self));
                 return;
@@ -110,7 +139,7 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            local tabnet = getService("CTableNet");
+            local tabnet = bash.Util.GetPlugin("CTableNet");
             if !tabnet:GetDomain(domain) then
                 MsgErr("NilEntry", domain);
                 return;
@@ -139,15 +168,6 @@ function SVC:AddDomain(domain)
             _self:SetNetVars(domain, {[id] = val});
         end
         meta.SetNetVars = function(_self, domain, data)
-            if !domain then
-                MsgErr("NilArgs", "domain");
-                return;
-            end
-            if !data then
-                MsgErr("NilArgs", "data");
-                return;
-            end
-
             if !_self.RegistryID or !_self.TableNet then
                 MsgErr("TableNotRegistered", tostring(_self));
                 return;
@@ -158,7 +178,7 @@ function SVC:AddDomain(domain)
                 return;
             end
 
-            local tablenet = getService("CTableNet");
+            local tablenet = bash.Util.GetPlugin("CTableNet");
             local domInfo = tablenet:GetDomain(domain);
             if !domInfo then
                 MsgErr("NilEntry", domain);
@@ -177,6 +197,7 @@ function SVC:AddDomain(domain)
             end
 
             local ids = {};
+            local hookData = {};
             local index = 1;
             local varData;
             local sqlData = {};
@@ -190,32 +211,39 @@ function SVC:AddDomain(domain)
                     _self.TableNet[domain].Private[id] = val;
                 end
                 ids[index] = id;
+                hookData[id] = val;
                 index = index + 1;
 
                 if varData.InSQL then
                     sqlData[id] = val;
                 end
 
+                --[[
                 if varData.OnSet then
                     varData:OnSet(_self, val);
                 end
+                ]]
             end
 
             tablenet:NetworkTable(_self.RegistryID, domain, ids);
 
             if domInfo.StoredInSQL then
-                local db = getService("CDatabase");
+                local db = bash.Util.GetPlugin("CDatabase");
                 db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(regID, results)
                     MsgLog(LOG_DB, "Updated rows for table %s.", regID);
                 end, _self.RegistryID);
+            end
+
+            for id, val in pairs(hookData) do
+                hook.Run(Format("CTableNet_OnSet_%s_%s", domain, id), _self, val);
             end
         end
 
         if SERVER then
             -- Listener functions.
+            -- Add a new listener.
             meta.AddListener = function(_self, domain, listener, mode)
                 local list = checkListenerTable(_self, domain);
-
                 if mode == LISTEN_PUBLIC then
                     if type(listener) == "table" then
                         for key, val in pairs(listener) do
@@ -244,14 +272,17 @@ function SVC:AddDomain(domain)
                     end
                 end
             end
+            -- Get all listeners.
             meta.GetListeners = function(_self, domain)
                 return checkListenerTable(_self, domain);
             end
+            -- Remove a listener.
             meta.RemoveListener = function(_self, domain, listener)
                 local list = checkListenerTable(_self, domain);
                 list.Public[listener] = nil;
                 list.Private[listener] = nil;
             end
+            -- Clear all listeners.
             meta.ClearListeners = function(_self, domain)
                 if !domain then
                     local list;
@@ -287,12 +318,8 @@ function SVC:AddDomain(domain)
     vars[domain.ID] = {};
 end
 
--- Do something about editing variables (adding callbacks).
-function SVC:AddVariable(var)
-    if !var then
-        MsgErr("NilArgs", "var");
-        return;
-    end
+-- Add/edit a variable struct.
+function PLUG:AddVariable(var)
     if !var.ID or !var.Domain then
         MsgErr("NilField", "ID/Domain", "var");
         return;
@@ -301,42 +328,48 @@ function SVC:AddVariable(var)
         MsgErr("NilEntry", var.Domain);
         return;
     end
+
+    --[[
     if vars[var.Domain][var.ID] then
         MsgErr("DupEntry", var.ID);
         return;
     end
+    ]]
 
     -- Variable fields.
     -- var.ID = var.ID; (Redundant, no default)
     -- var.Domain = var.Domain; (Redundant, no default)
+
+    -- The variable type.
     var.Type = var.Type or "string";
-    -- var.MaxLength = var.MaxLength;
+    -- The access scope of the variable.
     var.Public = var.Public or false;
+    -- Whether the client can request changes to the variable.
     var.Secure = var.Secure == nil and true or var.Secure;
 
     if SERVER then
+        -- If the variable should be stored in the database.
         var.InSQL = var.InSQL or false;
+        if var.InSQL then
+            -- The max length (in database field) of the variable.
+            var.MaxLength = var.MaxLength or 32;
+        end
 
         -- Charvar functions/hooks.
         var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
         -- var.OnInit = var.OnInit; (Redundant, no default)
         -- var.OnDeinit = var.OnDeinit; (Redundant, no default)
         -- var.OnSet = var.OnSet; (Redundant, no default)
-    elseif CLIENT then
-        -- Client does NOT need to know about these.
-        var.OnGenerate = nil;
-        var.OnInit = nil;
-        var.OnDeinit = nil;
-        var.OnSet = nil;
     end
 
     MsgDebug(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
     vars[var.Domain][var.ID] = var;
 
     if SERVER and var.InSQL then
-        local db = getService("CDatabase");
         local domInfo = domains[var.Domain];
         if !domInfo.StoredInSQL then return; end
+
+        local db = bash.Util.GetPlugin("CDatabase");
         db:AddColumn(domInfo.SQLTable, {
             Name = var.ID,
             Type = var.Type,
@@ -345,37 +378,33 @@ function SVC:AddVariable(var)
     end
 end
 
-function SVC:GetDomain(dom)
+-- Get a domain struct.
+function PLUG:GetDomain(dom)
     return domains[dom];
 end
 
-function SVC:GetVariable(domain, var)
+-- Get a variable struct.
+function PLUG:GetVariable(domain, var)
     return vars[domain][var];
 end
 
-function SVC:GetDomainVars(domain)
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
-
-    if !vars[domain] then
-        MsgErr("NilEntry", domain);
-        return;
-    end
-
+-- Get all variable structs belonging to a domain.
+function PLUG:GetDomainVars(domain)
     return vars[domain];
 end
 
-function SVC:GetRegistry()
+-- Get the registry table.
+function PLUG:GetRegistry()
     return registry;
 end
 
-function SVC:GetTable(id)
+-- Get a table from the registry.
+function PLUG:GetTable(id)
     return registry[id];
 end
 
-function SVC:IsRegistered(id, domain)
+-- Check to see if a RegistryID is still registered.
+function PLUG:IsRegistered(id, domain)
     if domain then
         return registry[id] != nil and registry[id] != NULL and registry[id].TableNet[domain] != nil;
     else
@@ -383,16 +412,13 @@ function SVC:IsRegistered(id, domain)
     end
 end
 
-function SVC:IsRegistryEmpty()
+-- Check to see if the registry is empty.
+function PLUG:IsRegistryEmpty()
     return table.IsEmpty(registry);
 end
 
-function SVC:NewTable(domain, data, obj, regID)
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
-
+-- Create a new instance of a networked table.
+function PLUG:NewTable(domain, data, obj, regID)
     local domInfo = domains[domain];
     if !domInfo then
         MsgErr("NilEntry", domain);
@@ -455,20 +481,12 @@ function SVC:NewTable(domain, data, obj, regID)
     MsgDebug(LOG_TABNET, "Registered table in TableNet with domain %s. (%s)", domain, tab.RegistryID);
 
     if SERVER then runInits(tab, domain, TAB_INIT); end
-    hook.Run("CTableNet_Hook_OnTableCreate", tab, domain);
+    hook.Run("CTableNet_OnTableCreate", tab, domain);
     return tab;
 end
 
-function SVC:RemoveTable(id, domain)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
-
+-- Remove a table from the registry.
+function PLUG:RemoveTable(id, domain)
     local tab = registry[id];
     if !tab then return; end
     if !tab.TableNet then return; end
@@ -477,7 +495,7 @@ function SVC:RemoveTable(id, domain)
     MsgDebug(LOG_TABNET, "Removing table from TableNet with domain %s. (%s)", domain, id);
 
     if SERVER then runInits(tab, domain, TAB_DEINIT); end
-    hook.Run("CTableNet_Hook_OnTableRemove", tab, domain);
+    hook.Run("CTableNet_OnTableRemove", tab, domain);
 
     if SERVER then
         local removePck = vnet.CreatePacket("CTableNet_Net_ObjOutOfScope");
@@ -498,16 +516,8 @@ function SVC:RemoveTable(id, domain)
     end
 end
 
-function SVC:GetNetVars(domain, ids)
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
-    if !ids then
-        MsgErr("NilArgs", "ids");
-        return;
-    end
-
+-- Get a netvar from a single table.
+function PLUG:GetNetVars(domain, ids)
     local tab = singlesMade[domain];
     if !tab then
         MsgErr("TableNotRegistered", domain);
@@ -543,16 +553,8 @@ function SVC:GetNetVars(domain, ids)
     return unpack(results);
 end
 
-function SVC:SetNetVars(domain, data)
-    if !domain then
-        MsgErr("NilArgs", "domain");
-        return;
-    end
-    if !data then
-        MsgErr("NilArgs", "data");
-        return;
-    end
-
+-- Set a netvar from a single table.
+function PLUG:SetNetVars(domain, data)
     local tab = singlesMade[domain];
     if !tab then
         MsgErr("TableNotRegistered", domain);

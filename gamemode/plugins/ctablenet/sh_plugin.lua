@@ -22,10 +22,14 @@ LOG_TABNET = {pre = "[TABNET]", col = color_darkgreen};
 TAB_INIT = 1;
 TAB_DEINIT = 2;
 
+--
+-- Misc. operations.
+--
+
 -- Custom errors.
-addErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
-addErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
-addErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
+bash.Util.AddErrType("TableNotRegistered", "This table has not been registered in TableNet! (%s)");
+bash.Util.AddErrType("NoDomainInTable", "No domain with that ID exists in that table! (%s -> %s)");
+bash.Util.AddErrType("MultiSingleTable", "Tried to create a single table when one already exists! (%s)");
 
 if SERVER then
     -- Network pool.
@@ -37,7 +41,9 @@ if SERVER then
 end
 
 -- Add main payloads.
-processDir("hooks");
-processService();
+bash.Util.ProcessDir("hooks");
+bash.Util.ProcessFile("sh_tablenet.lua");
+bash.Util.ProcessFile("sv_tablenet.lua");
 
+-- End plugin definition.
 definePlugin_end();

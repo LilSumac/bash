@@ -11,15 +11,26 @@ LISTEN_PUBLIC = 1;
 LISTEN_PRIVATE = 2;
 
 --
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local ipairs    = ipairs;
+local isentity  = isentity;
+local isplayer  = isplayer;
+local MsgErr    = MsgErr;
+local pairs     = pairs;
+local table     = table;
+local tostring  = tostring;
+local type      = type;
+local vnet      = vnet;
+
+--
 -- Plugin functions.
 --
 
-function SVC:NetworkTable(id, domain, _vars)
-    if !id or !domain then
-        MsgErr("NilArgs", "id/domain");
-        return;
-    end
-
+-- Send a single table to all of its appropriate listeners.
+function PLUG:NetworkTable(id, domain, _vars)
     local registry = self:GetRegistry();
     if !registry[id] then
         MsgErr("NilEntry", id);
@@ -138,17 +149,10 @@ function SVC:NetworkTable(id, domain, _vars)
     end
 end
 
-function SVC:SendTable(ply, id, domain, _vars, force)
+-- Send a single table to a specific player.
+function PLUG:SendTable(ply, id, domain, _vars, force)
     if !isplayer(ply) then
         MsgErr("InvalidPly");
-        return;
-    end
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-    if !domain then
-        MsgErr("NilArgs", "domain");
         return;
     end
 
@@ -177,8 +181,7 @@ function SVC:SendTable(ply, id, domain, _vars, force)
     local data = {};
     local list = tab:GetListeners(domain);
     if !list.Public[ply] and !list.Private[ply] and !force then
-        -- DEBUG
-        -- Remove old error msg.
+        MsgLog(LOG_WARN, "Tried sending the table '%s' to %s but they are not authorized! Use the 'force' argument to bypass this.", id, ply:Name());
         return;
     end
 
@@ -229,7 +232,8 @@ function SVC:SendTable(ply, id, domain, _vars, force)
     sendPck:Send();
 end
 
-function SVC:SendRegistry(ply, getAck)
+-- Send all tables to a specific player.
+function PLUG:SendRegistry(ply, getAck)
     if !isplayer(ply) then
         MsgErr("InvalidPly");
         return;

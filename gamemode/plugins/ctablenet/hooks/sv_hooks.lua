@@ -2,12 +2,27 @@
     CTableNet server hooks.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash      = bash;
+local hook      = hook;
+local MsgLog    = MsgLog;
+local pairs     = pairs;
+
+--
 -- Network hooks.
+--
+
+-- Receive a registry sending acknowledgement.
 vnet.Watch("CTableNet_Net_RegSendAck", function(pck)
     local ply = pck.Source;
     hook.Run("CTableNet_Hook_RegSendAck", ply);
 end);
 
+-- Receive client requests for variable changes.
 vnet.Watch("CTableNet_Net_ObjRequest", function(pck)
     local ply = pck.Source;
     local regID = pck:String();
