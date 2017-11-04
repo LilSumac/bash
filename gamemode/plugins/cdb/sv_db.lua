@@ -56,10 +56,12 @@ local castIn = {
     end,
     ["number"] = tonumber,
     ["string"] = function(str)
-        return Format("\'%s\'", PLUG:EscapeStr(tostring(str)));
+        local cdb = bash.Util.GetPlugin("CDatabase");
+        return Format("\'%s\'", cdb:EscapeStr(tostring(str)));
     end,
     ["table"] = function(tab)
-        return Format("\'%s\'", PLUG:EscapeStr(pon.encode(tab)));
+        local cdb = bash.Util.GetPlugin("CDatabase");
+        return Format("\'%s\'", cdb:EscapeStr(pon.encode(tab)));
     end
 };
 local castOut = {
@@ -265,7 +267,7 @@ function PLUG:CheckTables()
                 "`%s` %s %s %s, ",
                 _name,
                 sqlType,
-                col.Default != nil and ("DEFAULT " .. self:CastValue(col.Type, col.Default, CAST_IN)) or "",
+                col.Default != nil and ("DEFAULT " .. self:CastValue(col, col.Default, CAST_IN)) or "",
                 col.Field or ""
             );
         end

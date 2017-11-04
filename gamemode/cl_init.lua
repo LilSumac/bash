@@ -11,7 +11,9 @@ local function miscInit()
     -- Create default fonts.
     surface.CreateFont("bash-regular", {
 		font = "Aileron Thin",
-		size = 36
+		size = 24,
+        shadow = true,
+        antialias = true
         --weight = 300
 	});
 end
@@ -82,12 +84,14 @@ MsgC(color_cyan, "======================== BASE COMPLETE =======================
 
 // testing
 local str = "The quick brown fox jumps over the lazy dog.";
+local font = "bash-regular";
+hook.Remove("HUDPaint", "asdf");
 hook.Add("HUDPaint", "asdf", function()
-    surface.SetFont("bash-regular");
+    surface.SetFont(font);
     local x, y = surface.GetTextSize(str);
-    draw.RoundedBox(0, CENTER_X, CENTER_Y, x + 8, y + 8, color_black);
+    draw.RoundedBox(0, CENTER_X, CENTER_Y, x + 8, y + 8, color_grey);
     draw.SimpleText(
-        str, "bash-regular",
+        str, font,
         CENTER_X + 4, CENTER_Y + 4, color_white,
         TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_white
     );

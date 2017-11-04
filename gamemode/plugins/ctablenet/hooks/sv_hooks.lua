@@ -19,7 +19,7 @@ local pairs     = pairs;
 -- Receive a registry sending acknowledgement.
 vnet.Watch("CTableNet_Net_RegSendAck", function(pck)
     local ply = pck.Source;
-    hook.Run("CTableNet_Hook_RegSendAck", ply);
+    hook.Run("CTableNet_RegSendAck", ply);
 end);
 
 -- Receive client requests for variable changes.
