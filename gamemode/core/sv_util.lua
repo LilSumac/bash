@@ -43,6 +43,10 @@ end
 function bash.Util.PlayerInit(ply)
     if !isplayer(ply) or ply.Initialized then return; end
 
+    local respondPck = vnet.CreatePacket("bash_Net_RespondToClient");
+    respondPck:AddTargets(ply);
+    respondPck:Send();
+
     ply.Initialized = true;
     hook.Run("PlayerOnInit", ply);
 end

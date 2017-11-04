@@ -123,6 +123,12 @@ function PLUG:AddDomain(domain)
 
     local meta = domain.ParentMeta;
     if meta and !meta.TableNetFuncsAdded then
+        if CLIENT then
+            -- Set a table as client-only.
+            meta.SetClientOnly = function(_self)
+                _self.ClientOnly = true;
+            end
+        end
 
         -- Get functions.
         meta.GetNetVar = function(_self, domain, id)
@@ -178,14 +184,14 @@ function PLUG:AddDomain(domain)
                 return;
             end
 
-            local tablenet = bash.Util.GetPlugin("CTableNet");
-            local domInfo = tablenet:GetDomain(domain);
+            local tabnet = bash.Util.GetPlugin("CTableNet");
+            local domInfo = tabnet:GetDomain(domain);
             if !domInfo then
                 MsgErr("NilEntry", domain);
                 return;
             end
 
-            if CLIENT then
+            if CLIENT and !_self.ClientOnly then
                 local requestPck = vnet.CreatePacket("CTableNet_Net_ObjRequest");
                 requestPck:String(_self.RegistryID);
                 requestPck:String(domain);
@@ -202,7 +208,7 @@ function PLUG:AddDomain(domain)
             local varData;
             local sqlData = {};
             for id, val in pairs(data) do
-                varData = tablenet:GetVariable(domain, id);
+                varData = tabnet:GetVariable(domain, id);
                 if !varData then continue; end
 
                 if varData.Public then
@@ -225,17 +231,19 @@ function PLUG:AddDomain(domain)
                 ]]
             end
 
-            tablenet:NetworkTable(_self.RegistryID, domain, ids);
+            if SERVER then
+                tabnet:NetworkTable(_self.RegistryID, domain, ids);
 
-            if domInfo.StoredInSQL then
-                local db = bash.Util.GetPlugin("CDatabase");
-                db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(regID, results)
-                    MsgLog(LOG_DB, "Updated rows for table %s.", regID);
-                end, _self.RegistryID);
-            end
+                if domInfo.StoredInSQL then
+                    local db = bash.Util.GetPlugin("CDatabase");
+                    db:UpdateRow(domInfo.SQLTable, sqlData, domInfo:GetRowCondition(_self), function(regID, results)
+                        MsgLog(LOG_DB, "Updated rows for table %s.", regID);
+                    end, _self.RegistryID);
+                end
 
-            for id, val in pairs(hookData) do
-                hook.Run(Format("CTableNet_OnSet_%s_%s", domain, id), _self, val);
+                for id, val in pairs(hookData) do
+                    hook.Run(Format("CTableNet_OnSet_%s_%s", domain, id), _self, val);
+                end
             end
         end
 

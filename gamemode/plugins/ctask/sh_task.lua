@@ -27,7 +27,6 @@ local activeTasks = bash.Util.GetNonVolatileEntry("CTask_ActiveTasks", EMPTY_TAB
 
 -- Add a new task struct.
 function PLUG:AddTask(id)
-
     local task = {};
     task.ID = id;
     task.Conditions = {};
@@ -38,7 +37,6 @@ function PLUG:AddTask(id)
     task.NextTasks = {};
 
     tasks[id] = task;
-
 end
 
 -- Get a task struct.
@@ -135,6 +133,7 @@ function PLUG:NewTask(id, passed)
     local task = tasks[id];
     local tabnet = bash.Util.GetPlugin("CTableNet");
     local newTask = tabnet:NewTable("Task");
+    if CLIENT then newTask:SetClientOnly(); end
     newTask.TaskID = id;
     newTask.InScope = true;
     newTask:Initialize();

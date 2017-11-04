@@ -20,26 +20,8 @@ local resChanged = false;
 -- Gamemode hooks.
 --
 
--- Send client data if client was too quick (unlikely).
-hook.Add("InitPostEntity", "bash_DelayedClientInit", function()
-    if bash.WaitForPostInit then
-        MsgDebug(LOG_INIT, "Contacting server...");
-        bash.Util.SendClientData(true);
-        bash.WaitForPostInit = false;
-        bash.ServerResponded = false;
-    end
-end);
-
 -- Let the server know we're ready.
--- This marks the beginning of the client-side initialization process.
-hook.Add("PostInit_Base", "bash_ClientInit", function()
-    -- If InitPostEntity has not occured yet, postpone until then.
-    if !isplayer(LocalPlayer()) then
-        bash.WaitForPostInit = true;
-        return;
-    end
-
-    -- Otherwise, contact the server.
+hook.Add("InitPostEntity", "bash_DelayedClientInit", function()
     MsgDebug(LOG_INIT, "Contacting server...");
     bash.Util.SendClientData(true);
     bash.ServerResponded = false;

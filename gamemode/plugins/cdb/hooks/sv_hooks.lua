@@ -15,7 +15,7 @@ local MsgLog    = MsgLog;
 --
 
 -- Make sure the database is connected on setup/refresh.
-hook.Add("InitService", "CDatabase_OnInit", function()
+hook.Add("InitCalls", "CDatabase_OnInit", function()
     local db = bash.Util.GetPlugin("CDatabase");
     if db:IsConnected() then
         MsgLog(LOG_DB, "Database still connected, skipping.");

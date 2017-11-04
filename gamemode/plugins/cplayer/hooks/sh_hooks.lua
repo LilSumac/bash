@@ -41,6 +41,16 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTableNet", function()
         InSQL = true,
         OnGenerate = function(_self, ply)
             return ply:Name();
+        end,
+        OnInit = function(_self, ply, oldVal)
+            if ply:Name() != oldVal then
+                ply:SetNetVar("Player", "Name", ply:Name());
+            end
+        end,
+        OnDeinit = function(_self, ply, oldVal)
+            if ply:Name() != oldVal then
+                ply:SetNetVar("Player", "Name", ply:Name());
+            end
         end
     };
     tabnet:AddVariable{

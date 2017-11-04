@@ -29,7 +29,11 @@ vnet.Watch("CTableNet_Net_ObjRequest", function(pck)
     local domain = pck:String();
     local data = pck:Table();
 
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
+    if !tabnet:IsRegistered(regID) then
+        MsgLog(LOG_WARN, "Client '%s' requested a change of '%s'! Not supposed to happen.", ply:Name(), regID);
+        return;
+    end
     local tab = tabnet:GetTable(regID);
 
     local safeData = {};

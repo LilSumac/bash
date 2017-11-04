@@ -68,8 +68,8 @@ include("shared.lua");
 -- Hooks for init process.
 MsgLog(LOG_INIT, "Gathering base preliminary data...");
 hook.Run("GatherPrelimData_Base");
-MsgLog(LOG_INIT, "Initializing base services...");
-hook.Run("InitService_Base");
+MsgLog(LOG_INIT, "Doing base init calls...");
+hook.Run("InitCalls_Base");
 
 -- Report startup time.
 local len = math.Round(SysTime() - bash.StartTime, 8);
@@ -77,7 +77,7 @@ MsgLog(LOG_INIT, "Successfully initialized base client-side. Startup: %fs", len)
 bash.Started = true;
 
 MsgLog(LOG_DEF, "Doing base post-init calls...");
-hook.Run("PostInit_Base");
+hook.Run("PostInitCalls_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
 
