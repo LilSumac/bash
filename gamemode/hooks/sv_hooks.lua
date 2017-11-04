@@ -30,8 +30,11 @@ end);
 vnet.Watch("bash_Net_SendClientData", function(pck)
     local ply = pck.Source;
     local data = pck:Table();
+    local first = pck:Bool();
     bash.ClientData = bash.ClientData or {};
     bash.ClientData[ply:SteamID()] = data;
 
-    hook.Run("OnReceiveClientData", ply, data);
+    if first then
+        hook.Run("PlayerPreInit", ply);
+    end
 end);

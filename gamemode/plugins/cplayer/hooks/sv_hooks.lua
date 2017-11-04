@@ -254,15 +254,9 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
 end);
 
 -- Start the initialization process when player is ready.
-hook.Add("OnReceiveClientData", "CPlayer_StartPlyTasks", function(ply, data)
-    if !isplayer(ply) then return; end
-    if ply.Initialized then return; end
-
-    local ctask = bash.Util.GetPlugin("CTask");
-    local preinit = ctask:NewTask("bash_PlayerPreInit");
-    -- add listener to task
-    preinit:PassData("Player", ply);
-    preinit:Start();
+hook.Add("PlayerPreInit", "CPlayer_StartPlyTasks", function(ply, data)
+    local cplayer = bash.Util.GetPlugin("CPlayer");
+    cplayer:StartInitProcess(ply);
 end);
 
 -- Update OnInit when the player has received the registry.

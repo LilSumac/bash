@@ -35,6 +35,16 @@ end
 -- Plugins functions.
 --
 
+function PLUG:StartInitProcess(ply)
+    if !isplayer(ply) or ply.Initialized then return; end
+
+    local ctask = bash.Util.GetPlugin("CTask");
+    local preinit = ctask:NewTask("bash_PlayerPreInit");
+    -- add listener to task
+    preinit:PassData("Player", ply);
+    preinit:Start();
+end
+
 function PLUG:KickPlayer(ply, reason, kicker)
 
 end

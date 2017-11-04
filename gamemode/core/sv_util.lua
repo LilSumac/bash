@@ -39,10 +39,18 @@ function bash.Util.GetClientData(ply, id)
     end
 end
 
+-- Call the init stage for a player.
 function bash.Util.PlayerInit(ply)
+    if !isplayer(ply) or ply.Initialized then return; end
 
+    ply.Initialized = true;
+    hook.Run("PlayerOnInit", ply);
 end
 
+-- Call the postinit stage for a player.
 function bash.Util.PlayerPostInit(ply)
+    if !isplayer(ply) or ply.Initialized or ply.Initialized then return; end
 
+    ply.PostInitialized = true;
+    hook.Run("PlayerPostInit", ply);
 end

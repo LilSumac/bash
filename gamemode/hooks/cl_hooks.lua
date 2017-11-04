@@ -24,7 +24,7 @@ local resChanged = false;
 hook.Add("InitPostEntity", "bash_DelayedClientInit", function()
     if bash.WaitForPostInit then
         MsgDebug(LOG_INIT, "Contacting server...");
-        bash.Util.SendClientData();
+        bash.Util.SendClientData(true);
         bash.WaitForPostInit = false;
         bash.ServerResponded = false;
     end
@@ -41,7 +41,7 @@ hook.Add("PostInit_Base", "bash_ClientInit", function()
 
     -- Otherwise, contact the server.
     MsgDebug(LOG_INIT, "Contacting server...");
-    bash.Util.SendClientData();
+    bash.Util.SendClientData(true);
     bash.ServerResponded = false;
 end);
 
