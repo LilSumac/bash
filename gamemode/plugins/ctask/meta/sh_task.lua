@@ -2,7 +2,26 @@
     CTask main metatable.
 ]]
 
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash      = bash;
+local Format    = Format;
+local MsgDebug  = MsgDebug;
+local MsgErr    = MsgErr;
+local os        = os;
+local pairs     = pairs;
+local table     = table;
+local timer     = timer;
+local tostring  = tostring;
+
+--
 -- Meta functions.
+--
+
+-- Initialize a new task.
 function META:Initialize()
     if !self.RegistryID then
         MsgErr("TaskNotValid", tostring(self));
@@ -11,7 +30,7 @@ function META:Initialize()
 
     self:SetNetVar("Task", "Status", STATUS_PAUSED);
 
-    local task = getService("CTask");
+    local task = bash.Util.GetPlugin("CTask");
     local taskInfo = task:GetTask(self.TaskID);
     self.TaskInfo = taskInfo;
 
@@ -37,6 +56,7 @@ function META:Initialize()
     end
 end
 
+-- Start a waiting task.
 function META:Start()
     MsgDebug(LOG_TASK, "Starting task '%s->%s'...", self.RegistryID, self.TaskID);
     self:SetNetVars("Task", {
@@ -63,6 +83,7 @@ function META:Start()
     end
 end
 
+-- Pause a running task.
 function META:Pause()
     if self:GetNetVar("Task", "Status") == STATUS_PAUSED then return; end
     self:SetNetVar("Task", "Status", STATUS_PAUSED);
@@ -72,6 +93,7 @@ function META:Pause()
     end
 end
 
+-- Unpause a paused task.
 function META:Unpause()
     if self:GetNetVar("Task", "Status") != STATUS_PAUSED then return; end
     self:SetNetVar("Task", "Status", STATUS_RUNNING);
@@ -97,6 +119,7 @@ function META:Unpause()
     });
 end
 
+-- Restart a task.
 function META:Restart()
     local newVals = {};
     for condID, cond in pairs(self.TaskInfo.Conditions) do
@@ -113,20 +136,24 @@ function META:Restart()
     end
 end
 
+-- Get status of a task.
 function META:GetStatus()
     return self:GetNetVar("Task", "Status");
 end
 
+-- Pass data to a task.
 function META:PassData(id, data)
     local passed = self:GetPassedData();
     passed[id] = data;
     self:SetNetVar("Task", "PassedData", passed);
 end
 
+-- Get passed data from a task.
 function META:GetPassedData()
     return self:GetNetVar("Task", "PassedData");
 end
 
+-- Update a condition of the task.
 function META:Update(cond, value)
     if !self.InScope then return; end
 
@@ -159,17 +186,20 @@ function META:Update(cond, value)
     end
 end
 
+-- Finish a task with a failed status.
 function META:Fail()
     self:Finish(STATUS_FAILED);
 end
 
+-- Finish a task.
 function META:Finish(status)
     self:SetNetVar("Task", "Status", status);
 
-    local ctask = getService("CTask");
+    local ctask = bash.Util.GetPlugin("CTask");
     ctask:RemoveActiveTask(self.RegistryID);
 end
 
+-- Check to see if all conditions have been met.
 function META:CheckConditions()
     local values = self:GetNetVar("Task", "Values");
     for condID, cond in pairs(self.TaskInfo.Conditions) do

@@ -1,5 +1,5 @@
 --[[
-    CPlayer server service.
+    CPlayer server functionality.
 ]]
 
 --[[

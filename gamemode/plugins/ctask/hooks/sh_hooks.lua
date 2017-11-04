@@ -2,14 +2,27 @@
     CTask shared hooks.
 ]]
 
--- Gamemode hooks.
-hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
-    local tabnet = getService("CTableNet");
+--
+-- Local storage.
+--
+
+-- Micro-optimizations.
+local bash = bash;
+
+--
+-- bash hooks.
+--
+
+-- Add task variables to TableNet.
+hook.Add("GatherPrelimData_Base", "CTask_AddPlyTasks", function()
+    local tabnet = bash.Util.GetPlugin("CTableNet");
+    -- Task domain.
     tabnet:AddDomain{
         ID = "Task",
-        ParentMeta = getMeta("CTask")
+        ParentMeta = bash.Util.GetMeta("CTask")
     };
 
+    -- Task variables.
     tabnet:AddVariable{
         Domain = "Task",
         ID = "Status",
@@ -17,7 +30,6 @@ hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         Public = true,
         OnGenerate = STATUS_PAUSED
     };
-
     tabnet:AddVariable{
         Domain = "Task",
         ID = "StartTime",
@@ -25,21 +37,18 @@ hook.Add("bash_GatherPrelimData_Base", "bash_Hook_AddPlyTasks", function()
         Public = true,
         OnGenerate = -1
     };
-
     tabnet:AddVariable{
         Domain = "Task",
         ID = "Values",
         Type = "table",
         Public = true
     };
-
     tabnet:AddVariable{
         Domain = "Task",
         ID = "SavedValues",
         Type = "table",
         Public = true
     };
-
     tabnet:AddVariable{
         Domain = "Task",
         ID = "PassedData",

@@ -41,9 +41,9 @@ if SERVER then
 end
 
 -- Add main payloads.
-bash.Util.ProcessDir("hooks");
 bash.Util.ProcessFile("sh_tablenet.lua");
 bash.Util.ProcessFile("sv_tablenet.lua");
+bash.Util.ProcessDir("hooks");
 
 -- End plugin definition.
 definePlugin_end();

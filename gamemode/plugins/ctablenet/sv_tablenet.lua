@@ -1,5 +1,5 @@
 --[[
-    CTableNet server service.
+    CTableNet server functionality.
 ]]
 
 --

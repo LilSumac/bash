@@ -1,5 +1,5 @@
 --[[
-    CTableNet main service.
+    CTableNet shared functionality.
 ]]
 
 --
@@ -304,15 +304,6 @@ function PLUG:AddDomain(domain)
         meta.TableNetFuncsAdded = true;
     end
 
-    --[[ Changing to listeners.
-    domain.GetRecipients = domain.GetRecipients or function(_self, tab)
-        return player.GetInitializedAsKeys();
-    end
-    domain.GetPrivateRecipients = domain.GetPrivateRecipients or function(_self, tab)
-        return {};
-    end
-    ]]
-
     MsgDebug(LOG_TABNET, "Registered domain: %s", domain.ID);
     domains[domain.ID] = domain;
     vars[domain.ID] = {};
@@ -359,7 +350,11 @@ function PLUG:AddVariable(var)
         var.OnGenerate = var.OnGenerate or DEFAULTS[var.Type];
         -- var.OnInit = var.OnInit; (Redundant, no default)
         -- var.OnDeinit = var.OnDeinit; (Redundant, no default)
-        -- var.OnSet = var.OnSet; (Redundant, no default)
+    elseif CLIENT then
+        -- Client doesn't need to know about these.
+        var.OnGenerate = nil;
+        var.OnInit = nil;
+        var.OnDeinit = nil;
     end
 
     MsgDebug(LOG_TABNET, "Registered netvar %s in domain %s.", var.ID, var.Domain);
