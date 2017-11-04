@@ -128,7 +128,7 @@ function PLUG:Connect()
     self:CheckTables();
 
     -- CALL THIS AFTER ALL CHECKS
-    hook.Run("CDatabase_Hook_OnConnected");
+    hook.Run("CDatabase_OnConnected");
 end
 
 -- Check to see if the database is connected.
@@ -208,6 +208,11 @@ function PLUG:Query(query, callback, ...)
             args[#args + 1] = resultsTab;
             callback(unpack(args));
         end);
+
+        return true;
+    else
+        MsgErr("DBNotConnected");
+        return false;
     end
 end
 
@@ -235,9 +240,14 @@ end
 
 -- Check to see if all tables in database struct exist in the database.
 function PLUG:CheckTables()
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
+
     if table.IsEmpty(tables) then
         MsgDebug(LOG_DB, "No tables registered in database. Skipping...");
-        return;
+        return false;
     end
 
     local query, cols, sqlType = "";
@@ -266,18 +276,29 @@ function PLUG:CheckTables()
         MsgDebug(LOG_DB, "Table check complete.");
         self:CheckColumns();
     end);
+
+    return true;
 end
 
 -- Check to see if all columns in database struct exist in the database.
 function PLUG:CheckColumns()
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
 
 end
 
 -- Select a row from the database with certain conditions.
 function PLUG:SelectRow(tab, cols, conds, callback, ...)
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
+
     if !tables[tab] then
         MsgErr("NilEntry", tab);
-        return;
+        return false;
     end
 
     cols = cols or "*";
@@ -306,13 +327,20 @@ function PLUG:SelectRow(tab, cols, conds, callback, ...)
             callback(unpack(args));
         end
     end);
+
+    return true;
 end
 
 -- Insert a new row into the database with data.
 function PLUG:InsertRow(tab, data, callback, ...)
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
+
     if !tables[tab] then
         MsgErr("NilEntry", tab);
-        return;
+        return false;
     end
 
     local query = Format("INSERT INTO %s(", tab);
@@ -334,17 +362,24 @@ function PLUG:InsertRow(tab, data, callback, ...)
             callback(unpack(args));
         end
     end);
+
+    return true;
 end
 
 -- Update an existing row in the database.
 function PLUG:UpdateRow(tab, data, cond, callback, ...)
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
+
     if !tables[tab] then
         MsgErr("NilEntry", tab);
-        return;
+        return false;
     end
     if table.IsEmpty(data) then
         MsgErr("EmptyTable", "data");
-        return;
+        return false;
     end
 
     local query = Format("UPDATE %s SET ", tab);
@@ -369,8 +404,15 @@ function PLUG:UpdateRow(tab, data, cond, callback, ...)
             callback(unpack(args));
         end
     end);
+
+    return true;
 end
 
 function PLUG:RemoveRow()
+    if !self:IsConnected() then
+        MsgErr("DBNotConnected");
+        return false;
+    end
+
     -- todo
 end

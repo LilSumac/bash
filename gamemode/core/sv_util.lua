@@ -10,7 +10,6 @@
 local bash      = bash;
 local isplayer  = isplayer;
 local MsgErr    = MsgErr;
-local vnet      = vnet;
 
 --
 -- Utility functions.

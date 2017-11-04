@@ -23,15 +23,15 @@ local player        = player;
 local function createPlyData(ply)
     MsgLog(LOG_DB, "Creating new row for '%s'...", ply:Name());
 
-    local tablenet = getService("CTableNet");
+    local tablenet = bash.Util.GetPlugin("CTableNet");
     local vars = tablenet:GetDomainVars("Player");
     local data = {};
     for id, var in pairs(vars) do
         data[id] = handleFunc(var.OnGenerate, var, ply);
     end
 
-    local db = getService("CDatabase");
-    db:InsertRow(
+    local db = bash.Util.GetPlugin("CDatabase");
+     if !db:InsertRow(
         "bash_plys",            -- Table to query.
         data,                   -- Data to insert.
 
@@ -45,15 +45,18 @@ local function createPlyData(ply)
         end,
 
         ply                     -- Argument #1 for callback.
-    );
+    ) then
+        local preinit = ply.PreInitTask;
+        preinit:Fail();
+    end
 end
 
 -- Search for a row for a player in the database.
 local function getPlyData(ply)
     MsgDebug(LOG_DB, "Gathering player data for '%s'...", ply:Name());
 
-    local db = getService("CDatabase");
-    db:SelectRow(
+    local db = bash.Util.GetPlugin("CDatabase");
+    if !db:SelectRow(
         "bash_plys",                                        -- Table to query.
         "*",                                                -- Columns to get.
         Format("WHERE SteamID = \'%s\'", ply:SteamID()),    -- Condition to compare against.
@@ -77,12 +80,15 @@ local function getPlyData(ply)
         end,
 
         ply                                                 -- Argument #1 for callback.
-    );
+    ) then
+        local preinit = ply.PreInitTask;
+        preinit:Fail();
+    end
 end
 
 -- Remove all tasks and registry traces from a player on disconnect.
 local function removePly(ply)
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     if ply.RegistryID then
         tabnet:RemoveTable(ply.RegistryID, "Player");
     end
@@ -134,25 +140,41 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
     ctask:AddTaskCondition("bash_PlayerPreInit", "WaitForSQL", TASK_NUMERIC, 0, 1);
     ctask:AddTaskOnBorn("bash_PlayerPreInit", function(task)
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-        data["Player"].PreInitTask = task;
+        local ply = data["Player"];
+
+        if !isplayer(ply) then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        ply.PreInitTask = task;
     end);
     ctask:AddTaskOnStart("bash_PlayerPreInit", function(task)
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-        getPlyData(data["Player"]);
+        local ply = data["Player"];
+
+        if !isplayer(ply) then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        getPlyData(ply);
     end);
     ctask:AddTaskOnFinish("bash_PlayerPreInit", function(status, task)
-        if status == STATUS_FAILED then return; end
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) or !data["SQLData"] then return; end
-
         local ply = data["Player"];
+        local sqlData = data["SQLData"];
+
+        if !isplayer(ply) or !sqlData or status == STATUS_FAILED then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
         local tabnet = bash.Util.GetPlugin("CTableNet");
         local cplayer = bash.Util.GetPlugin("CPlayer");
 
         -- Handle player affairs.
-        tabnet:NewTable("Player", data["SQLData"], data["Player"]);
+        tabnet:NewTable("Player", sqlData, ply);
         bash.Util.PlayerInit(ply);
 
         ply:AddListener("Player", player.GetInitialized(), LISTEN_PUBLIC);  -- Add everyone else as public listeners.
@@ -166,27 +188,38 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
     ctask:AddTaskCondition("bash_PlayerOnInit", "WaitForTableNet", TASK_NUMERIC, 0, 1);
     ctask:AddTaskOnBorn("bash_PlayerOnInit", function(task)
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-        data["Player"].OnInitTask = task;
+        local ply = data["Player"];
+
+        if !isplayer(ply) then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        ply.OnInitTask = task;
     end);
     ctask:AddTaskOnStart("bash_PlayerOnInit", function(task)
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-
         local ply = data["Player"];
-        local tabnet = bash.Util.GetPlugin("CTableNet");
 
+        if !isplayer(ply) then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        local tabnet = bash.Util.GetPlugin("CTableNet");
         -- Handle player affairs.
         tabnet:SendRegistry(ply, true);
     end);
     ctask:AddTaskOnFinish("bash_PlayerOnInit", function(status, task)
-        if status == STATUS_FAILED then return; end
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-
         local ply = data["Player"];
-        local cplayer = bash.Util.GetPlugin("CPlayer");
 
+        if !isplayer(ply) or status == STATUS_FAILED then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        local cplayer = bash.Util.GetPlugin("CPlayer");
         -- Handle player affairs.
         bash.Util.PlayerPostInit(ply);
         ply.OnInitTask = nil;
@@ -195,15 +228,24 @@ hook.Add("GatherPrelimData_Base", "CPlayer_AddTaskFunctions", function()
     -- PostInit
     ctask:AddTaskOnBorn("bash_PlayerPostInit", function(task)
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-        data["Player"].PostInitTask = task;
+        local ply = data["Player"];
+
+        if !isplayer(ply) or status == STATUS_FAILED then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
+
+        if !isplayer(ply) then return; end
+        ply.PostInitTask = task;
     end);
     ctask:AddTaskOnFinish("bash_PlayerPostInit", function(status, task)
-        if status == STATUS_FAILED then return; end
         local data = task:GetPassedData();
-        if !isplayer(data["Player"]) then return; end
-
         local ply = data["Player"];
+
+        if !isplayer(ply) or status == STATUS_FAILED then
+            MsgLog(LOG_WARN, "Initialization process for '%s' failed early! See previous errors.", task.RegistryID);
+            return;
+        end
 
         -- Handle player affairs.
         MsgDebug(LOG_INIT, "Initialize process finished for player '%s'.", ply:Name());

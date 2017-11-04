@@ -12,7 +12,6 @@ local handleFunc    = handleFunc;
 local Material      = Material;
 local MsgErr        = MsgErr;
 local pairs         = pairs;
-local vnet          = vnet;
 
 --
 -- Utility functions.

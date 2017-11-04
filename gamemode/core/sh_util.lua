@@ -181,7 +181,7 @@ function definePlugin_end()
     end
 
     MsgDebug(LOG_INIT, "Registered plugin: %s", plug.ID);
-    bash.PLugins[plug.ID] = plug;
+    bash.Plugins[plug.ID] = plug;
     _G["PLUG"] = nil;
 end
 

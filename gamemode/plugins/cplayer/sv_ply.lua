@@ -35,10 +35,10 @@ end
 -- Plugins functions.
 --
 
-function SVC:KickPlayer(ply, reason, kicker)
+function PLUG:KickPlayer(ply, reason, kicker)
 
 end
 
-function SVC:BanPlayer(ply, reason, length, banner)
+function PLUG:BanPlayer(ply, reason, length, banner)
 
 end

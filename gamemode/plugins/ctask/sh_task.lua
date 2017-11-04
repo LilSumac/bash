@@ -1,12 +1,32 @@
 --[[
-    CTask shared service.
+    CTask shared functionality.
 ]]
 
--- Service storage.
-local tasks = {};
-local activeTasks = getNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
+--
+-- Local storage.
+--
 
-function SVC:AddTask(id)
+-- Micro-optimizations.
+local bash      = bash;
+local ipairs    = ipairs;
+local MsgDebug  = MsgDebug;
+local MsgErr    = MsgErr;
+local pairs     = pairs;
+
+--
+-- Service storage.
+--
+
+-- Task objects.
+local tasks = {};
+local activeTasks = bash.Util.GetNonVolatileEntry("CTask_ActiveTasks", EMPTY_TABLE);
+
+--
+-- Service functions.
+--
+
+-- Add a new task struct.
+function PLUG:AddTask(id)
 
     local task = {};
     task.ID = id;
@@ -21,16 +41,13 @@ function SVC:AddTask(id)
 
 end
 
-function SVC:GetTask(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
-
+-- Get a task struct.
+function PLUG:GetTask(id)
     return tasks[id];
 end
 
-function SVC:AddTaskCondition(id, cond, type, begin, finish)
+-- Add a condition to a task struct.
+function PLUG:AddTaskCondition(id, cond, type, begin, finish)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -49,7 +66,8 @@ function SVC:AddTaskCondition(id, cond, type, begin, finish)
     };
 end
 
-function SVC:AddTaskOnBorn(id, func)
+-- Add an OnBorn callback to a task struct.
+function PLUG:AddTaskOnBorn(id, func)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -59,7 +77,8 @@ function SVC:AddTaskOnBorn(id, func)
     task.OnBorn = func;
 end
 
-function SVC:AddTaskOnStart(id, func)
+-- Add an OnStart callback to a task struct.
+function PLUG:AddTaskOnStart(id, func)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -69,7 +88,8 @@ function SVC:AddTaskOnStart(id, func)
     task.OnStarts[#task.OnStarts + 1] = func;
 end
 
-function SVC:AddTaskOnFinish(id, func)
+-- Add an OnFinish callback to a task struct.
+function PLUG:AddTaskOnFinish(id, func)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -79,7 +99,8 @@ function SVC:AddTaskOnFinish(id, func)
     task.OnFinishes[#task.OnFinishes + 1] = func;
 end
 
-function SVC:AddTaskOnDeath(id, func)
+-- Add an OnDeath callback to a task struct.
+function PLUG:AddTaskOnDeath(id, func)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -89,7 +110,8 @@ function SVC:AddTaskOnDeath(id, func)
     task.OnDeath = func;
 end
 
-function SVC:AddNextTask(id, nextID)
+-- Add a task to be executed after another task struct.
+function PLUG:AddNextTask(id, nextID)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -103,14 +125,15 @@ function SVC:AddNextTask(id, nextID)
     task.NextTasks[#task.NextTasks + 1] = nextID;
 end
 
-function SVC:NewTask(id, passed)
+-- Create an instance of a new task.
+function PLUG:NewTask(id, passed)
     if !tasks[id] then
         MsgErr("NilEntry", id);
         return;
     end
 
     local task = tasks[id];
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     local newTask = tabnet:NewTable("Task");
     newTask.TaskID = id;
     newTask.InScope = true;
@@ -119,11 +142,8 @@ function SVC:NewTask(id, passed)
     return newTask;
 end
 
-function SVC:GetActiveTask(id)
-    if !id then
-        MsgErr("NilArgs", "id");
-        return;
-    end
+-- Get an active task object.
+function PLUG:GetActiveTask(id)
     if !activeTasks[id] then
         MsgErr("NilEntry", id);
         return;
@@ -132,7 +152,8 @@ function SVC:GetActiveTask(id)
     return activeTasks[id];
 end
 
-function SVC:RemoveActiveTask(id)
+-- Remove an active task object.
+function PLUG:RemoveActiveTask(id)
     local task = self:GetActiveTask(id);
     local regID = task.RegistryID;
     local taskID = task.TaskID;
@@ -149,14 +170,16 @@ function SVC:RemoveActiveTask(id)
         taskInfo.OnDeath(status, task);
     end
 
-    local tabnet = getService("CTableNet");
+    local tabnet = bash.Util.GetPlugin("CTableNet");
     tabnet:RemoveTable(regID, "Task");
     activeTasks[regID] = nil;
 
-    local newTask;
-    for _, nextID in pairs(taskInfo.NextTasks) do
-        newTask = self:NewTask(nextID);
-        newTask:SetNetVar("Task", "PassedData", passed);
-        newTask:Start();
+    if status == STATUS_SUCCESS then
+        local newTask;
+        for _, nextID in pairs(taskInfo.NextTasks) do
+            newTask = self:NewTask(nextID);
+            newTask:SetNetVar("Task", "PassedData", passed);
+            newTask:Start();
+        end
     end
 end

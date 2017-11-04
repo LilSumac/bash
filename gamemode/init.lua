@@ -11,7 +11,7 @@ DeriveGamemode("sandbox");
 
 -- If there's a refresh, let 'em know.
 if bash and bash.Started then
-    MsgCon(LOG_WARN, "Gamemode is reloading!");
+    MsgLog(LOG_WARN, "Gamemode is reloading!");
     hook.Run("OnReload");
 end
 

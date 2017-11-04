@@ -18,7 +18,7 @@ local string = string;
 function string.random(len, chars, pre)
     if len < 0 then return; end
     if len == 0 then return ""; end
-    
+
     len = len or 8;
     chars = chars or CHAR_ALPHANUM;
     pre = pre or "";
@@ -26,7 +26,7 @@ function string.random(len, chars, pre)
     local lenChars = #chars;
     local ran, index = {}, 0;
     while index != len do
-        ran[index + 1] = math.random(1, lenChars);
+        ran[index + 1] = chars[math.random(1, lenChars)];
         index = index + 1;
     end
     return pre .. table.concat(ran);

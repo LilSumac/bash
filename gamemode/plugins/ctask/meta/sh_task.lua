@@ -2,6 +2,9 @@
     CTask main metatable.
 ]]
 
+-- Start meta definition.
+defineMeta_start("CTask");
+
 --
 -- Local storage.
 --
@@ -181,7 +184,7 @@ function META:Update(cond, value)
     end
     self:SetNetVar("Task", "Values", values);
 
-    if self:CheckConditions() then
+    if status <= 1 and self:CheckConditions() then
         self:Finish(STATUS_SUCCESS);
     end
 end
@@ -192,7 +195,9 @@ function META:Fail()
 end
 
 -- Finish a task.
-function META:Finish(status)
+function META:Finish(status, force)
+    local curStatus = self:GetNetVar("Task", "Status");
+    if curStatus >= 2 then return; end
     self:SetNetVar("Task", "Status", status);
 
     local ctask = bash.Util.GetPlugin("CTask");
@@ -215,3 +220,6 @@ function META:CheckConditions()
     end
     return true;
 end
+
+-- End meta definition.
+defineMeta_end();

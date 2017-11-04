@@ -21,7 +21,7 @@ DeriveGamemode("sandbox");
 
 -- If there's a refresh, let 'em know.
 if bash and bash.Started then
-    MsgCon()
+    MsgLog(LOG_WARN, "Gamemode is reloading!");
     hook.Run("OnReload");
 end
 
@@ -38,8 +38,8 @@ bash.NonVolatile = bash.NonVolatile or {};
 -- Refresh/init util table.
 bash.Util = {};
 include("core/sh_const.lua");
-include("core/cl_util.lua");
 include("core/sh_util.lua");
+include("core/cl_util.lua");
 
 -- Materials should persist.
 bash.Materials = bash.Util.GetNonVolatileEntry("CachedMaterials", EMPTY_TABLE);

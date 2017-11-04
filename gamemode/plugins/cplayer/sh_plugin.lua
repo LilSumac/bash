@@ -12,8 +12,8 @@ PLUG.Desc = "A framework that handles all player-related functionalities.";
 PLUG.Depends = {"CDatabase", "CTableNet", "CTask"};
 
 -- Process plugin contents.
-bash.util.ProcessFile("sv_ply.lua");
-bash.util.ProcessDir("hooks");
+bash.Util.ProcessFile("sv_ply.lua");
+bash.Util.ProcessDir("hooks");
 
 -- End plugin definition.
 definePlugin_end();
