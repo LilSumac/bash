@@ -14,6 +14,17 @@ local MsgErr        = MsgErr;
 local pairs         = pairs;
 
 --
+-- Global utility functions.
+-- Functions that are simple/common enough that they can
+-- be their own global variable.
+--
+
+-- Check to see if a variable is a panel and a valid one.
+function ispanel(panel)
+    return panel and panel.IsValid and panel:IsValid();
+end
+
+--
 -- Utility functions.
 --
 

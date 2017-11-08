@@ -48,8 +48,8 @@ end
 
 --
 -- Global utility functions.
--- Functions that are simple enough that they can be their own
--- global variable.
+-- Functions that are simple/common enough that they can
+-- be their own global variable.
 --
 
 -- Send something to the output and log if verbose mode is enabled.

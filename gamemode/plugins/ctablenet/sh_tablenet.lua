@@ -79,7 +79,7 @@ local function checkListenerTable(tab, domain)
 end
 
 --
--- Plugins functions.
+-- Plugin functions.
 --
 
 -- Add/edit a domain struct.
