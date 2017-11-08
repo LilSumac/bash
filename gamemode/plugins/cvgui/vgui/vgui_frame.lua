@@ -130,7 +130,7 @@ function PANEL:Close()
 end
 
 --
--- Panel functions.
+-- BFrame functions.
 --
 
 function PANEL:ShowingTopBar()
