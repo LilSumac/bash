@@ -14,5 +14,3 @@
 function PLUG:RegisterClass()
 
 end
-
-function PLUG:

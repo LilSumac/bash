@@ -1,5 +1,5 @@
 --[[
-    BFrame panel.
+    bash.Frame element.
 ]]
 
 --
@@ -27,72 +27,35 @@ local PANEL = {};
 
 function PANEL:Init()
     -- Components.
-    self.Title = "";
     self.TopBar = nil;
     self.Navigation = nil;
     self.Content = nil;
+    self.Scheme = SCHEME_BASH;
+    self.TopBarHeight = 30;
 
-    -- Sizes.
-    self.TopBarHeight = 24;
+    -- Default size.
+    self:SetSize(200, self.TopBarHeight);
+
+    gui.EnableScreenClicker(true);
 
     local parent = self:GetParent();
+
     -- Only independent panels should have a top bar.
-    self.ShowTopBar = !ispanel(parent);
+    self.ShowTopBar = isbasepanel(parent);
+    MsgN(self.ShowTopBar);
+    if self.ShowTopBar then
+        self.TopBar = vgui.Create("bash.TopBar", self);
+        self.TopBar:SetPos(0, 0);
+        self.TopBar:SetSize(200, self.TopBarHeight);
+    end
 
     self.ShowingNavigation = false;
     self.NavigationType = nil;
-
-    -- Colors.
-    self.Scheme = SCHEME_BASH;
-    --[[
-    self.BackgroundCol = SCHEME_BASH["TopBar"];
-    self.ButtonHover = SCHEME_BASH["ButtonHover"];
-    self.ButtonTextPassive = SCHEME_BASH["ButtonTextPassive"];
-    self.ButtonTextHover = SCHEME_BASH["ButtonTextHover"];
-    ]]
-
-    -- Default size.
-    self:SetSize(300, 200);
-
-    -- Topbar buttons.
-    self.CloseButton = vgui.Create("DButton", self);
-    self.CloseButton:SetText("");
-    self.CloseButton:SetSize(self.TopBarHeight, self.TopBarHeight);
-    self.CloseButton.Paint = function(_self, w, h)
-        local bgCol, textCol;
-        if _self:IsHovered() then
-            bgCol = self.ButtonHover;
-            textCol = self.ButtonTextHover;
-        else
-            bgCol = self.BackgroundCol;
-            textCol = self.ButtonTextPassive;
-        end
-
-        surface.SetDrawColor(bgCol);
-        surface.DrawRect(0, 0, w, h);
-
-        draw.SimpleText("r", "marlett", w / 2, h / 2, textCol, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
-    end
-    self.CloseButton.DoClick = function(_self)
-        self:Close();
-    end
 
     self:InvalidateLayout();
 end
 
 function PANEL:Paint(w, h)
-    -- Draw topbar.
-    surface.SetDrawColor(self.BackgroundCol);
-    surface.DrawRect(0, 0, w, self.TopBarHeight);
-
-    -- Draw topbar title.
-    if self.Title != "" then
-        draw.SimpleText(
-            self.Title, "cvgui-title",
-            4, 4, self.ButtonTextPassive
-        );
-    end
-
     -- Prevent the default background from being drawn.
     return true;
 end
@@ -102,14 +65,18 @@ function PANEL:PerformLayout(w, h)
     local setW, setH = w, h;
 
     if self.ShowTopBar then
-        if !ispanel(self.TopBar) then
-            self.TopBar = vgui.Create("Panel", self);
+        if ispanel(self.TopBar) then
+            self.TopBar:SetPos(0, 0);
+            self.TopBar:SetSize(w, self.TopBarHeight);
         end
     else
-
+        if ispanel(self.TopBar) then
+            self.TopBar:Remove();
+            self.TopBar = nil;
+        end
     end
 
-    if ispanel(parent) and parent.GetMaxContentSize then
+    if !isbasepanel(parent) and parent.GetMaxContentSize then
         local parX, parY = parent:GetMaxContentSize();
         self:SetSize(parX, parY);
         self.MaxContX = parX - (self.ShowNavigation and self.Navigation:GetWide() or 0);
@@ -117,8 +84,6 @@ function PANEL:PerformLayout(w, h)
     else
         self.MaxContX, self.MaxContY = 200, 200;
     end
-
-    self.CloseButton:SetPos(w - self.TopBarHeight, 0);
 end
 
 function PANEL:Close()
@@ -130,7 +95,7 @@ function PANEL:Close()
 end
 
 --
--- BFrame functions.
+-- bash.Frame functions.
 --
 
 function PANEL:ShowingTopBar()
@@ -142,6 +107,12 @@ function PANEL:SetShowTopBar(show)
     self:InvalidateLayout();
 end
 
+function PANEL:SetTitleText(text)
+    if ispanel(self.TopBar) then
+        self.TopBar:SetTitleText(text);
+    end
+end
+
 function PANEL:ShowingNavigation()
     return self.ShowNavigation, self.NavigationType;
 end
@@ -149,10 +120,6 @@ end
 function PANEL:SetShowNavigation(show)
     self.ShowNavigation = show;
     self:InvalidateLayout();
-end
-
-function PANEL:SetTitleText(text)
-    self.Title = text;
 end
 
 function PANEL:SetContent(panel)
@@ -166,6 +133,14 @@ end
 
 function PANEL:SetMaxContentSize(x, y)
     self.MaxContX, self.MaxContY = x, y;
+end
+
+function PANEL:IsScreenLocked()
+    return self.ScreenLocked;
+end
+
+function PANEL:SetScreenLock(lock)
+    self.ScreenLocked = lock;
 end
 
 vgui.Register("bash.Frame", PANEL, "EditablePanel");

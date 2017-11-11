@@ -18,7 +18,7 @@ if CLIENT then
 
     -- Color scheme.
     SCHEME_BASH = {};
-    SCHEME_BASH["TopBar"] = Color(32, 34, 37);
+    SCHEME_BASH["TopBar"] = Color(32, 34, 37, 240);
     SCHEME_BASH["ButtonPassive"] = Color(32, 34, 37);
     SCHEME_BASH["ButtonHover"] = Color(42, 44, 47);
     SCHEME_BASH["ButtonTextPassive"] = Color(165, 166, 167);
@@ -38,6 +38,7 @@ if CLIENT then
 end
 
 -- Process plugin contents.
+--bash.Util.ProcessFile("cl_skin.lua");
 bash.Util.ProcessDir("vgui");
 
 -- End plugin definition.

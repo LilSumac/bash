@@ -24,6 +24,11 @@ function ispanel(panel)
     return panel and panel.IsValid and panel:IsValid();
 end
 
+-- Check to see if a variable is the base GMod panel.
+function isbasepanel(panel)
+    return ispanel(panel) and panel:GetName() == "GModBase";
+end
+
 --
 -- Utility functions.
 --

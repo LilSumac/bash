@@ -83,6 +83,7 @@ MsgC(color_cyan, "======================== BASE COMPLETE =======================
 
 
 // testing
+--[[
 local str = "The quick brown fox jumps over the lazy dog.";
 local font = "bash-regular";
 hook.Remove("HUDPaint", "asdf");
@@ -96,3 +97,4 @@ hook.Add("HUDPaint", "asdf", function()
         TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_white
     );
 end);
+]]

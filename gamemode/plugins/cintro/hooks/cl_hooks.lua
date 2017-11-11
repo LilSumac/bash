@@ -32,9 +32,22 @@ hook.Add("InitPostEntity", "CIntro_StartProcess", function()
     if LocalPlayer().IntroFinished then return; end
 
     if !LocalPlayer().IntroFrame then
-        local introFrame = vgui.Create("BFrame");
+        local introFrame = vgui.Create("bash.Frame");
         introFrame:SetTitleText("Intr0");
         introFrame:SetScreenLock(true);
+
+        --[[
+        local introFrame = vgui.Create("DFrame");
+        introFrame:SetSize(400, 300);
+        introFrame:MakePopup();
+        local form = vgui.Create("DForm", introFrame);
+        form:Dock(FILL);
+
+        local but = vgui.Create("DButton", form);
+        but:SetText("Heyo!");
+        form:AddItem(but);
+        ]]
+
         LocalPlayer().IntroFrame = introFrame;
     end
 

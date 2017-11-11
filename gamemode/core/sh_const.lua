@@ -69,7 +69,7 @@ OS_OSX = 2;
 OS_LIN = 3;
 OS_UNK = 4;
 
-PREFIXES_CLIENT = {["cl_"] = true, ["vgui"] = true};
+PREFIXES_CLIENT = {["cl_"] = true, ["vgui_"] = true};
 PREFIXES_SERVER = {["sv_"] = true};
 PREFIXES_SHARED = {["sh_"] = true};
 
