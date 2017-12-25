@@ -1,0 +1,7 @@
+--[[
+    Engine network strings.
+]]
+
+-- Network strings for the engine.
+util.AddNetworkString("bash_Net_SendClientData");
+util.AddNetworkString("bash_Net_RespondToClient");
