@@ -38,9 +38,10 @@ function bash.Util.AddClientData(id, generate)
 end
 
 -- Send stored client data to server.
-function bash.Util.SendClientData(first)
+function bash.Util.SendClientData(first, ids)
     local send = vnet.CreatePacket("bash_Net_SendClientData");
     local data = {};
+    local tab = bash.ClientData or ids;
     for id, generate in pairs(bash.ClientData) do
         data[id] = handleFunc(generate);
     end

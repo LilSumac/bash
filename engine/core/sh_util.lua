@@ -73,8 +73,7 @@ function bash.Util.MsgDebug(log, text, ...)
     -- TODO: Add the real debug mode condition.
     --if !bash.DebugMode then return; end
 
-    local args = {...};
-    bash.Util.MsgLog(log, text, unpack(args));
+    bash.Util.MsgLog(log, text, ...);
 end
 
 -- Send something to the output as an error with a trace and log.
@@ -96,7 +95,7 @@ function bash.Util.MsgErr(errType, ...)
         fromInfo = debug.getinfo(3);
     end
 
-    local gm = (GM and GM.Name) or (GAMEMODE and GAMEMODE.Name);
+    local gm = (GM and GM.FolderName) or (GAMEMODE and GAMEMODE.FolderName);
     if PLUGIN then
         gm = gm .. " > " .. PLUGIN.Name;
     end
@@ -116,27 +115,32 @@ function bash.Util.AddErrType(name, str)
     ERR_TYPES[name] = str;
 end
 
--- Process a file based on its prefix.
-function bash.Util.ProcessFile(file)
+-- Process a file based on its prefix or the given argument.
+function bash.Util.ProcessFile(file, forceScope)
     local pre = file:GetFileFromFilename();
     pre = pre:sub(1, pre:find('_', 1));
-    if PREFIXES_CLIENT[pre] then
+    if PREFIXES_CLIENT[pre] or forceScope == "CLIENT" then
         if CLIENT then include(file);
         else AddCSLuaFile(file); end
-    elseif PREFIXES_SERVER[pre] then
+    elseif PREFIXES_SERVER[pre] or forceScope == "SERVER" then
         if SERVER then include(file); end
-    elseif PREFIXES_SHARED[pre] then
+    elseif PREFIXES_SHARED[pre] or forceScope == "SHARED" then
         if CLIENT then include(file);
         else AddCSLuaFile(file); include(file); end
     end
 end
 
--- Process all files in a directory based on working directory.
-function bash.Util.ProcessDir(dir)
-    local from = debug.getinfo(2);
-    local src = from.short_src;
-    src = src:GetPathFromFilename();
-    src = src:Replace("gamemodes/", "");
+-- Process all files in a directory relative to the root gamemode folder or CWD.
+function bash.Util.ProcessDir(dir, relative)
+    local src;
+    if relative then
+        local from = debug.getinfo(2);
+        src = from.short_src;
+        src = src:GetPathFromFilename();
+        src = src:Replace("gamemodes/", "");
+    else
+        src = GM.FolderName .. "/";
+    end
     src = src .. dir .. "/";
 
     local files, dirs = file.Find(src .. "*.lua", "LUA", nameasc);

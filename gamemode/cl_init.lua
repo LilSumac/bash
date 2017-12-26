@@ -1,3 +1,4 @@
+--[[
 -- Things that should be done, regardless of refresh or not.
 local function miscInit()
     -- Random seed!
@@ -80,21 +81,9 @@ MsgLog(LOG_DEF, "Doing base post-init calls...");
 hook.Run("PostInitCalls_Base");
 
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
-
-
-// testing
---[[
-local str = "The quick brown fox jumps over the lazy dog.";
-local font = "bash-regular";
-hook.Remove("HUDPaint", "asdf");
-hook.Add("HUDPaint", "asdf", function()
-    surface.SetFont(font);
-    local x, y = surface.GetTextSize(str);
-    draw.RoundedBox(0, CENTER_X, CENTER_Y, x + 8, y + 8, color_grey);
-    draw.SimpleText(
-        str, font,
-        CENTER_X + 4, CENTER_Y + 4, color_white,
-        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_white
-    );
-end);
 ]]
+
+GM.Name = "/bash/";
+GM.Author = "LilSumac";
+
+include("bash/engine/core/cl_boot.lua");

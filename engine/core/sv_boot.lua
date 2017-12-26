@@ -8,7 +8,7 @@ local function miscInit()
     math.randomseed(os.time());
 end
 
--- Base relies on sandbox elements.
+-- Engine relies on sandbox elements.
 DeriveGamemode("sandbox");
 
 -- If there's a refresh, let 'em know.
@@ -17,23 +17,20 @@ if bash and bash.Started then
     hook.Call("OnReload");
 end
 
--- Report base startup.
-MsgC(Color(0, 255, 255), "======================== BASE STARTED ========================\n");
+-- Report engine startup.
+MsgC(Color(0, 255, 255), "======================== ENGINE STARTED ========================\n");
 miscInit();
 
 -- Global table for bash elements.
-bash = bash or {};
+bash = bash or {StartTime = SysTime()};
 local bash = bash;
-bash.StartTime = SysTime();
+bash.RefreshTime = SysTime();
 -- bash.Dev.DevMode = true;
 
 -- Send files to server.
 AddCSLuaFile("sh_const.lua");
 AddCSLuaFile("sh_util.lua");
 AddCSLuaFile("cl_util.lua");
-AddCSLuaFile("sh_hook.lua");
-AddCSLuaFile("sh_memory.lua");
-AddCSLuaFile("sh_plugin.lua");
 
 -- Include required util/global table.
 include("sh_const.lua");
@@ -41,35 +38,51 @@ include("sh_util.lua");
 include("sv_util.lua");
 include("sv_netpool.lua");
 
--- Include all other engine components.
-include("sh_hook.lua");
-include("sh_memory.lua");
-include("sh_plugin.lua");
-include("sv_resources.lua");
-bash.Util.ProcessDir("external");
-bash.Util.ProcessDir("hooks");
-bash.Util.ProcessDir("libraries");
-
 -- Things that should be done on engine start.
-function bash.EngineStart()
+function bash.StartEngine()
+    -- Include all other engine components.
+    bash.Util.ProcessFile("sh_hook.lua");
+    bash.Util.ProcessFile("sh_memory.lua");
+    bash.Util.ProcessFile("sh_plugin.lua");
+    bash.Util.ProcessFile("sh_schema.lua");
+    bash.Util.ProcessFile("sv_resources.lua");
+    bash.Util.ProcessDir("engine/external");
+    bash.Util.ProcessDir("engine/hooks");
+    bash.Util.ProcessDir("engine/libraries");
+
     -- Client data should persist.
     bash.ClientData = bash.Memory.GetNonVolatile("ClientData", EMPTY_TABLE);
 
     -- Hooks for init process.
     bash.Util.MsgLog(LOG_INIT, "Creating engine preliminary structures...");
-    hook.Call("CreateStructures_Engine");
+    hook.Run("CreateStructures_Engine");
     bash.Util.MsgLog(LOG_INIT, "Starting engine sub-systems...");
-    hook.Call("StartSystems_Engine");
+    hook.Run("StartSystems_Engine");
 
     -- Report startup time.
-    local len = math.Round(SysTime() - bash.StartTime, 8);
-    bash.Util.MsgLog(LOG_INIT, "Successfully started engine server-side. Startup: %fs", len);
+    local len = math.Round(SysTime() - (bash.Started and bash.RefreshTime or bash.StartTime), 8);
+    bash.Util.MsgLog(LOG_INIT, "Successfully %s engine server-side. Startup: %fs", (bash.Started and "refreshed" or "started"), len);
     bash.Started = true;
 
-    bash.Util.MsgLog(LOG_DEF, "Calling engine post-init hooks...");
-    hook.Call("PostInit_Engine");
+    bash.Util.MsgLog(LOG_INIT, "Calling engine post-init hooks...");
+    hook.Run("PostInit_Engine");
+
+    -- Load engine plugins.
+    bash.Util.MsgLog(LOG_INIT, "Loading engine plugins...");
+    bash.Plugins.Process();
 end
 
 -- Start the engine.
-bash.EngineStart();
-MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
+bash.StartEngine();
+MsgC(color_cyan, "======================== ENGINE COMPLETE ========================\n");
+
+
+
+
+
+
+
+
+
+bash.Testing = bash.TableNet.NewTable();
+PrintTable(bash.Testing);

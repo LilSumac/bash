@@ -18,14 +18,33 @@ hook.CallEngine = hook.CallEngine or hook.Call;
 
 -- New hook.Call function for plugins and schema.
 function hook.Call(hookID, gm, ...)
-    local pluginHooks = bash.Plugin.HookCache[hookID];
+    local pluginHooks = bash.Plugins.HookCache[hookID];
+    local success, result;
     if pluginHooks then
-        -- TODO: Call plugin hooks.
+        for plugin, func in pairs(pluginHooks) do
+            success, result = pcall(func, plugin, ...);
+            if success then
+                result = {result};
+                if #result > 0 then
+                    return unpack(result);
+                end
+            else
+                bash.Util.MsgErr("HookError", hookID, plugin.UniqueID, result);
+            end
+        end
     end
 
     if SCHEMA and SCHEMA[hookID] then
-        -- TODO: Call schema hook.
+        success, result = pcall(SCHEMA[hookID], SCHEMA, ...);
+        if success then
+            result = {result};
+            if #result > 0 then
+                return unpack(result);
+            end
+        else
+            bash.Util.MsgErr("HookError", hookID, SCHEMA.Name, result);
+        end
     end
 
-    -- TODO: Do other stuff.
+    hook.CallEngine(hookID, gm, ...);
 end

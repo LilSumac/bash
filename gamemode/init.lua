@@ -1,3 +1,4 @@
+--[[
 --FProfiler.start();
 
 -- Things that should be done, regardless of refresh or not.
@@ -72,3 +73,10 @@ concommand.Add("bench", function(ply, cmd, args)
         tabnet:NewTable("Char");
     end
 end);
+]]
+
+GM.Name = "/bash/";
+GM.Author = "LilSumac";
+
+AddCSLuaFile("bash/engine/core/cl_boot.lua");
+include("bash/engine/core/sv_boot.lua");
