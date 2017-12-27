@@ -18,13 +18,6 @@ local resChanged = false;
 -- Engine hooks.
 --
 
--- Let the server know we're ready.
-hook.Add("InitPostEntity", "bash_ClientInit", function()
-    bash.Util.MsgLog(LOG_INIT, "Contacting server...");
-    bash.Util.SendClientData(true);
-    bash.ServerResponded = false;
-end);
-
 -- Detect if the resolution has been changed.
 hook.Add("HUDPaint", "bash_ResChanged", function()
     if SCRW != ScrW() then
@@ -42,6 +35,14 @@ hook.Add("HUDPaint", "bash_ResChanged", function()
         resChanged = false;
         hook.Run("ResolutionChanged", w, h);
     end
+end);
+
+
+-- Let the server know we're ready.
+hook.Add("InitPostEntity", "bash_ClientInit", function()
+    bash.Util.MsgLog(LOG_INIT, "Contacting server...");
+    bash.Util.SendClientData(true);
+    bash.ServerResponded = false;
 end);
 
 --

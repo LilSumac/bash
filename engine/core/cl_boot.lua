@@ -23,9 +23,6 @@ local function miscInit()
 	});
 end
 
--- Engine relies on sandbox elements.
-DeriveGamemode("sandbox");
-
 -- If there's a refresh, let 'em know.
 if bash and bash.Started then
     bash.Util.MsgLog(LOG_WARN, "Gamemode is reloading!");
@@ -47,25 +44,19 @@ include("sh_const.lua");
 include("sh_util.lua");
 include("cl_util.lua");
 
-
-include("sh_hook.lua");
-include("sh_memory.lua");
-include("sh_plugin.lua");
-
-
 -- Things that should be done on engine start.
 function bash.EngineStart()
     -- Include all other engine components.
     bash.Util.ProcessFile("sh_hook.lua");
-    bash.Util.ProcessFile("sh_memory.lua");
     bash.Util.ProcessFile("sh_plugin.lua");
     bash.Util.ProcessFile("sh_schema.lua");
     bash.Util.ProcessDir("engine/external");
+    bash.Util.ProcessDir("engine/config");
     bash.Util.ProcessDir("engine/hooks");
     bash.Util.ProcessDir("engine/libraries");
 
     -- Materials should persist.
-    bash.Materials = bash.Memory.GetNonVolatile("CachedMaterials", EMPTY_TABLE);
+    bash.Materials = bash.Materials or {};
 
     -- Add default client data.
     bash.Util.AddClientData("Country", system.GetCountry);
@@ -97,7 +88,7 @@ function bash.EngineStart()
 
     -- Load engine plugins.
     bash.Util.MsgLog(LOG_INIT, "Loading engine plugins...");
-    bash.Plugins.Process();
+    bash.Plugin.Process();
 end
 
 -- Start the engine.
@@ -105,7 +96,16 @@ bash.EngineStart();
 MsgC(color_cyan, "======================== ENGINE COMPLETE ========================\n");
 
 
-// testing
+
+
+
+
+--
+-- TESTING
+--
+
+
+
 --[[
 local str = "The quick brown fox jumps over the lazy dog.";
 local font = "bash-regular";
@@ -121,3 +121,33 @@ hook.Add("HUDPaint", "asdf", function()
     );
 end);
 ]]
+
+concommand.Add("printreg", function(ply, cmd, args)
+    PrintTable(bash.TableNet.Registry);
+end);
+
+concommand.Add("printchar", function(ply, cmd, args)
+    MsgN(ply);
+    local char = ply:GetCharacter();
+    if !char then
+        MsgN("No character.");
+    else
+        PrintTable(char);
+    end
+end);
+
+hook.Add("HUDPaint", "somebullshit", function()
+    local traceInfo = {
+        start = LocalPlayer():EyePos(),
+        endpos = LocalPlayer():EyePos() + LocalPlayer():GetAimVector() * 2000,
+        filter = LocalPlayer()
+    };
+    local trace = util.TraceLine(traceInfo);
+    local traceEnt = trace.Entity;
+    local traceIndex = traceEnt:EntIndex();
+
+    if traceEnt:GetCharacter() then
+        local char = traceEnt:GetCharacter();
+        draw.SimpleText(char:Get("Name"), "ChatFont", CENTER_X, CENTER_Y, color_red, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+    end
+end);

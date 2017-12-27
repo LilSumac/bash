@@ -53,7 +53,7 @@ function bash.StartSchema()
 
     -- Load schema plugins.
     bash.Util.MsgLog(LOG_INIT, "Loading schema plugins...");
-    bash.Plugins.Process();
+    bash.Plugin.Process();
 
     MsgC(color_purple, "======================== SCHEMA COMPLETE ========================\n");
 end

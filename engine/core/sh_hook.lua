@@ -18,7 +18,7 @@ hook.CallEngine = hook.CallEngine or hook.Call;
 
 -- New hook.Call function for plugins and schema.
 function hook.Call(hookID, gm, ...)
-    local pluginHooks = bash.Plugins.HookCache[hookID];
+    local pluginHooks = bash.Plugin.HookCache[hookID];
     local success, result;
     if pluginHooks then
         for plugin, func in pairs(pluginHooks) do
@@ -46,5 +46,5 @@ function hook.Call(hookID, gm, ...)
         end
     end
 
-    hook.CallEngine(hookID, gm, ...);
+    return hook.CallEngine(hookID, gm, ...);
 end

@@ -6,7 +6,8 @@
 BASE_NAME = "/bash/";
 BASE_FOLDER = "bash";
 
-CHAR_ALPHANUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+CHAR_ALPHA = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+CHAR_ALPHANUM = CHAR_ALPHA .. "0123456789";
 CHAR_HEX = "abcdef0123456789";
 CHAR_ALL = CHAR_ALPHANUM .. "!@#$%^&*()-_=+{}[]|;:<,>.?/";
 
@@ -55,6 +56,7 @@ ERR_TYPES["InvalidPly"] = "Invalid player argument!";
 ERR_TYPES["InvalidVarArgs"] = "Invalid number of varible arguments!";
 ERR_TYPES["HookError"] = "The '%s' hook from '%s' has failed! Result: %s";
 ERR_TYPES["SchemaOnBase"] = "Tried loading the engine as the schema! Call bash.StartSchema() in a separate gamemode.";
+ERR_TYPES["NoDBConnect"] = "Could not connect to database: %s";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";

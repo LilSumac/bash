@@ -82,7 +82,7 @@ function bash.Util.MsgErr(errType, ...)
     local errMsg = ERR_TYPES[errType] or ERR_TYPES["Generic"];
     local args = {...};
     local _, count = errMsg:gsub("%%", "");
-    if #args != count then
+    if #args != count and errType != "Generic" then
         bash.Util.MsgErr("InvalidVarArgs");
         return;
     end

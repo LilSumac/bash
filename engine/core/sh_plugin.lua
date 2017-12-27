@@ -12,10 +12,10 @@ local bash = bash;
 -- Global storage.
 --
 
-bash.Plugins                = bash.Plugins or {};
-bash.Plugins.Registered     = bash.Plugins.Registered or {};
-bash.Plugins.HookCache      = bash.Plugins.HookCache or {};
-bash.Plugins.EngineLoaded   = false;
+bash.Plugin                 = bash.Plugin or {};
+bash.Plugin.Registered      = bash.Plugin.Registered or {};
+bash.Plugin.HookCache       = bash.Plugin.HookCache or {};
+bash.Plugin.EngineLoaded    = false;
 
 --
 -- Plugin functions.
@@ -25,16 +25,16 @@ bash.Plugins.EngineLoaded   = false;
 local function registerHooks()
     for name, func in pairs(PLUGIN) do
         if type(func) == "function" then
-            bash.Plugins.HookCache[name] = bash.Plugins.HookCache[name] or {};
-            bash.Plugins.HookCache[name][PLUGIN] = func;
+            bash.Plugin.HookCache[name] = bash.Plugin.HookCache[name] or {};
+            bash.Plugin.HookCache[name][PLUGIN] = func;
         end
     end
 end
 
 -- Process all plugins located in the working directory.
-function bash.Plugins.Process()
+function bash.Plugin.Process()
     local src = SCHEMA and SCHEMA.FolderName or BASE_FOLDER;
-    if src == BASE_FOLDER and bash.Plugins.EngineLoaded then return; end
+    if src == BASE_FOLDER and bash.Plugin.EngineLoaded then return; end
     src = src .. "/plugins/";
 
     --[[
@@ -52,7 +52,7 @@ function bash.Plugins.Process()
         uniqueID = _file:GetFileFromFilename():StripExtension();
         plugSrc = src .. _file;
 
-        PLUGIN = bash.Plugins.Get(uniqueID) or {
+        PLUGIN = bash.Plugin.Get(uniqueID) or {
             UniqueID = uniqueID,
             Name = uniqueID,
             SrcPath = plugSrc,
@@ -67,7 +67,7 @@ function bash.Plugins.Process()
         registerHooks();
         hook.Run("ProcessPlugin", uniqueID);
 
-        bash.Plugins.Registered[uniqueID] = PLUGIN;
+        bash.Plugin.Registered[uniqueID] = PLUGIN;
         PLUGIN = nil;
     end
 
@@ -83,7 +83,7 @@ function bash.Plugins.Process()
             continue;
         end
 
-        PLUGIN = bash.Plugins.Get(uniqueID) or {
+        PLUGIN = bash.Plugin.Get(uniqueID) or {
             UniqueID = uniqueID,
             Name = uniqueID,
             SrcPath = plugSrc,
@@ -94,26 +94,26 @@ function bash.Plugins.Process()
         };
 
         bash.Util.ProcessFile(plugSrc .. "sh_plugin.lua");
-        bash.Plugins.ProcessEntities(plugSrc);
-        bash.Plugins.ProcessWeapons(plugSrc);
-        bash.Plugins.ProcessEffects(plugSrc);
+        bash.Plugin.ProcessEntities(plugSrc);
+        bash.Plugin.ProcessWeapons(plugSrc);
+        bash.Plugin.ProcessEffects(plugSrc);
 
         registerHooks();
         hook.Run("ProcessPlugin", uniqueID);
 
-        bash.Plugins.Registered[uniqueID] = PLUGIN;
+        bash.Plugin.Registered[uniqueID] = PLUGIN;
         PLUGIN = nil;
     end
 
-    bash.Plugins.CheckDependencies();
+    bash.Plugin.CheckDependencies();
 
     if src == "/bash/plugins/" then
-        bash.Plugins.EngineLoaded = true;
+        bash.Plugin.EngineLoaded = true;
     end
 end
 
 -- Process entity files in plugin.
-function bash.Plugins.ProcessEntities(dir)
+function bash.Plugin.ProcessEntities(dir)
     local folderSrc = dir .. "entities/entities/";
     local files, folders = file.Find(folderSrc .. "*", "LUA");
     for _, _file in pairs(files) do
@@ -157,7 +157,7 @@ function bash.Plugins.ProcessEntities(dir)
 end
 
 -- Process weapon files in plugin.
-function bash.Plugins.ProcessWeapons(dir)
+function bash.Plugin.ProcessWeapons(dir)
     local folderSrc = dir .. "entities/weapons/";
     local files, folders = file.Find(folderSrc .. "*", "LUA");
     for _, _file in pairs(files) do
@@ -203,7 +203,7 @@ function bash.Plugins.ProcessWeapons(dir)
 end
 
 -- Process effects files in plugin.
-function bash.Plugins.ProcessEffects(dir)
+function bash.Plugin.ProcessEffects(dir)
     local folderSrc = dir .. "entities/effects/";
     local files, folders = file.Find(folderSrc .. "*", "LUA");
     for _, _file in pairs(files) do
@@ -237,11 +237,11 @@ end
 -- TODO: Tools?
 
 -- Make sure all plugins have their dependencies met.
-function bash.Plugins.CheckDependencies()
+function bash.Plugin.CheckDependencies()
     local allMet, count, total = true, 0, 0;
-    for id, plug in pairs(bash.Plugins.Registered) do
+    for id, plug in pairs(bash.Plugin.Registered) do
         for _, dep in pairs(plug.Depends) do
-            if !bash.Plugins.Registered[dep] then
+            if !bash.Plugin.Registered[dep] then
                 bash.Util.MsgLog(LOG_WARN, "Plugin '%s' is missing dependency '%s'! This may cause errors, so resolve this immediately!", plug.Name, dep);
                 allMet = false;
                 count = count + 1;
@@ -260,11 +260,11 @@ function bash.Plugins.CheckDependencies()
 end
 
 -- Check to see if a plugin struct has been registered.
-function bash.Plugins.IsRegistered(id)
-    return bash.Plugins.Registered[id] != nil;
+function bash.Plugin.IsRegistered(id)
+    return bash.Plugin.Registered[id] != nil;
 end
 
 -- Fetch a registered plugin struct.
-function bash.Plugins.Get(id)
-    return bash.Plugins.Registered[id];
+function bash.Plugin.Get(id)
+    return bash.Plugin.Registered[id];
 end

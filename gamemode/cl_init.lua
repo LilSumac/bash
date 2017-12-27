@@ -83,7 +83,7 @@ hook.Run("PostInitCalls_Base");
 MsgC(color_cyan, "======================== BASE COMPLETE ========================\n");
 ]]
 
-GM.Name = "/bash/";
-GM.Author = "LilSumac";
+-- Engine relies on sandbox elements.
+DeriveGamemode("sandbox");
 
 include("bash/engine/core/cl_boot.lua");

@@ -75,8 +75,8 @@ concommand.Add("bench", function(ply, cmd, args)
 end);
 ]]
 
-GM.Name = "/bash/";
-GM.Author = "LilSumac";
+-- Engine relies on sandbox elements.
+DeriveGamemode("sandbox");
 
 AddCSLuaFile("bash/engine/core/cl_boot.lua");
 include("bash/engine/core/sv_boot.lua");
