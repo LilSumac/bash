@@ -10,16 +10,8 @@ local bash = bash;
 local hook = hook;
 
 --
--- Engine hooks.
+-- Engine hook helpers.
 --
-
--- Remove client data when client disconnects.
-gameevent.Listen("player_disconnect");
-hook.Add("player_disconnect", "bash_RemoveClientData", function(data)
-    if data.bot == 0 then
-        bash.ClientData[data.networkid] = nil;
-    end
-end);
 
 -- Handle basis of player pre-init process.
 function bash.PlayerPreInit(ply)
@@ -37,6 +29,21 @@ function bash.PlayerInit(ply)
     ply.Initialized = true;
     hook.Run("PlayerInit", ply);
 end
+
+--
+-- Engine hooks.
+--
+
+-- Remove client data when client disconnects.
+gameevent.Listen("player_disconnect");
+hook.Add("player_disconnect", "bash_RemoveClientData", function(data)
+    if data.bot == 0 then
+        bash.ClientData[data.networkid] = nil;
+    end
+end);
+
+-- Override the base DoPlayerDeath.
+function GM:DoPlayerDeath(ply, attacker, dmgInfo) end
 
 --
 -- Network hooks.

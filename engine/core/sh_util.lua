@@ -52,6 +52,11 @@ function handleFunc(var, ...)
     end
 end
 
+-- Check to see if a variable is an entity and a valud one.
+function isent(ent)
+    return ent != nil and type(ent) == "Entity" and ent.IsValid and ent:IsValid();
+end
+
 -- Check to see if a variable is a player and a valid one.
 function isplayer(ply)
     return ply != nil and type(ply) == "Player" and ply.IsPlayer and ply:IsPlayer();

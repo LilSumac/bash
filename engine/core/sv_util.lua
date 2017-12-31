@@ -26,6 +26,7 @@ function bash.Util.GetClientData(ply, id)
         return;
     end
 
+    bash.ClientData = bash.ClientData or {};
     local index = ply:SteamID();
     if !bash.ClientData[index] then return; end
 

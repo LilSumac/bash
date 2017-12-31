@@ -56,12 +56,18 @@ ERR_TYPES["InvalidPly"] = "Invalid player argument!";
 ERR_TYPES["InvalidVarArgs"] = "Invalid number of varible arguments!";
 ERR_TYPES["HookError"] = "The '%s' hook from '%s' has failed! Result: %s";
 ERR_TYPES["SchemaOnBase"] = "Tried loading the engine as the schema! Call bash.StartSchema() in a separate gamemode.";
+ERR_TYPES["NoDBModule"] = "No tmysql4 module found! This is required and must be resolved.";
 ERR_TYPES["NoDBConnect"] = "Could not connect to database: %s";
+ERR_TYPES["QueryFailed"] = "The SQL query failed!\nQuery: %s\nError: %s";
+ERR_TYPES["QueryNumFailed"] = "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s";
+ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";
 ERR_TYPES["NilNVEntry"] = "Non-volatile entry resolved to be nil! (%s)";
 ERR_TYPES["UnsafeNVEntry"] = "Do not set NV entries to nil! Use 'removeNonVolatileEntry' instead. (%s)";
 ERR_TYPES["NoPluginFile"] = "A sh_plugin.lua file does not exists in this plugin directory! (%s)";
+
+F = Format;
 
 LOG_DEF = {pre = "[LOG]", col = color_grey};
 LOG_INIT = {pre = "[INIT]", col = color_green};

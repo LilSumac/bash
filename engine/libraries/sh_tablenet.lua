@@ -101,11 +101,15 @@ if SERVER then
         if !data.Public and !data.Private then return; end
 
         -- Silently make changes with data.
-        for id, val in pairs(data.Public) do
-            self:Set(id, val, NET_PUBLIC, false);
+        if data.Public then
+            for id, val in pairs(data.Public) do
+                self:Set(id, val, NET_PUBLIC, true);
+            end
         end
-        for id, val in pairs(data.Private) do
-            self:Set(id, val, NET_PRIVATE, false);
+        if data.Private then
+            for id, val in pairs(data.Private) do
+                self:Set(id, val, NET_PRIVATE, true);
+            end
         end
 
         -- TODO: Network to listeners.
@@ -113,25 +117,23 @@ if SERVER then
     end
 
     -- Delete an entry in a table.
-    function TABNET_META:Delete(id, silent)
-        local recips, scope = {};
-        if self.Data.Public and self.Data.Public[id] then
-            if self:IsGlobal() then recips = player.GetAll();
-            else recips = self.Listeners.Public; end
-            scope = NET_PUBLIC;
-        elseif self.Data.Private and self.Data.Private[id] then
-            recips = self.Listeners.Private;
-            scope = NET_PRIVATE;
-        else return; end
+    function TABNET_META:Delete(...)
+        local ids = {...};
+        if table.IsEmpty(ids) then return; end
 
-        if !silent then
-            local delUpdate = vnet.CreatePacket("bash_Net_TableNetDeleteEntry");
-            delUpdate:String(self.RegistryID);
-            delUpdate:Variable(id);
-            delUpdate:String(scope);
-            delUpdate:AddTargets(recips);
-            delUpdate:Send();
+        for _, id in pairs(ids) do
+            if self.Data.Public then
+                self.Data.Public[id] = nil;
+            end
+            if self.Data.Private then
+                self.Data.Private[id] = nil;
+            end
         end
+
+        local delUpdate = vnet.CreatePacket("bash_Net_TableNetDeleteEntry");
+        delUpdate:String(self.RegistryID);
+        delUpdate:Table(ids);
+        delUpdate:Broadcast();
     end
 
     -- Network table's data to listeners.
@@ -370,6 +372,7 @@ function bash.TableNet.DeleteTable(id)
     if SERVER then
         local delUpdate = vnet.CreatePacket("bash_Net_TableNetDelete");
         delUpdate:String(id);
+        delUpdate:String(NET_ALL);
         delUpdate:Broadcast();
     end
 end
@@ -441,55 +444,57 @@ elseif CLIENT then
         local data = pck:Table();
 
         bash.Util.MsgDebug(LOG_TABNET, "Receiving updates from networked table '%s'...", regID);
-        -- TODO: Figure out a better way of hooking this?
 
         if !bash.TableNet.IsRegistered(regID) then
             bash.TableNet.NewTable(data, nil, regID);
-
-            if data.Public then
-                for id, val in pairs(data.Public) do
-                    hook.Run("TableUpdate", regID, id, val);
-                end
-            end
-            if data.Private then
-                for id, val in pairs(data.Private) do
-                    hook.Run("TableUpdate", regID, id, val);
-                end
-            end
+            hook.Run("TableCreate", regID);
         else
             local tab = bash.TableNet.Get(regID);
             if !tab then return; end
 
             if data.Public then
                 tab.Data.Public = tab.Data.Public or {};
-
                 for id, val in pairs(data.Public) do
                     tab.Data.Public[id] = val;
-                    hook.Run("TableUpdate", regID, id, val);
                 end
             end
             if data.Private then
                 tab.Data.Private = tab.Data.Private or {};
-
                 for id, val in pairs(data.Private) do
                     tab.Data.Private[id] = val;
-                    hook.Run("TableUpdate", regID, id, val);
                 end
             end
         end
+
+        -- TODO: Figure out a better way of hooking this?
+        local hookData = {};
+        table.Merge(hookData, data.Public or {});
+        table.Merge(hookData, data.Private or {});
+        hook.Run("TableUpdate", regID, hookData);
     end);
 
     -- Watch for table entry deletions.
     vnet.Watch("bash_Net_TableNetDeleteEntry", function(pck)
         local regID = pck:String();
-        local id = pck:Variable();
-        local scope = pck:String();
+        local ids = pck:Table();
         local tab = bash.TableNet.Get(regID);
+        if !tab then return end;
 
-        if !tab then return; end
+        bash.Util.MsgDebug(LOG_TABNET, "Deleting %d entries in networked table '%s'...", #ids, regID);
 
-        bash.Util.MsgDebug(LOG_TABNET, "Deleting entry '%s' in networked table '%s'...", id, regID);
-        tab.Data[scope][id] = nil;
+        local hookData = {};
+        for _, id in pairs(ids) do
+            if tab.Data.Public then
+                hookData[id] = tab.Data.Public[id];
+                tab.Data.Public[id] = nil;
+            end
+            if tab.Data.Private then
+                hookData[id] = tab.Data.Private[id];
+                tab.Data.Private[id] = nil
+            end
+        end
+
+        hook.Run("TableDeleteEntry", regID, hookData);
     end);
 
     -- Watch for table deletions.
