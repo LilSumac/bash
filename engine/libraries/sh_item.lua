@@ -15,12 +15,32 @@ local LOG_ITEM = {pre = "[ITEM]", col = color_limegreen};
 --
 
 bash.Item           = bash.Item or {};
+bash.Item.Vars      = bash.Item.Vars or {};
 bash.Item.Cache     = bash.Item.Cache or {};
 bash.Item.Waiting   = bash.Item.Waiting or {};
 
 --
 -- Item functions.
 --
+
+-- Add a new character variable struct.
+function bash.Item.AddVar(data)
+    bash.Item.Vars[data.ID] = {
+        ID = data.ID,
+        Type = data.Type,
+        Default = data.Default,
+        Scope = data.Scope,
+        InSQL = data.InSQL
+    };
+
+    if SERVER and data.InSQL then
+        bash.Database.AddColumn("bash_items", {
+            Name = data.ID,
+            Type = data.Type,
+            MaxLength = data.MaxLength
+        }, data.PrimaryKey);
+    end
+end
 
 if SERVER then
 
@@ -32,8 +52,13 @@ if SERVER then
             local results = resultsTab[1];
             if !results.status then return; end
 
-            local fetchData = results.data[1];
-            bash.Item.Cache[fetchData.ItemID] = fetchData;
+            local fetchData, itemData = results.data[1], {};
+            if !fetchData then return; end
+            for id, var in pairs(bash.Item.Vars) do
+                itemData[var.Scope] = itemData[var.Scope] or {};
+                itemData[var.Scope][id] = fetchData[id] or handleFunc(var.Default);
+            end
+            bash.Item.Cache[fetchData.ItemID] = itemData;
             bash.Util.MsgDebug(LOG_ITEM, "Item '%s' fetched from database.", id);
 
             if bash.Item.Waiting[id] then
@@ -58,8 +83,83 @@ if SERVER then
 
         if !bash.TableNet.IsRegistered(id) then
             local itemData = bash.Item.Cache[id];
-            bash.TableNet.NewTable(itemData, nil, itemData.ItemID);
+            bash.TableNet.NewTable(itemData, nil, id);
         end
     end
 
+    --
+    -- Engine hooks.
+    --
+
+    -- Push changes to SQL.
+    hook.Add("TableUpdate", "bash_ItemPushToDatabase", function(regID, data)
+        local item = bash.TableNet.Get(regID);
+        if !item then return; end
+        local itemID = item:Get("ItemID");
+        if !itemID then return; end
+        MsgN("ITEM UPDATE");
+
+        local sqlData, var = {};
+        for id, val in pairs(data) do
+            var = bash.Item.Vars[id];
+            PrintTable(var);
+            if !var or !var.InSQL then continue; end
+            sqlData[id] = val;
+        end
+        PrintTable(sqlData);
+
+        if table.IsEmpty(sqlData) then return; end
+        bash.Database.UpdateRow("bash_items", sqlData, F("ItemID = \'%s\'", itemID), function(results)
+            bash.Util.MsgDebug(LOG_ITEM, "Updated item '%s' in database.", itemID);
+        end);
+    end);
+
 end
+
+--
+-- Engine hooks.
+--
+
+-- Create item structures.
+hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
+    bash.Item.AddVar{
+        ID = "ItemNum",
+        Type = "number",
+        Default = -1,
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        PrimaryKey = true
+    };
+    bash.Item.AddVar{
+        ID = "ItemID",
+        Type = "string",
+        Default = "",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 17
+    };
+    bash.Item.AddVar{
+        ID = "Owner",
+        Type = "string",
+        Default = "",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 32
+    };
+    bash.Item.AddVar{
+        ID = "PosInInv",
+        Type = "table",
+        Default = EMPTY_TABLE,
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 64
+    };
+    bash.Item.AddVar{
+        ID = "PosInWorld",
+        Type = "table",
+        Default = EMPTY_TABLE,
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 64
+    };
+end);

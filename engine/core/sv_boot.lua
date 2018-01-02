@@ -205,11 +205,34 @@ if !bash.Tested then
         --bash.Inventory.FetchItems("inv_asdf");
     end);
 
+    concommand.Add("addtoinv", function(ply, cmd, args)
+        bash.TableNet.NewTable({
+            Public = {
+                ItemNum = 999,
+                ItemID = "item_testing",
+                InvID = "inv_asdf"
+            }
+        }, nil, "item_testing");
+        bash.Inventory.AddItem("inv_asdf", "item_testing");
+    end);
+
+    concommand.Add("removefrominv", function(ply, cmd, args)
+        bash.Inventory.RemoveItem("inv_asdf", "item_testing");
+    end);
+
 
     concommand.Add("printreg", function(ply, cmd, args)
         PrintTable(bash.TableNet.Registry);
     end);
 
+    concommand.Add("changename", function(ply, cmd, args)
+        local char = ply:GetCharacter();
+        if !char then return; end
+        char:Set("Name", args[1] or "John Doe");
+    end);
+
     bash.Tested = true;
+
+    MsgN(pon.encode({X = 1, Y = 1}))
 
 end

@@ -46,20 +46,21 @@ function TABNET_META:Get(id, def)
     end
 end
 
--- Getter for key with a certain value.
-function TABNET_META:GetKey(val, def)
-    local key;
+-- Getter for keys with a certain value.
+function TABNET_META:GetKeys(val)
+    local keys, _keys = {};
+
     if self.Data.Public then
-        key = table.KeyFromValue(self.Data.Public, val);
+        _keys = table.KeysFromValue(self.Data.Public, val);
+        table.Merge(keys, _keys);
     end
-    if key then return key; end
 
     if self.Data.Private then
-        key = table.KeyFromValue(self.Data.Private, val);
+        _keys = table.KeysFromValue(self.Data.Private, val);
+        table.Merge(keys, _keys);
     end
-    if key then return key; end
 
-    return def;
+    return keys;
 end
 
 -- Check to see if the table is global.
@@ -81,7 +82,13 @@ end
 if SERVER then
 
     -- Setter for networked variables.
-    function TABNET_META:Set(id, val, scope, silent)
+    function TABNET_META:Set(id, val, scope)
+        scope = scope or NET_PUBLIC;
+        self:SetData{
+            [scope] = {[id] = val}
+        };
+
+        --[[
         -- TODO: Handle client-side requests for changes.
         if !id then return; end
 
@@ -92,6 +99,7 @@ if SERVER then
         if !silent then
             self:Network({[scope] = {[id] = val}});
         end
+        ]]
     end
 
     -- Multi-setter for networked variables.
@@ -101,16 +109,25 @@ if SERVER then
         if !data.Public and !data.Private then return; end
 
         -- Silently make changes with data.
+        local hookData = {};
         if data.Public then
             for id, val in pairs(data.Public) do
-                self:Set(id, val, NET_PUBLIC, true);
+                self.Data.Public = self.Data.Public or {};
+                self.Data.Public[id] = val;
+                hookData[id] = val;
+                --self:Set(id, val, NET_PUBLIC, true);
             end
         end
         if data.Private then
             for id, val in pairs(data.Private) do
-                self:Set(id, val, NET_PRIVATE, true);
+                self.Data.Private = self.Data.Private or {};
+                self.Data.Private[id] = val;
+                hookData[id] = val;
+                --self:Set(id, val, NET_PRIVATE, true);
             end
         end
+
+        hook.Run("TableUpdate", self.RegistryID, hookData);
 
         -- TODO: Network to listeners.
         self:Network(data);
@@ -121,14 +138,19 @@ if SERVER then
         local ids = {...};
         if table.IsEmpty(ids) then return; end
 
+        local hookData = {};
         for _, id in pairs(ids) do
             if self.Data.Public then
+                hookData[id] = self.Data.Public[id];
                 self.Data.Public[id] = nil;
             end
             if self.Data.Private then
+                hookData[id] = self.Data.Private[id];
                 self.Data.Private[id] = nil;
             end
         end
+
+        hook.Run("TableDeleteEntry", self.RegistryID, hookData);
 
         local delUpdate = vnet.CreatePacket("bash_Net_TableNetDeleteEntry");
         delUpdate:String(self.RegistryID);
@@ -353,6 +375,7 @@ function bash.TableNet.NewTable(data, list, idOverride)
 
     bash.TableNet.Registry[tab.RegistryID] = tab;
     bash.Util.MsgDebug(LOG_TABNET, "Creating networked table with ID '%s'!", tab.RegistryID);
+    hook.Run("TableCreate", tab.RegistryID, data);
 
     if SERVER then tab:Network(); end
 
@@ -398,10 +421,10 @@ if SERVER then
             if tab:IsGlobal() then continue; end
 
             ghosts = bash.Player.GetAllAsKeys();
-            for _, ply in pairs(tab.Listeners.Public) do
+            for ply, _ in pairs(tab.Listeners.Public) do
                 ghosts[ply] = nil;
             end
-            for _, ply in pairs(tab.Listeners.Private) do
+            for ply, _ in pairs(tab.Listeners.Private) do
                 ghosts[ply] = nil;
             end
 
@@ -432,6 +455,18 @@ if SERVER then
     end
     hook.Add("PlayerInit", "bash_TableNetOnConnect", bash.TableNet.SendTablesOnConnect);
 
+    hook.Add("EntityRemoved", "bash_TableNetDeleteListenerOnRemove", function(ent)
+        if !isplayer(ent) then return; end
+        MsgN(ent);
+        for regID, tab in pairs(bash.TableNet.Registry) do
+            if !tab:IsGlobal() then
+                tab.Listeners.Public[ent] = nil;
+            end
+            tab.Listeners.Private[ent] = nil;
+        end
+        PrintTable(bash.TableNet.Registry);
+    end);
+
 elseif CLIENT then
 
     --
@@ -447,7 +482,7 @@ elseif CLIENT then
 
         if !bash.TableNet.IsRegistered(regID) then
             bash.TableNet.NewTable(data, nil, regID);
-            hook.Run("TableCreate", regID);
+            hook.Run("TableCreate", regID, data);
         else
             local tab = bash.TableNet.Get(regID);
             if !tab then return; end

@@ -17,10 +17,10 @@ local castIn = {
     end,
     ["number"] = tonumber,
     ["string"] = function(str)
-        return Format("\'%s\'", bash.Database.EscapeStr(tostring(str)));
+        return Format("\'%s\'", bash.Database.EscapeStr(tostring(str or "")));
     end,
     ["table"] = function(tab)
-        return Format("\'%s\'", bash.Database.EscapeStr(pon.encode(tab)));
+        return Format("\'%s\'", bash.Database.EscapeStr(pon.encode(tab or {})));
     end
 };
 local castOut = {
@@ -28,7 +28,8 @@ local castOut = {
     ["number"] = tonumber,
     ["string"] = tostring,
     ["table"] = function(str)
-        return pon.decode(tostring(str));
+        if str == "" then str = PON_EMPTY; end
+        return pon.decode(tostring(str or PON_EMPTY));
     end
 };
 
@@ -72,23 +73,6 @@ if !tmysql4 then
     end
 end
 
--- Handle casting in and out of the database.
-function bash.Database.CastData(tab, data, inout)
-    local tabData = bash.Database.Tables[tab];
-    if !tabData then return; end
-
-    inout = inout or CAST_IN;
-    local castFuncs = (inout == CAST_IN and castIn) or castOut;
-    local colData;
-    for id, val in pairs(data) do
-        colData = tabData.Columns[id];
-        if !colData then continue; end
-        if !castIn[colData.Type] and !castOut[colData.Type] then continue; end
-
-        data[id] = castFuncs[colData.Type](val);
-    end
-end
-
 -- Connect to the database.
 function bash.Database.Connect()
     local obj, err = tmysql.initialize(
@@ -125,7 +109,7 @@ function bash.Database.AddColumn(tab, col, primary)
     -- col.Name = col.Name;
     col.Type = col.Type or "string";
     --col.MaxLength = col.MaxLength;
-    col.Default = col.Default;
+    --col.Default = col.Default;
 
     bash.Util.MsgDebug(LOG_DB, "Database column '%s' registered in table '%s'.", col.Name, tab);
 
@@ -167,6 +151,23 @@ function bash.Database.Query(query, callback, ...)
     end
 end
 
+-- Handle casting in and out of the database.
+function bash.Database.CastData(tab, data, inout)
+    local tabData = bash.Database.Tables[tab];
+    if !tabData then return; end
+
+    inout = inout or CAST_IN;
+    local castFuncs = (inout == CAST_IN and castIn) or castOut;
+    local colData;
+    for id, val in pairs(data) do
+        colData = tabData.Columns[id];
+        if !colData then continue; end
+        if !castIn[colData.Type] and !castOut[colData.Type] then continue; end
+
+        data[id] = castFuncs[colData.Type](val);
+    end
+end
+
 -- Escape all special characters in a string.
 function bash.Database.EscapeStr(str)
     if bash.Database.Connected then
@@ -193,14 +194,13 @@ function bash.Database.CheckTables()
             if col.Type == "counter" or col.Type == "boolean" then
                 sqlType = SQL_TYPE[col.Type];
             else
-                sqlType = Format(SQL_TYPE[col.Type], (col.MaxLength or 8000));
+                sqlType = Format(SQL_TYPE[col.Type], (col.MaxLength or (col.Type != "number" and 8000 or 20)));
             end
 
             cols[#cols + 1] = Format(
-                "`%s` %s%s, ",
+                "`%s` %s, ",
                 _name,
-                sqlType,
-                col.Default != nil and (" DEFAULT " .. bash.Database.CastData(name, {[_name] = col.Default}, CAST_IN)) or ""
+                sqlType
             );
         end
         query = query .. table.concat(cols) .. Format("PRIMARY KEY(%s)); ", tab.PrimaryKey);
@@ -297,82 +297,6 @@ end
 --
 -- Engine hooks.
 --
-
--- Build the default database structure.
-hook.Add("CreateStructures_Engine", "bash_DatabaseBuildTables", function()
-    -- Build database structure.
-    -- Player table.
-    bash.Database.AddColumn("bash_plys", {
-        Name = "PlyNum",
-        Type = "counter"
-    }, true);
-    bash.Database.AddColumn("bash_plys", {
-        Name = "SteamID",
-        Type = "string",
-        MaxLength = 18
-    });
-
-    -- Character table.
-    bash.Database.AddColumn("bash_chars", {
-        Name = "CharNum",
-        Type = "counter"
-    }, true);
-    bash.Database.AddColumn("bash_chars", {
-        Name = "CharID",
-        Type = "string",
-        MaxLength = 17
-    });
-    bash.Database.AddColumn("bash_chars", {
-        Name = "SteamID",
-        Type = "string",
-        MaxLength = 18
-    });
-    bash.Database.AddColumn("bash_chars", {
-        Name = "Name",
-        Type = "string",
-        MaxLength = 32
-    });
-    bash.Database.AddColumn("bash_chars", {
-        Name = "Description",
-        Type = "string",
-        MaxLength = 512
-    });
-    bash.Database.AddColumn("bash_chars", {
-        Name = "Inventory",
-        Type = "table"
-    });
-
-    -- Inventory table.
-    bash.Database.AddColumn("bash_invs", {
-        Name = "InvNum",
-        Type = "counter"
-    }, true);
-    bash.Database.AddColumn("bash_invs", {
-        Name = "InvID",
-        Type = "string",
-        MaxLength = 16
-    });
-    bash.Database.AddColumn("bash_invs", {
-        Name = "Contents",
-        Type = "table"
-    });
-
-    -- Item table.
-    bash.Database.AddColumn("bash_items", {
-        Name = "ItemNum",
-        Type = "counter"
-    }, true);
-    bash.Database.AddColumn("bash_items", {
-        Name = "ItemID",
-        Type = "string",
-        MaxLength = 17
-    });
-    bash.Database.AddColumn("bash_items", {
-        Name = "InvID",
-        Type = "string",
-        MaxLength = 16
-    });
-end);
 
 -- Connect to the database when loaded.
 hook.Add("PostInit_Engine", "bash_DatabaseConnect", bash.Database.Connect);

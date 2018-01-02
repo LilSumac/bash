@@ -47,12 +47,22 @@ end
 --
 
 -- Add a new character variable struct.
-function bash.Character.AddVar(id, def, scope)
-    bash.Character.Vars[id] = {
-        ID = id,
-        Default = def,
-        Scope = scope
+function bash.Character.AddVar(data)
+    bash.Character.Vars[data.ID] = {
+        ID = data.ID,
+        Type = data.Type,
+        Default = data.Default,
+        Scope = data.Scope,
+        InSQL = data.InSQL
     };
+
+    if SERVER and data.InSQL then
+        bash.Database.AddColumn("bash_chars", {
+            Name = data.ID,
+            Type = data.Type,
+            MaxLength = data.MaxLength
+        }, data.PrimaryKey);
+    end
 end
 
 -- Get the character registry.
@@ -101,7 +111,9 @@ if SERVER then
             local results = resultsTab[1];
             if !results.status then return; end
 
-            local fetchData, charData, var = results.data[1], {};
+            local fetchData, charData = results.data[1], {};
+            if !fetchData then return; end
+            bash.Database.CastData("bash_chars", fetchData, CAST_OUT);
             for id, var in pairs(bash.Character.Vars) do
                 charData[var.Scope] = charData[var.Scope] or {};
                 charData[var.Scope][id] = fetchData[id] or handleFunc(var.Default);
@@ -192,6 +204,32 @@ if SERVER then
             bash.TableNet.DeleteTable(charID);
         end
     end
+
+    --
+    -- Engine hooks.
+    --
+
+    -- Push changes to SQL.
+    hook.Add("TableUpdate", "bash_CharacterPushToDatabase", function(regID, data)
+        local char = bash.TableNet.Get(regID);
+        if !char then return; end
+        local charID = char:Get("CharID");
+        if !charID then return; end
+        MsgN("CHAR UPDATE");
+
+        local sqlData, var = {};
+        for id, val in pairs(data) do
+            var = bash.Character.Vars[id];
+            if !var or !var.InSQL then continue; end
+            sqlData[id] = val;
+        end
+        PrintTable(sqlData);
+
+        if table.IsEmpty(sqlData) then return; end
+        bash.Database.UpdateRow("bash_chars", sqlData, F("CharID = \'%s\'", charID), function(results)
+            bash.Util.MsgDebug(LOG_CHAR, "Updated character '%s' in database.", charID);
+        end);
+    end);
 
     --
     -- Network hooks.
@@ -301,16 +339,64 @@ end
 hook.Add("CreateStructures_Engine", "bash_CharacterStructures", function()
     if SERVER then
         if !bash.TableNet.IsRegistered("bash_CharRegistry") then
-            bash.TableNet.NewTable({}, NET_GLOBAL, "bash_CharRegistry");
+            bash.TableNet.NewTable(nil, NET_GLOBAL, "bash_CharRegistry");
         end
     end
 
-    bash.Character.AddVar("CharNum", -1, NET_PUBLIC);
-    bash.Character.AddVar("CharID", "bash_charID", NET_PUBLIC);
-    bash.Character.AddVar("Name", "John Doe", NET_PUBLIC);
-    bash.Character.AddVar("Desc", "A real character.", NET_PUBLIC);
-    bash.Character.AddVar("BaseModel", "models/breen.mdl", NET_PUBLIC);
-    bash.Character.AddVar("Inv", "somestring", NET_PRIVATE);
+    bash.Character.AddVar{
+        ID = "CharNum",
+        Type = "number",
+        Default = -1,
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        PrimaryKey = true
+    };
+    bash.Character.AddVar{
+        ID = "SteamID",
+        Type = "string",
+        Default = "STEAMID",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 18
+    };
+    bash.Character.AddVar{
+        ID = "CharID",
+        Type = "string",
+        Default = "CHARID",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 17
+    };
+    bash.Character.AddVar{
+        ID = "Name",
+        Type = "string",
+        Default = "John Doe",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 32
+    };
+    bash.Character.AddVar{
+        ID = "Description",
+        Type = "string",
+        Default = "A real character.",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 512
+    };
+    bash.Character.AddVar{
+        ID = "BaseModel",
+        Type = "string",
+        Default = "models/breen.mdl",
+        Scope = NET_PUBLIC,
+        InSQL = true
+    };
+    bash.Character.AddVar{
+        ID = "Inventory",
+        Type = "table",
+        Default = EMPTY_TABLE,
+        Scope = NET_PRIVATE,
+        InSQL = true
+    };
 end);
 
 -- Watch for entity removals.

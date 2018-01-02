@@ -11,7 +11,6 @@ function CHAR:Init()
     self:ShowCloseButton(LocalPlayer():GetCharacter() != nil);
     self.WaitingOnChar = false;
     self.WaitingOnDigest = true;
-    self.CharReg = bash.Character.GetRegistry();
 
     hook.Add("OnCharacterAttach", "bash_CharMenuWatchForLoad", function(char, ent)
         if ent != LocalPlayer() then return; end

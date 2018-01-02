@@ -144,6 +144,26 @@ concommand.Add("openmenu", function(ply, cmd, args)
     bash.CharMenu = vgui.Create("bash_CharacterMenu");
 end);
 
+concommand.Add("openinv", function(ply, cmd, args)
+    if bash.CharInv then return; end
+    local char = ply:GetCharacter();
+    if !char then return; end
+
+    local invs = char:Get("Inventory", {});
+    bash.CharInv = vgui.Create("bash_Inventory");
+    bash.CharInv:SetInventory(invs["Primary"]);
+end);
+
+concommand.Add("opentest", function(ply, cmd, args)
+    if bash.TestCharInv then return; end
+    local char = ply:GetCharacter();
+    if !char then return; end
+
+    local invs = char:Get("Inventory", {});
+    bash.TestCharInv = vgui.Create("bash_TestFrame");
+    bash.TestCharInv:SetInventory(invs["Primary"]);
+end);
+
 hook.Add("HUDPaint", "somebullshit", function()
     local traceInfo = {
         start = LocalPlayer():EyePos(),
