@@ -10,6 +10,7 @@ function SLOT:Init()
     self.ItemObj = nil;
     self.GridX = nil;
     self.GridY = nil;
+    self.DragID = nil;
 
     self:Receiver("bash_ItemDrag", self.ReceiveItem, {"Someshit"});
     self:Droppable("bash_ItemDrag");
@@ -29,7 +30,6 @@ function SLOT:SetItem(itemID)
         self.ItemID = itemID;
         self.ItemObj = bash.TableNet.Get(itemID);
         self.ItemName = self.ItemObj:Get("ItemNum");
-        --self:CreateOverlay();
     end
 end
 
@@ -37,34 +37,23 @@ function SLOT:ClearItem()
     self.ItemID = "";
     self.ItemObj = nil;
     self.ItemName = nil;
-    --self:RemoveOverlay();
 end
 
---[[
-function SLOT:CreateOverlay()
-    if !self.ItemID then return; end
-
-    self:RemoveOverlay();
-    self.ItemOverlay = vgui.Create("bash_TestSlotOverlay", self);
-    self.ItemOverlay:Dock(FILL);
-    self.ItemOverlay:SetItem(self.ItemID);
+function SLOT:OnStartDragging()
+    self.DragID = self.ItemID;
 end
-]]
 
---[[
-function SLOT:RemoveOverlay()
-    if self.ItemOverlay then
-        self.ItemOverlay:Remove();
-        self.ItemOverlay = nil;
-    end
+function SLOT:OnStopDragging()
+    self.DragID = nil;
 end
-]]
 
 function SLOT:ReceiveItem(panels, dropped, index, x, y)
     if !dropped then return; end
 
     local dropItem = panels[1];
     if !dropItem then return; end
+    if dropItem == self then return; end
+    if dropItem.DragID != dropItem.ItemID then return; end
     local fromInv = dropItem.InvID;
     local toInv = self.InvID;
 

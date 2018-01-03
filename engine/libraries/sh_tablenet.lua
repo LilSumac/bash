@@ -166,6 +166,9 @@ if SERVER then
             return;
         end
 
+        -- TODO: WHY. Ugh.
+        self:CleanListeners();
+
         -- If we're only networking specific changes...
         if changes then
 
@@ -226,6 +229,9 @@ if SERVER then
     function TABNET_META:Send(list)
         if !self:HasListener(list) then return; end
         if !isplayer(list) then return; end
+
+        -- TODO: WHY. Ugh.
+        self:CleanListeners();
 
         local send = vnet.CreatePacket("bash_Net_TableNetUpdate");
         local data = {};
@@ -320,6 +326,24 @@ if SERVER then
 
             self.Listeners.Public = {};
             self.Listeners.Private = {};
+        end
+    end
+
+    -- Checks to see if there are any NULL listeners, and removes them.
+    function TABNET_META:CleanListeners()
+        if !self:IsGlobal() then
+            for ply, _ in pairs(self.Listeners.Public) do
+                if !ply:IsValid() then
+                    bash.Util.MsgDebug(LOG_TABNET, "Removing NULL 'Public' listener from networked table '%s'...", self.RegistryID);
+                    self.Listeners.Public[ply] = nil;
+                end
+            end
+        end
+        for ply, _ in pairs(self.Listeners.Private) do
+            if !ply:IsValid() then
+                bash.Util.MsgDebug(LOG_TABNET, "Removing NULL 'Private' listener from networked table '%s'...", self.RegistryID);
+                self.Listeners.Private[ply] = nil;
+            end
         end
     end
 
@@ -478,7 +502,7 @@ if SERVER then
     end
     hook.Add("PlayerInit", "bash_TableNetOnConnect", bash.TableNet.SendTablesOnConnect);
 
-    --[[
+    --[[ TODO: Come back to this, find out why it's not working.
     hook.Add("EntityRemoved", "bash_TableNetDeleteListenerOnRemove", function(ent)
         if !isplayer(ent) then return; end
         MsgN(ent);

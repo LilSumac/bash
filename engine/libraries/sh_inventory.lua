@@ -98,7 +98,6 @@ if SERVER then
         bash.Util.MsgDebug(LOG_INV, "Fetching inventory '%s' and related items from database...", id);
 
         bash.Database.Query(F("SELECT * FROM `bash_invs` WHERE InvID = \'%s\'; SELECT * FROM `bash_items` WHERE Owner = \'%s\';", id, id), function(resultsTab)
-            PrintTable(resultsTab);
             local invResults = resultsTab[1];
             if !invResults.status then return; end
             local itemResults = resultsTab[2];
@@ -124,9 +123,6 @@ if SERVER then
                 end
                 bash.Item.Cache[itemFetchData.ItemID] = itemData;
             end
-
-            PrintTable(bash.Inventory.Cache)
-            PrintTable(bash.Item.Cache)
 
             bash.Util.MsgDebug(LOG_INV, "Inventory '%s' and %d items fetched from database.", id, #itemResults.data);
 
@@ -314,6 +310,28 @@ if SERVER then
         for slot, inv in pairs(invs) do
             bash.Inventory.DetachFrom(inv, ent);
         end
+    end);
+
+    -- Push changes to SQL.
+    hook.Add("TableUpdate", "bash_InventoryPushToDatabase", function(regID, data)
+        local inv = bash.TableNet.Get(regID);
+        if !inv then return; end
+        local invID = inv:Get("InvID");
+        if !invID then return; end
+        MsgN("INV UPDATE");
+
+        local sqlData, var = {};
+        for id, val in pairs(data) do
+            var = bash.Inventory.Vars[id];
+            if !var or !var.InSQL then continue; end
+            sqlData[id] = val;
+        end
+        PrintTable(sqlData);
+
+        if table.IsEmpty(sqlData) then return; end
+        bash.Database.UpdateRow("bash_invs", sqlData, F("InvID = \'%s\'", invID), function(results)
+            bash.Util.MsgDebug(LOG_INV, "Updated inventory '%s' in database.", invID);
+        end);
     end);
 
     -- Delete a character's inventory and items on character removal/unload.

@@ -155,15 +155,22 @@ concommand.Add("openinv", function(ply, cmd, args)
 end);
 
 concommand.Add("opentest", function(ply, cmd, args)
-    if bash.Primary then return; end
+    if bash.inv_asdf or bash.inv_lala then return; end
     local char = ply:GetCharacter();
     if !char then return; end
 
     local invs = char:Get("Inventory", {});
-    bash.Primary = vgui.Create("bash_TestFrame");
-    bash.Primary:SetInventory(invs["Primary"]);
-    bash.Secondary = vgui.Create("bash_TestFrame");
-    bash.Secondary:SetInventory(invs["Secondary"]);
+    bash.inv_asdf = vgui.Create("bash_TestFrame");
+    bash.inv_asdf:SetInventory(invs["Primary"]);
+    bash.inv_lala = vgui.Create("bash_TestFrame");
+    bash.inv_lala:SetInventory(invs["Secondary"]);
+end);
+
+concommand.Add("openground", function(ply, cmd, args)
+    if bash.inv_ground then return; end
+
+    bash.inv_ground = vgui.Create("bash_TestFrame");
+    bash.inv_ground:SetInventory("inv_ground");
 end);
 
 hook.Add("HUDPaint", "somebullshit", function()

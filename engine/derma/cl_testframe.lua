@@ -72,8 +72,16 @@ function INV:Init()
                 local oldPos = self.ItemRef[regID];
                 if !oldPos then return; end
 
-                if self.InvGrid[oldPos.X][oldPos.Y] then
-                    self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
+                local oldPanel = self.InvGrid[oldPos.X][oldPos.Y];
+                if oldPanel then
+                    -- TODO: Cancel active drag.
+                    --if oldPanel:IsDragging() then
+                        --MsgN("DRAGGING");
+                        dragndrop.Drop();
+                        --oldPanel:DragMouseRelease(MOUSE_LEFT);
+                    --end
+
+                    oldPanel:ClearItem();
                     self.ItemRef[regID] = nil;
                 end
             end

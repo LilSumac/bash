@@ -86,17 +86,6 @@ MsgC(color_cyan, "======================== ENGINE COMPLETE =====================
 
 if !bash.Tested then
 
-    bash.Testing = bash.TableNet.NewTable({
-        Public = {
-            ["pub1"] = "heyo!",
-            ["pub2"] = "bye!"
-        },
-        Private = {
-            ["priv1"] = "shhh",
-            ["priv2"] = "quiet"
-        }
-    }, NET_GLOBAL);
-
     hook.Add("PlayerInit", "asdfasdf", function(ply)
         if bash.box then return; end
 
@@ -108,42 +97,6 @@ if !bash.Tested then
         bash.box:SetPos(pos);
         bash.box:Spawn();
         bash.box:Activate();
-    end);
-
-
-    concommand.Add("setglobal", function(ply, cmd, args)
-        local glob = tobool(args[1]);
-        bash.Testing:SetGlobal(glob);
-        PrintTable(bash.Testing);
-    end);
-
-    concommand.Add("addlist", function(ply, cmd, args)
-        local scope = args[1];
-        bash.Testing:AddListener(ply, scope);
-        PrintTable(bash.Testing);
-    end);
-
-    concommand.Add("removelist", function(ply, cmd, args)
-        local scope = args[1];
-        bash.Testing:RemoveListener(ply, scope);
-        PrintTable(bash.Testing);
-    end);
-
-    concommand.Add("removeall", function(ply, cmd, args)
-        bash.Testing:RemoveListeners();
-        PrintTable(bash.Testing);
-    end);
-
-    local index = 1;
-    concommand.Add("updatetab", function(ply, cmd, args)
-        local scope = args[1];
-        bash.Testing:Set(tostring(index), index, scope);
-        index = index + 1;
-        PrintTable(bash.Testing);
-    end);
-
-    concommand.Add("invalidate", function(ply, cmd, args)
-        bash.Testing.Listeners = {Public = {}, Private = {}};
     end);
 
     concommand.Add("switchchar", function(ply, cmd, args)
@@ -233,9 +186,67 @@ if !bash.Tested then
 
     bash.Tested = true;
 
-    MsgN(pon.encode({X = 1, Y = 1}))
-    timer.Simple(10, function()
-        MsgN(collectgarbage("count") / 1024);
+    bash.Inventory.Load("inv_ground");
+
+    concommand.Add("addground", function(ply, cmd, args)
+        local ground = bash.TableNet.Get("inv_ground");
+        if !ground then return; end
+
+        local contents = ground:Get("Contents", {});
+        ground:AddListener(ply, NET_PUBLIC);
+        local curItem;
+        for itemID, _ in pairs(contents) do
+            curItem = bash.TableNet.Get(itemID);
+            if !curItem then continue; end
+            curItem:AddListener(ply, NET_PUBLIC);
+        end
+
+        bash.Util.MsgDebug(LOG_DEF, "Added '%s' to ground inventory.", tostring(ply));
+    end);
+
+    concommand.Add("domove", function(ply, cmd, args)
+        -- Move item_asdf to (4, 4) in inv_ground
+
+        local item = bash.TableNet.Get("item_asdf");
+        if !item then return; end
+        local oldInvID = item:Get("Owner");
+        if !oldInvID or oldInvID == "inv_ground" then return; end
+        local oldInv = bash.TableNet.Get(oldInvID);
+        if !oldInv then return; end
+        local newInv = bash.TableNet.Get("inv_ground");
+        if !newInv then return; end
+
+        local oldContents = oldInv:Get("Contents", {});
+        oldContents["item_asdf"] = nil;
+        oldInv:Set("Contents", oldContents);
+
+        local newContents = newInv:Get("Contents", {});
+        newContents["item_asdf"] = true;
+        newInv:Set("Contents", newContents);
+
+        item:SetData{
+            Public = {
+                ["Owner"] = "inv_ground",
+                ["PosInInv"] = {X = 4, Y = 4}
+            }
+        };
+    end);
+
+    concommand.Add("dointer", function(ply, cmd, args)
+        timer.Simple(3, function()
+            local item1 = bash.TableNet.Get("item_asdf");
+            if !item1 then return; end
+            local item2 = bash.TableNet.Get("item_lala");
+
+            local newPos1 = {X = 2, Y = 3};
+            item1:Set("PosInInv", newPos1);
+            local newPos2 = {X = 3, Y = 3};
+            item2:Set("PosInInv", newPos2);
+        end);
+    end);
+
+    concommand.Add("curmem", function(ply, cmd, args)
+        MsgN(tostring(collectgarbage("count") / 1024))
     end);
 
 end
