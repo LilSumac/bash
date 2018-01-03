@@ -257,12 +257,14 @@ if SERVER then
     end
 
     -- Add a listener to a table.
-    function TABNET_META:AddListener(list, scope)
+    function TABNET_META:AddListener(list, scope, silent)
         if !isplayer(list) then return; end
 
         scope = scope or NET_PUBLIC;
         if self:IsGlobal() and scope == NET_PUBLIC then return; end
         if self.Listeners[scope][list] then return; end
+
+        bash.Util.MsgDebug(LOG_TABNET, "Adding player '%s' to '%s' listeners for networked table '%s'...", tostring(list), scope, self.RegistryID);
 
         self.Listeners[scope][list] = true;
         if scope == NET_PUBLIC then
@@ -272,16 +274,19 @@ if SERVER then
             self.Listeners.Public[list] = nil;
         end
 
-        self:Send(list);
+        if !silent then
+            self:Send(list);
+        end
     end
 
     -- Remove a listener from a table.
-    function TABNET_META:RemoveListener(list, scope)
+    function TABNET_META:RemoveListener(list, scope, silent)
         if !isplayer(list) then return; end
 
         scope = scope or NET_ALL;
         if self:IsGlobal() and scope != NET_PRIVATE then return; end
 
+        bash.Util.MsgDebug(LOG_TABNET, "Removing player '%s' from '%s' listeners for networked table '%s'...", tostring(list), scope, self.RegistryID);
         if scope == NET_ALL then
             self.Listeners.Public[list] = nil;
             self.Listeners.Private[list] = nil;
@@ -289,7 +294,9 @@ if SERVER then
             self.Listeners[scope][list] = nil;
         end
 
-        self:RemoveFrom(list, scope);
+        if !silent then
+            self:RemoveFrom(list, scope);
+        end
     end
 
     -- Remove all listeners from a table.
@@ -299,12 +306,15 @@ if SERVER then
         local del = vnet.CreatePacket("bash_Net_TableNetDelete");
         del:String(self.RegistryID);
         if scope then
+            bash.Util.MsgDebug(LOG_TABNET, "Removing all '%s' listeners from networked table '%s'...", scope, self.RegistryID);
             del:String(scope);
             del:AddTargets(self.Listeners[scope]);
             del:Send();
 
             self.Listeners[scope] = {};
         else
+            bash.Util.MsgDebug(LOG_TABNET, "Removing all listeners from networked table '%s'...", self.RegistryID);
+
             del:String(NET_ALL);
             del:Broadcast();
 
@@ -317,6 +327,7 @@ if SERVER then
     function TABNET_META:SetGlobal(global)
         if global == self:IsGlobal() then return; end
 
+        bash.Util.MsgDebug(LOG_TABNET, "Making networked table '%s' %s...", self.RegistryID, global and "global" or "non-global");
         if global then
             self.Listeners.Public = NET_GLOBAL;
 
@@ -375,7 +386,7 @@ function bash.TableNet.NewTable(data, list, idOverride)
 
     bash.TableNet.Registry[tab.RegistryID] = tab;
     bash.Util.MsgDebug(LOG_TABNET, "Creating networked table with ID '%s'!", tab.RegistryID);
-    hook.Run("TableCreate", tab.RegistryID, data);
+    hook.Run("TableCreate", tab.RegistryID, tab);
 
     if SERVER then tab:Network(); end
 
@@ -388,9 +399,9 @@ function bash.TableNet.DeleteTable(id)
     local tab = bash.TableNet.Registry[id];
     if !tab then return; end
 
+    hook.Run("TableDelete", id, tab);
     bash.TableNet.Registry[id] = nil;
     bash.Util.MsgDebug(LOG_TABNET, "Deleting networked table with ID '%s'!", id);
-    hook.Run("TableDelete", id);
 
     if SERVER then
         local delUpdate = vnet.CreatePacket("bash_Net_TableNetDelete");
@@ -418,14 +429,26 @@ if SERVER then
 
         local ghosts, delGhosts;
         for id, tab in pairs(bash.TableNet.Registry) do
-            if tab:IsGlobal() then continue; end
-
             ghosts = bash.Player.GetAllAsKeys();
-            for ply, _ in pairs(tab.Listeners.Public) do
-                ghosts[ply] = nil;
+
+            if !tab:IsGlobal() then
+                for ply, _ in pairs(tab.Listeners.Public) do
+                    if !ply:IsValid() then
+                        bash.Util.MsgDebug(LOG_TABNET, "Found NULL player in 'Public' listeners for networked table '%s'! Removing...", id);
+                        tab.Listeners.Public[ply] = nil;
+                    else
+                        ghosts[ply] = nil;
+                    end
+                end
             end
+
             for ply, _ in pairs(tab.Listeners.Private) do
-                ghosts[ply] = nil;
+                if !ply:IsValid() then
+                    bash.Util.MsgDebug(LOG_TABNET, "Found NULL player in 'Private' listeners for networked table '%s'! Removing...", id);
+                    tab.Listeners.Private[ply] = nil;
+                else
+                    ghosts[ply] = nil;
+                end
             end
 
             if !table.IsEmpty(ghosts) then
@@ -455,17 +478,24 @@ if SERVER then
     end
     hook.Add("PlayerInit", "bash_TableNetOnConnect", bash.TableNet.SendTablesOnConnect);
 
+    --[[
     hook.Add("EntityRemoved", "bash_TableNetDeleteListenerOnRemove", function(ent)
         if !isplayer(ent) then return; end
         MsgN(ent);
         for regID, tab in pairs(bash.TableNet.Registry) do
+            MsgN(regID);
+            MsgN(tab:IsGlobal());
             if !tab:IsGlobal() then
-                tab.Listeners.Public[ent] = nil;
+                MsgN("REMOVING PUBLIC");
+                bash.TableNet.Registry[regID].Listeners.Public[ent] = nil;
+                MsgN("LOOKIT: ", tostring(bash.TableNet.Registry[regID].Listeners.Public[ent]));
             end
-            tab.Listeners.Private[ent] = nil;
+            bash.TableNet.Registry[regID].Listeners.Private[ent] = nil;
         end
+        MsgN(ent);
         PrintTable(bash.TableNet.Registry);
     end);
+    ]]
 
 elseif CLIENT then
 

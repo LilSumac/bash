@@ -246,6 +246,10 @@ if SERVER then
         local ply = pck.Source;
         local id = pck:String();
         bash.Character.Load(id, ply, true);
+
+        timer.Simple(5, function()
+            MsgN(collectgarbage("count") / 1024);
+        end);
     end);
 
 elseif CLIENT then
@@ -345,7 +349,7 @@ hook.Add("CreateStructures_Engine", "bash_CharacterStructures", function()
 
     bash.Character.AddVar{
         ID = "CharNum",
-        Type = "number",
+        Type = "counter",
         Default = -1,
         Scope = NET_PUBLIC,
         InSQL = true,

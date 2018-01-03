@@ -194,8 +194,8 @@ if SERVER then
             local oldContents = oldInv:Get("Contents", {});
 
             oldContents[itemID] = nil;
-            oldInv:
-            bash.Inventory.RemoveItem(oldInvID, itemID);
+            oldInv:Set("Contents", oldContents);
+            --bash.Inventory.RemoveItem(oldInvID, itemID);
         end
     end
 
@@ -266,6 +266,7 @@ if SERVER then
             local curItem;
             for itemID, _ in pairs(inv:Get("Contents", {})) do
                 curItem = bash.TableNet.Get(itemID);
+                if !curItem then continue; end
                 curItem:AddListener(ent, NET_PUBLIC);
             end
         elseif invType == INV_ITEM then
@@ -280,6 +281,8 @@ if SERVER then
         local inv = bash.TableNet.Get(id);
         if !inv then return; end
         if !isent(ent) and !isplayer(ent) then return; end
+
+        bash.Util.MsgDebug(LOG_INV, "Detaching inventory '%s' from entity '%s'...", id, tostring(ent));
 
         if isplayer(ent) then
             inv:RemoveListener(ent, NET_PUBLIC);
@@ -313,21 +316,31 @@ if SERVER then
         end
     end);
 
-    --
-    -- Network hooks.
-    --
+    -- Delete a character's inventory and items on character removal/unload.
+    hook.Add("TableDelete", "bash_InventoryRemoveChar", function(id, tab)
+        local charID = tab:Get("CharID");
+        if !charID then return; end
 
-    -- Watch for item move requests.
-    vnet.Watch("bash_Net_ItemMoveRequest", function(pck)
-        -- TODO: Clean this up.
-        local itemID = pck:String();
-        local newPos = pck:Table();
-        local item = bash.TableNet.Get(itemID);
-        MsgN(itemID);
-        PrintTable(newPos);
-        if !item then return; end
+        local invs = tab:Get("Inventory", {});
+        local curInv, contents, curItem;
+        for slot, invID in pairs(invs) do
+            curInv = bash.TableNet.Get(invID);
+            if !curInv then continue; end
+            -- TODO: Figure out why this would ever be a thing.
+            if curInv:Get("Owner", "") != charID then continue; end
 
-        item:Set("PosInInv", newPos);
+            contents = curInv:Get("Contents", {});
+            for itemID, _ in pairs(contents) do
+                curItem = bash.TableNet.Get(itemID);
+                if !curItem then continue; end
+
+                if curItem:Get("Owner", "") == invID then
+                    bash.TableNet.DeleteTable(itemID);
+                end
+            end
+
+            bash.TableNet.DeleteTable(invID);
+        end
     end);
 
 end
@@ -348,7 +361,7 @@ hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
 
     bash.Inventory.AddVar{
         ID = "InvNum",
-        Type = "number",
+        Type = "counter",
         Default = -1,
         Scope = NET_PUBLIC,
         InSQL = true,
@@ -383,5 +396,11 @@ hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
         Default = "",
         Scope = NET_PUBLIC,
         InSQL = true
+    };
+    bash.Inventory.AddVar{
+        ID = "Spaces",
+        Type = "table",
+        Default = EMPTY_TABLE,
+        Scope = NET_PUBLIC
     };
 end);

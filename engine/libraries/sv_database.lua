@@ -16,6 +16,7 @@ local castIn = {
         else return 0; end
     end,
     ["number"] = tonumber,
+    ["counter"] = tonumber,
     ["string"] = function(str)
         return Format("\'%s\'", bash.Database.EscapeStr(tostring(str or "")));
     end,
@@ -26,6 +27,7 @@ local castIn = {
 local castOut = {
     ["boolean"] = tobool,
     ["number"] = tonumber,
+    ["counter"] = tonumber,
     ["string"] = tostring,
     ["table"] = function(str)
         if str == "" then str = PON_EMPTY; end
@@ -36,6 +38,7 @@ local castOut = {
 local SQL_DEF = {};
 SQL_DEF["boolean"] = false;
 SQL_DEF["number"] = 0;
+SQL_DEF["counter"] = 1;
 SQL_DEF["string"] = "";
 SQL_DEF["table"] = {};
 
@@ -162,7 +165,7 @@ function bash.Database.CastData(tab, data, inout)
     for id, val in pairs(data) do
         colData = tabData.Columns[id];
         if !colData then continue; end
-        if !castIn[colData.Type] and !castOut[colData.Type] then continue; end
+        if !castFuncs[colData.Type] then continue; end
 
         data[id] = castFuncs[colData.Type](val);
     end

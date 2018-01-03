@@ -102,7 +102,6 @@ if SERVER then
         local sqlData, var = {};
         for id, val in pairs(data) do
             var = bash.Item.Vars[id];
-            PrintTable(var);
             if !var or !var.InSQL then continue; end
             sqlData[id] = val;
         end
@@ -112,6 +111,66 @@ if SERVER then
         bash.Database.UpdateRow("bash_items", sqlData, F("ItemID = \'%s\'", itemID), function(results)
             bash.Util.MsgDebug(LOG_ITEM, "Updated item '%s' in database.", itemID);
         end);
+    end);
+
+    --
+    -- Network hooks.
+    --
+
+    -- Watch for item move requests.
+    vnet.Watch("bash_Net_ItemMoveRequest", function(pck)
+        -- TODO: Clean this up.
+        local droppedItemID = pck:String();
+        local currentItemID = pck:String();
+        local droppedInvID = pck:String();
+        local currentInvID = pck:String();
+        local droppedItemPos = pck:Table();
+        local currentItemPos = pck:Table();
+
+        local droppedItem = bash.TableNet.Get(droppedItemID);
+        if !droppedItem then return; end
+        local currentItem = bash.TableNet.Get(currentItemID);
+
+        if currentItem then
+            -- TODO: Try to combine, else swap.
+            MsgN("Combine/swap two items.")
+
+            if droppedInv == currentInvID then
+                -- Same inv.
+            else
+                -- Different inv.
+            end
+        else
+            if droppedInvID == currentInvID then
+                -- TODO: Just move the item.
+                MsgN("Move one item to empty spot.");
+                droppedItem:Set("PosInInv", currentItemPos);
+            else
+                -- TODO: See if the item can hold the item.
+                --       If so, move.
+                MsgN("Move one item to another inventory.");
+
+                local oldInv = bash.TableNet.Get(droppedInvID);
+                if !oldInv then return; end
+                local newInv = bash.TableNet.Get(currentInvID);
+                if !newInv then return; end
+
+                local oldContents = oldInv:Get("Contents", {});
+                oldContents[droppedItemID] = nil;
+                oldInv:Set("Contents", oldContents);
+
+                local newContents = newInv:Get("Contents", {});
+                newContents[droppedItemID] = true;
+                newInv:Set("Contents", newContents);
+
+                droppedItem:SetData{
+                    Public = {
+                        ["Owner"] = currentInvID,
+                        ["PosInInv"] = currentItemPos
+                    }
+                };
+            end
+        end
     end);
 
 end
@@ -124,7 +183,7 @@ end
 hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
     bash.Item.AddVar{
         ID = "ItemNum",
-        Type = "number",
+        Type = "counter",
         Default = -1,
         Scope = NET_PUBLIC,
         InSQL = true,

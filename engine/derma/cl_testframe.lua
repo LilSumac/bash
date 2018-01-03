@@ -13,49 +13,97 @@ function INV:Init()
     self.InvID = "";
     self.InvObj = nil;
     self.WaitingOnInv = true;
+    self.HookID = string.random(8);
 
     self.GridContainer = vgui.Create("DPanel", self);
     self.GridContainer:Dock(FILL);
     self.ItemRef = {};
 
-    hook.Add("TableUpdate", "bash_InventoryWatchForUpdate", function(regID, data)
+    hook.Add("TableUpdate", "bash_InventoryWatchForUpdate_" .. self.HookID, function(regID, data)
         -- TODO: Update on inv/item changes.
         if !self.InvObj then return; end
+        local item = bash.TableNet.Get(regID);
+        if !item:Get("ItemID") then return; end
 
-        MsgN(regID);
-        PrintTable(data);
-        PrintTable(self.ItemRef);
-
-        if regID == self.InvID then
+        --[[
+        if isInv and regID == self.InvID then
             local contents = self.InvObj:Get("Contents", {});
             if contents[regID] then
-                -- TODO: Item has been added/removed from inv.
-            end
-        elseif self.ItemRef[regID] then
-            if data["PosInInv"] then
+                -- TODO: Item has been added to inv.
                 local oldPos = self.ItemRef[regID];
-                local newPos = data["PosInInv"];
 
                 if self.InvGrid[oldPos.X][oldPos.Y] then
                     self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
+                    self.ItemRef[regID] = nil;
                 end
                 if self.InvGrid[newPos.X][newPos.Y] then
                     self.InvGrid[newPos.X][newPos.Y]:SetItem(regID);
+                    self.ItemRef[regID] = newPos;
                 end
+            else
+                -- TODO: Item has been removed from inv.
+                local oldPos = self.ItemRef[regID];
+                if !oldPos then return; end
+
+                if self.InvGrid[oldPos.X][oldPos.Y] then
+                    self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
+                    self.ItemRef[regID] = nil;
+                end
+            end
+        end
+        ]]
+
+        MsgN("FRAME HOOK");
+        MsgN(regID);
+        PrintTable(data);
+
+        if data["Owner"] then
+            if data["Owner"] == self.InvID then
+                -- TODO: Item was added to this inv.
+                local newPos = item:Get("PosInInv");
+                if !newPos then return; end
+
+                if self.InvGrid[newPos.X][newPos.Y] then
+                    self.InvGrid[newPos.X][newPos.Y]:SetItem(regID);
+                    self.ItemRef[regID] = newPos;
+                end
+            else
+                -- TODO: Item was removed from this inv.
+                local oldPos = self.ItemRef[regID];
+                if !oldPos then return; end
+
+                if self.InvGrid[oldPos.X][oldPos.Y] then
+                    self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
+                    self.ItemRef[regID] = nil;
+                end
+            end
+        end
+
+        if item:Get("Owner") != self.InvID then return; end
+
+        if data["PosInInv"] then
+            local oldPos = self.ItemRef[regID];
+            local newPos = data["PosInInv"];
+
+            if self.InvGrid[oldPos.X][oldPos.Y] then
+                MsgN("ADDING ", self.InvID)
+                self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
+                self.ItemRef[regID] = nil;
+            end
+            if self.InvGrid[newPos.X][newPos.Y] then
+                MsgN("REMOVING ", self.InvID)
+                self.InvGrid[newPos.X][newPos.Y]:SetItem(regID);
                 self.ItemRef[regID] = newPos;
             end
         end
     end);
 
-    hook.Add("TableDelete", "bash_InventoryWatchForDelete", function(regID, data)
+    hook.Add("TableDelete", "bash_InventoryWatchForDelete_" .. self.HookID, function(regID, data)
         -- TODO: Update on inv/item delete.
         if !self.InvObj then return; end
 
-        local contents = self.InvObj:Get("Contents", {});
         if self.InvID == regID then
             self:Remove();
-        elseif contents[regID] then
-
         end
     end);
 end
@@ -65,6 +113,7 @@ function INV:SetInventory(invID)
         self.InvID = invID;
         self.InvObj = bash.TableNet.Get(invID);
         self.WaitingOnInv = false;
+        self:SetTitle(self.InvID);
         self:CreateTemplate();
     end
 end
@@ -86,6 +135,7 @@ function INV:CreateTemplate()
             self.InvGrid[xIndex][yIndex] = vgui.Create("bash_TestSlot", self.GridContainer);
             self.InvGrid[xIndex][yIndex]:SetSize(50, 50);
             self.InvGrid[xIndex][yIndex]:SetPos((xIndex - 1) * 50, (yIndex - 1) * 50);
+            self.InvGrid[xIndex][yIndex]:SetInv(self.InvID);
             self.InvGrid[xIndex][yIndex]:SetGridPos(xIndex, yIndex);
         end
     end
@@ -142,8 +192,9 @@ function INV:PaintOver(w, h)
 end
 
 function INV:OnRemove()
-    hook.Remove("TableUpdate", "bash_InventoryWatchForUpdate");
-    bash.TestCharInv = nil;
+    hook.Remove("TableUpdate", "bash_InventoryWatchForUpdate_" .. self.HookID);
+    hook.Remove("TableDelete", "bash_InventoryWatchForDelete_" .. self.HookID);
+    bash[self.InvID] = nil;
 end
 
 vgui.Register("bash_TestFrame", INV, "DFrame");

@@ -1269,17 +1269,16 @@ local function _addplys(self, plys)
         if type(val) == "table" then
             _addplys(self, val);
             continue;
-        elseif type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer()) then
+        elseif (type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer())) and key:IsValid() then
             ply = key;
-        elseif type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer()) then
+        elseif (type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer())) and val:IsValid() then
             ply = val;
         else
             -- assume the value is at fault, not the key
-            error("cannot add a " .. type(val) .. " as target(s)");
+            error("cannot add a " .. type(val) .. " as target(s) (" .. tostring(val) .. ")");
         end
 
         self.Targets[#self.Targets + 1] = ply;
-        self.Targets[ply] = true;
     end
 end
 

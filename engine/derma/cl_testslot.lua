@@ -5,6 +5,7 @@
 local SLOT = {};
 
 function SLOT:Init()
+    self.InvID = "";
     self.ItemID = "";
     self.ItemObj = nil;
     self.GridX = nil;
@@ -12,6 +13,10 @@ function SLOT:Init()
 
     self:Receiver("bash_ItemDrag", self.ReceiveItem, {"Someshit"});
     self:Droppable("bash_ItemDrag");
+end
+
+function SLOT:SetInv(invID)
+    self.InvID = invID;
 end
 
 function SLOT:SetGridPos(x, y)
@@ -60,15 +65,16 @@ function SLOT:ReceiveItem(panels, dropped, index, x, y)
 
     local dropItem = panels[1];
     if !dropItem then return; end
-    PrintTable(panels);
-    MsgN(dropped);
-    MsgN(index);
-    MsgN(x);
-    MsgN(y);
+    local fromInv = dropItem.InvID;
+    local toInv = self.InvID;
 
     local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
-    moveReq:String(dropItem.ItemID);
-    moveReq:Table({X = self.GridX, Y = self.GridY}); -- NewPos
+    moveReq:String(dropItem.ItemID);    -- Dropped item.
+    moveReq:String(self.ItemID);        -- Current item.
+    moveReq:String(fromInv);            -- Dropped item inv.
+    moveReq:String(toInv);              -- Current item inv.
+    moveReq:Table({X = dropItem.GridX, Y = dropItem.GridY});    -- Dropped item pos.
+    moveReq:Table({X = self.GridX, Y = self.GridY});            -- Current item pos.
     moveReq:AddServer();
     moveReq:Send();
 end

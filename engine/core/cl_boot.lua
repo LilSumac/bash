@@ -155,13 +155,15 @@ concommand.Add("openinv", function(ply, cmd, args)
 end);
 
 concommand.Add("opentest", function(ply, cmd, args)
-    if bash.TestCharInv then return; end
+    if bash.Primary then return; end
     local char = ply:GetCharacter();
     if !char then return; end
 
     local invs = char:Get("Inventory", {});
-    bash.TestCharInv = vgui.Create("bash_TestFrame");
-    bash.TestCharInv:SetInventory(invs["Primary"]);
+    bash.Primary = vgui.Create("bash_TestFrame");
+    bash.Primary:SetInventory(invs["Primary"]);
+    bash.Secondary = vgui.Create("bash_TestFrame");
+    bash.Secondary:SetInventory(invs["Secondary"]);
 end);
 
 hook.Add("HUDPaint", "somebullshit", function()

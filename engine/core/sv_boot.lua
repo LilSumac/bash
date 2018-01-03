@@ -234,5 +234,8 @@ if !bash.Tested then
     bash.Tested = true;
 
     MsgN(pon.encode({X = 1, Y = 1}))
+    timer.Simple(10, function()
+        MsgN(collectgarbage("count") / 1024);
+    end);
 
 end
