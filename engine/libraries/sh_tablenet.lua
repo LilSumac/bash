@@ -453,16 +453,15 @@ if SERVER then
 
         local ghosts, delGhosts;
         for id, tab in pairs(bash.TableNet.Registry) do
+            if tab:IsGlobal() then continue; end
             ghosts = bash.Player.GetAllAsKeys();
 
-            if !tab:IsGlobal() then
-                for ply, _ in pairs(tab.Listeners.Public) do
-                    if !ply:IsValid() then
-                        bash.Util.MsgDebug(LOG_TABNET, "Found NULL player in 'Public' listeners for networked table '%s'! Removing...", id);
-                        tab.Listeners.Public[ply] = nil;
-                    else
-                        ghosts[ply] = nil;
-                    end
+            for ply, _ in pairs(tab.Listeners.Public) do
+                if !ply:IsValid() then
+                    bash.Util.MsgDebug(LOG_TABNET, "Found NULL player in 'Public' listeners for networked table '%s'! Removing...", id);
+                    tab.Listeners.Public[ply] = nil;
+                else
+                    ghosts[ply] = nil;
                 end
             end
 

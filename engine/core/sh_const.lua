@@ -60,6 +60,10 @@ ERR_TYPES["NoDBModule"] = "No tmysql4 module found! This is required and must be
 ERR_TYPES["NoDBConnect"] = "Could not connect to database: %s";
 ERR_TYPES["QueryFailed"] = "The SQL query failed!\nQuery: %s\nError: %s";
 ERR_TYPES["QueryNumFailed"] = "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s";
+ERR_TYPES["NoValidItem"] = "No item available with the Registry ID '%s'!";
+ERR_TYPES["NoValidInv"] = "No inventory available with the Registry ID '%s'!";
+ERR_TYPES["NoValidInv"] = "No inventory type available with the ID '%s' in networked table '%s'!";
+
 ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";

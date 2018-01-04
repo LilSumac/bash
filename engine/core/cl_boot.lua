@@ -173,6 +173,48 @@ concommand.Add("openground", function(ply, cmd, args)
     bash.inv_ground:SetInventory("inv_ground");
 end);
 
+concommand.Add("text", function(ply, cmd, args)
+    local frame = vgui.Create("DFrame");
+    frame:SetSize(500, 500);
+    frame:MakePopup(true);
+    frame:Center();
+    frame:ShowCloseButton(false);
+
+    local close = vgui.Create("bash_Close", frame);
+    close:SetSize(16, 16);
+    close:SetPos(frame:GetWide() - 20, 4);
+
+    local dis = vgui.Create("DTextEntry", frame);
+    dis:Dock(TOP);
+    dis:DockMargin(10, 10, 10, 10);
+    dis:SetDisabled(true);
+
+    local act = vgui.Create("DTextEntry", frame);
+    act:Dock(TOP);
+    act:DockMargin(10, 10, 10, 10);
+end);
+
+concommand.Add("grid", function(ply, cmd, args)
+    local char = ply:GetCharacter();
+    if !char then return; end
+
+    local frame = vgui.Create("DFrame");
+    frame:SetSize(300, 300);
+    frame:Center();
+    frame:ShowCloseButton(false);
+    frame:MakePopup(true);
+    frame:SetSizable(true);
+
+    local close = vgui.Create("bash_Close", frame);
+    close:SetSize(16, 16);
+    close:SetPos(frame:GetWide() - 20, 4);
+
+    local invs = char:Get("Inventory", {});
+    local grid = vgui.Create("bash_TestInvGrid", frame);
+    grid:AlignTop(24);
+    grid:SetInv(invs["Primary"]);
+end);
+
 hook.Add("HUDPaint", "somebullshit", function()
     local traceInfo = {
         start = LocalPlayer():EyePos(),
@@ -214,8 +256,8 @@ hook.Add("HUDPaint", "stencils", function()
     render.ClearStencil();
     render.SetStencilEnable(true);
 
-    --render.SetStencilWriteMask(1);
-    --render.SetStencilTestMask(1);
+    render.SetStencilWriteMask(69); -- HAHAHAHAHAHAHAHAHAHAHA
+    render.SetStencilTestMask(69);  -- HAAHAHAHAHAHAHAHAHAHAHAHAHAHAHAH
     render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_NEVER);
     render.SetStencilPassOperation(STENCILOPERATION_ZERO);
     render.SetStencilFailOperation(STENCILOPERATION_REPLACE);
@@ -223,14 +265,14 @@ hook.Add("HUDPaint", "stencils", function()
     render.SetStencilReferenceValue(1);
 
     -- Draw outer circle.
-    draw.NoTexture();
+    --draw.NoTexture();
 	surface.SetDrawColor(color_white);
 	surface.DrawPoly(outerPoly);
 
     render.SetStencilFailOperation(STENCILOPERATION_ZERO);
 
     -- Draw inner circle.
-    draw.NoTexture();
+    --draw.NoTexture();
 	surface.SetDrawColor(color_white);
 	surface.DrawPoly(innerPoly);
 

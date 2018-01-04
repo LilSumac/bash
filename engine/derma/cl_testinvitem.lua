@@ -1,35 +1,18 @@
---[[
-    Test slot element.
-]]
+local ITEM = {};
 
-local SLOT = {};
-
-function SLOT:Init()
-    self.InvID = "";
+function ITEM:Init()
     self.ItemID = "";
-    self.ItemObj = nil;
-    self.GridX = nil;
-    self.GridY = nil;
-    self.DragID = nil;
+    self.ItemObj = {};
+    self.ItemName = nil;
+    self.SizeX = 2;
+    self.SizeY = 2;
+    self.GhostHovering = false;
 
-    self:Receiver("bash_ItemDrag", self.ReceiveItem, {"Someshit"});
-    self:Droppable("bash_ItemDrag");
+    self:Receiver("bash_TestDrag", self.ReceiveItem, {"Someshit"});
+    self:Droppable("bash_TestDrag");
 end
 
-function SLOT:SetInv(invID)
-    self.InvID = invID;
-end
-
-function SLOT:SetGridPos(x, y)
-    self.GridX = x;
-    self.GridY = y;
-end
-
-function SLOT:GetItem()
-    return self.ItemID;
-end
-
-function SLOT:SetItem(itemID)
+function ITEM:SetItem(itemID)
     if bash.TableNet.IsRegistered(itemID) then
         self.ItemID = itemID;
         self.ItemObj = bash.TableNet.Get(itemID);
@@ -37,17 +20,24 @@ function SLOT:SetItem(itemID)
     end
 end
 
-function SLOT:ClearItem()
+function ITEM:ClearItem()
     self.ItemID = "";
     self.ItemObj = nil;
     self.ItemName = nil;
 end
 
-function SLOT:OnStartDragging()
-    self.DragID = self.ItemID;
+function ITEM:DragHoverEnd()
+    self.GhostHovering = false;
 end
 
-function SLOT:ReceiveItem(panels, dropped, index, x, y)
+function ITEM:ReceiveItem(panels, dropped, index, x, y)
+    self.GhostHovering = !dropped;
+    if !droppen then
+        local posX, posY = self:GetPos();
+        self:GetParent():ReceiveItem(panels, dropped, index, posX + x, posY + y);
+    end
+
+    --[[
     if !dropped then return; end
 
     local dropItem = panels[1];
@@ -66,10 +56,11 @@ function SLOT:ReceiveItem(panels, dropped, index, x, y)
     moveReq:Table({X = self.GridX, Y = self.GridY});            -- Current item pos.
     moveReq:AddServer();
     moveReq:Send();
+    ]]
 end
 
-function SLOT:Paint(w, h)
-    surface.SetDrawColor(color_white);
+function ITEM:Paint(w, h)
+    surface.SetDrawColor(self.GhostHovering and color_blue or color_white);
     surface.DrawOutlinedRect(0, 0, w, h);
 
     if self.ItemName then
@@ -77,4 +68,4 @@ function SLOT:Paint(w, h)
     end
 end
 
-vgui.Register("bash_TestSlot", SLOT, "DPanel");
+vgui.Register("bash_TestInvItem", ITEM, "DPanel");

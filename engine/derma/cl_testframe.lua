@@ -8,12 +8,16 @@ function INV:Init()
     self:SetSize(SCRH * 0.33, SCRH * 0.33);
     self:Center();
     self:MakePopup();
-    self:ShowCloseButton(true);
+    self:ShowCloseButton(false);
     self:SetSizable(true);
     self.InvID = "";
     self.InvObj = nil;
     self.WaitingOnInv = true;
     self.HookID = string.random(8);
+
+    self.CloseButton = vgui.Create("bash_Close", self);
+    self.CloseButton:SetSize(16, 16);
+    self.CloseButton:SetPos(self:GetWide() - 20, 4);
 
     self.GridContainer = vgui.Create("DPanel", self);
     self.GridContainer:Dock(FILL);
@@ -71,15 +75,11 @@ function INV:Init()
                 -- TODO: Item was removed from this inv.
                 local oldPos = self.ItemRef[regID];
                 if !oldPos then return; end
-
                 local oldPanel = self.InvGrid[oldPos.X][oldPos.Y];
-                if oldPanel then
+
+                if ispanel(oldPanel) and oldPanel:GetItem() == regID then
                     -- TODO: Cancel active drag.
-                    --if oldPanel:IsDragging() then
-                        --MsgN("DRAGGING");
-                        dragndrop.Drop();
-                        --oldPanel:DragMouseRelease(MOUSE_LEFT);
-                    --end
+                    dragndrop.Drop();
 
                     oldPanel:ClearItem();
                     self.ItemRef[regID] = nil;
@@ -92,14 +92,14 @@ function INV:Init()
         if data["PosInInv"] then
             local oldPos = self.ItemRef[regID];
             local newPos = data["PosInInv"];
+            local oldPanel = self.InvGrid[oldPos.X][oldPos.Y];
+            local newPanel = self.InvGrid[newPos.X][newPos.Y];
 
-            if self.InvGrid[oldPos.X][oldPos.Y] then
-                MsgN("ADDING ", self.InvID)
+            if ispanel(oldPanel) and oldPanel:GetItem() == regID then
                 self.InvGrid[oldPos.X][oldPos.Y]:ClearItem();
                 self.ItemRef[regID] = nil;
             end
-            if self.InvGrid[newPos.X][newPos.Y] then
-                MsgN("REMOVING ", self.InvID)
+            if ispanel(newPanel) then
                 self.InvGrid[newPos.X][newPos.Y]:SetItem(regID);
                 self.ItemRef[regID] = newPos;
             end

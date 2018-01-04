@@ -135,10 +135,38 @@ if SERVER then
             -- TODO: Try to combine, else swap.
             MsgN("Combine/swap two items.")
 
-            if droppedInv == currentInvID then
-                -- Same inv.
+            if droppedInvID != currentInvID then
+                -- Change owners and swap.
+                local oldInv = bash.TableNet.Get(droppedInvID);
+                if !oldInv then return; end
+                local newInv = bash.TableNet.Get(currentInvID);
+                if !newInv then return; end
+
+                local oldContents = oldInv:Get("Contents", {});
+                oldContents[droppedItemID] = nil;
+                oldContents[currentItemID] = true;
+                oldInv:Set("Contents", oldContents);
+
+                local newContents = newInv:Get("Contents", {});
+                newContents[droppedItemID] = true;
+                newContents[currentItemID] = nil;
+                newInv:Set("Contents", newContents);
+
+                droppedItem:SetData{
+                    Public = {
+                        ["Owner"] = currentInvID,
+                        ["PosInInv"] = currentItemPos
+                    }
+                };
+                currentItem:SetData{
+                    Public = {
+                        ["Owner"] = droppedInvID,
+                        ["PosInInv"] = droppedItemPos
+                    }
+                };
             else
-                -- Different inv.
+                droppedItem:Set("PosInInv", currentItemPos);
+                currentItem:Set("PosInInv", droppedItemPos);
             end
         else
             if droppedInvID == currentInvID then

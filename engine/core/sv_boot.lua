@@ -245,7 +245,7 @@ if !bash.Tested then
         end);
     end);
 
-    concommand.Add("curmem", function(ply, cmd, args)
+    concommand.Add("printmem", function(ply, cmd, args)
         MsgN(tostring(collectgarbage("count") / 1024))
     end);
 

@@ -2,7 +2,7 @@
     Custom skin definitions.
 ]]
 
-local SKIN = {};
+SKIN = {};
 SKIN.PrintName = "/bash/skin/";
 SKIN.Author = "LilSumac";
 SKIN.DermaVersion = 2;
@@ -317,12 +317,68 @@ function SKIN:PaintFrame(panel, w, h)
     draw.RoundedBox(0, 0, 0, w, 24, Color(58, 67, 72));
 end
 
+function SKIN:PaintCloseButton(panel, w, h)
+    --[[
+    if panel:IsHovered() then
+        surface.SetDrawColor(color_red);
+        surface.DrawRect(0, 0, w, h);
+    end
+
+    surface.SetDrawColor(color_white);
+    surface.DrawOutlinedRect(0, 0, w, h);
+    ]]
+
+    local col = panel:IsHovered() and color_white or Color(150, 150, 150);
+    draw.SimpleText("r", "marlett", w / 2, h / 2, col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+end
+
 function SKIN:PaintWindowCloseButton(panel, w, h) end
 function SKIN:PaintWindowMinimizeButton(panel, w, h) end
 function SKIN:PaintWindowMaximizeButton(panel, w, h) end
 
+function SKIN:PaintButton(panel, w, h)
+	if !panel.m_bBackground then return end
+
+	if panel.Depressed or panel:IsSelected() or panel:GetToggle() then
+        surface.SetDrawColor(Color(100, 100, 150));
+        surface.DrawRect(0, 0, w, h);
+	elseif panel:GetDisabled() then
+        surface.SetDrawColor(Color(75, 75, 75));
+        surface.DrawRect(0, 0, w, h);
+	elseif panel.Hovered then
+        surface.SetDrawColor(Color(225, 225, 225));
+        surface.DrawRect(0, 0, w, h);
+	else
+        surface.SetDrawColor(Color(200, 200, 200));
+        surface.DrawRect(0, 0, w, h);
+    end
+
+    surface.SetDrawColor(Color(25, 25, 25));
+    surface.DrawOutlinedRect(0, 0, w, h);
+end
+
+function SKIN:PaintTextEntry(panel, w, h)
+	if panel.m_bBackground then
+		if panel:GetDisabled() then
+            surface.SetDrawColor(Color(75, 75, 75));
+            surface.DrawRect(0, 0, w, h);
+		elseif panel:HasFocus() then
+            surface.SetDrawColor(Color(225, 225, 255));
+            surface.DrawRect(0, 0, w, h);
+		else
+            surface.SetDrawColor(Color(225, 225, 225));
+            surface.DrawRect(0, 0, w, h);
+		end
+	end
+
+    surface.SetDrawColor(Color(25, 25, 25));
+    surface.DrawOutlinedRect(0, 0, w, h);
+
+	panel:DrawTextEntryText(panel:GetTextColor(), panel:GetHighlightColor(), panel:GetCursorColor());
+end
+
 derma.DefineSkin("/bash/skin/", "Default skin for /bash/.", SKIN);
 
-function GM:ForceDermaSkin()
+hook.Add("ForceDermaSkin", "bash_SkinForce", function()
     return "/bash/skin/";
-end
+end);
