@@ -45,12 +45,12 @@ function bash.Item.AddVar(data)
 end
 
 -- Add a new item type struct.
-function bash.Item.Register(data)
-    bash.Item.Types[data.ID] = {
-        ID = data.ID,
-        Name = data.Name,
-        SizeX = data.SizeX,
-        SizeY = data.SizeY
+function bash.Item.Register(item)
+    bash.Item.Types[item.ID] = {
+        ID = item.ID,
+        Name = item.Name,
+        SizeX = item.SizeX,
+        SizeY = item.SizeY
     };
 end
 
