@@ -93,6 +93,8 @@ function bash.Database.Connect()
     end
 
     bash.Database.CheckTables();
+
+    hook.Run("OnDatabaseConnected");
 end
 
 -- Add a column to a table in the database struct.

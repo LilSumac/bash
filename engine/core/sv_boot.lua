@@ -104,15 +104,12 @@ if !bash.Tested then
         bash.Character.AttachTo(ply:GetCharacter():Get("CharID"), bash.box, true);
     end);
 
-    --[[
     concommand.Add("createchar", function(ply, cmd, args)
         local data = {
-            CharID = string.random(3, CHAR_ALPHANUM, "char_"),
             Name = args[1]
         };
         bash.Character.Create(data);
     end);
-    ]]
 
     concommand.Add("fetchchar", function(ply, cmd, args)
         bash.Character.Fetch(args[1]);
@@ -247,6 +244,13 @@ if !bash.Tested then
 
     concommand.Add("printmem", function(ply, cmd, args)
         MsgN(tostring(collectgarbage("count") / 1024))
+    end);
+
+    concommand.Add("testhook", function(ply, cmd, args)
+        MsgN("testing hook");
+        local items = {};
+        hook.Run("GetStarterItems", items);
+        PrintTable(items);
     end);
 
 end

@@ -18,6 +18,7 @@ local Entity = FindMetaTable("Entity");
 
 bash.Character              = bash.Character or {};
 bash.Character.Vars         = bash.Character.Vars or {};
+bash.Character.IDs          = bash.Character.IDs or {};
 bash.Character.Cache        = bash.Character.Cache or {};
 bash.Character.Waiting      = bash.Character.Waiting or {};
 bash.Character.Digest       = (CLIENT and (bash.Character.Digest or {})) or nil;
@@ -99,8 +100,55 @@ if SERVER then
         end);
     end
 
-    function bash.Character.Create(data, ent)
+    -- Get an ununused CharID.
+    function bash.Character.GetUnusedID()
+        local id;
+        repeat
+            id = string.random(12, CHAR_ALPHANUM, "char_");
+        until !bash.Character.IDs[id];
+        return id;
+    end
 
+    -- Create a new character from scratch.
+    function bash.Character.Create(data, ply, forceID)
+        -- TODO: This function.
+        local charID = forceID;
+        if !charID then
+            charID = bash.Character.GetUnusedID();
+        end
+        data.CharID = charID;
+
+        local charData = {};
+        for id, var in pairs(bash.Character.Vars) do
+            if !var.InSQL then continue; end
+            charData[id] = data[id] or handleFunc(var.Default);
+        end
+
+        -- Create new inventory.
+        local invID = bash.Inventory.GetUnusedID();
+
+        -- TODO: Add default items.
+        local items = {};
+        hook.Run("GetStarterItems", items, charData);
+
+        bash.Inventory.Create({}, invID);
+        charData["Inventory"]["Primary"] = invID;
+
+        bash.Util.MsgLog(LOG_CHAR, "Creating a new character with the ID '%s' and name '%s'...", charData.CharID, charData.Name);
+
+        bash.Database.InsertRow("bash_chars", charData, function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then
+                bash.Util.MsgErr("CharCreateFailed", charID);
+                return;
+            end
+
+            bash.Util.MsgLog(LOG_CHAR, "Successfully created new character '%s'.", charID);
+
+            if ply then
+                bash.Character.Load(charID, ply, true);
+            end
+        end);
     end
 
     -- Fetch all data from the database tied to a character ID.
@@ -171,7 +219,7 @@ if SERVER then
         local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
         bash.Character.DetachFrom(oldOwner, false);
 
-        bash.Util.MsgDebug(LOG_CHAR, "Attaching character '%s' to entity '%s'...", id, tostring(ent));
+        bash.Util.MsgLog(LOG_CHAR, "Attaching character '%s' to entity '%s'...", id, tostring(ent));
         -- Add both for two-way lookup.
         reg:SetData{
             Public = {
@@ -194,7 +242,7 @@ if SERVER then
         local char = ent:GetCharacter();
         local charID = char:Get("CharID");
         local index = ent:EntIndex();
-        bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", charID, tostring(ent));
+        bash.Util.MsgLog(LOG_CHAR, "Detaching character '%s' from entity '%s'...", charID, tostring(ent));
 
         reg:Delete(index, charID);
         char:RemoveListener(ent, NET_PRIVATE);
@@ -208,6 +256,24 @@ if SERVER then
     --
     -- Engine hooks.
     --
+
+    -- Fetch all used IDs.
+    hook.Add("OnDatabaseConnected", "bash_CharacterFetchIDs", function()
+        bash.Util.MsgDebug(LOG_CHAR, "Fetching used CharIDs...");
+
+        bash.Database.Query("SELECT CharID FROM `bash_chars`;", function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then return; end
+
+            local index = 0;
+            for _, tab in pairs(results.data) do
+                bash.Character.IDs[tab.CharID] = true;
+                index = index + 1;
+            end
+
+            bash.Util.MsgDebug(LOG_CHAR, "Fetched %d CharIDs from the database.", index);
+        end);
+    end);
 
     -- Push changes to SQL.
     hook.Add("TableUpdate", "bash_CharacterPushToDatabase", function(regID, data)
@@ -246,10 +312,6 @@ if SERVER then
         local ply = pck.Source;
         local id = pck:String();
         bash.Character.Load(id, ply, true);
-
-        timer.Simple(5, function()
-            MsgN(collectgarbage("count") / 1024);
-        end);
     end);
 
 elseif CLIENT then

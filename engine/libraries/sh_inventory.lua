@@ -20,6 +20,7 @@ INV_STORE = "Storage";
 
 bash.Inventory          = bash.Inventory or {};
 bash.Inventory.Vars     = bash.Inventory.Vars or {};
+bash.Inventory.IDs      = bash.Inventory.IDs or {};
 bash.Inventory.Types    = bash.Inventory.Types or {};
 bash.Inventory.Cache    = bash.Inventory.Cache or {};
 bash.Inventory.Waiting  = bash.Inventory.Waiting or {};
@@ -49,12 +50,12 @@ function bash.Inventory.AddVar(data)
 end
 
 -- Add a new inventory type struct.
-function bash.Inventory.AddType(id, name, x, y)
-    bash.Inventory.Types[id] = {
-        ID = id,
-        Name = name,
-        SizeX = x,
-        SizeY = y
+function bash.Inventory.Register(inv)
+    bash.Inventory.Types[inv.ID] = {
+        ID = inv.ID,
+        Name = inv.Name,
+        SizeX = inv.SizeX,
+        SizeY = inv.SizeY
     };
 end
 
@@ -92,6 +93,20 @@ function bash.Inventory.HasUniqueItem(invID, id)
 end
 
 if SERVER then
+
+    -- Get an ununused InvID.
+    function bash.Inventory.GetUnusedID()
+        local id;
+        repeat
+            id = string.random(12, CHAR_ALPHANUM, "inv_");
+        until !bash.Inventory.IDs[id];
+        return id;
+    end
+
+    -- Create a new inventory from scratch.
+    function bash.Inventory.Create(data, forceID)
+        -- TODO: This function.
+    end
 
     -- Fetch all data from the database tied to an inventory ID.
     function bash.Inventory.Fetch(id)
@@ -165,14 +180,66 @@ if SERVER then
         end
     end
 
-    -- Add an item to an inventory.
-    function bash.Inventory.AddItem(invID, itemID)
+    -- Attempts to insert an item into an inventory (changes owner and position).
+    function bash.Inventory.InsertItem(invID, itemID)
         -- TODO: Handle non-registered inventories.
-        if !bash.TableNet.IsRegistered(invID) then return; end
-        if !bash.TableNet.IsRegistered(itemID) then return; end
-
         local inv = bash.TableNet.Get(invID);
         local item = bash.TableNet.Get(itemID);
+        if !inv then return; end
+        if !item then return; end
+
+        local contents = inv:Get("Contents", {});
+        if contents[itemID] then return; end
+
+        local invTypeID = inv:Get("InvType", "");
+        local invType = bash.Inventory.Types[invTypeID];
+        if !invType then return; end
+
+        local occupied = {};
+        for xIndex = 1, invType.SizeX do
+            occupied[xIndex] = occupied[xIndex] or {};
+            for yIndex = 1, invType.SizeY do
+                occupied[xIndex][yIndex] = 0;
+            end
+        end
+
+        local curItem, itemPos, itemTypeID, itemType;
+        for _itemID, _ in pairs(contents) do
+            curItem = bash.TableNet.Get(_itemID);
+            if !curItem then continue; end
+
+            itemPos = curItem:Get("PosInInv", {});
+            if !itemPos.X or !itemPos.Y then continue; end
+
+            itemTypeID = curItem:Get("ItemType", "");
+            itemType = bash.Item.Types[itemTypeID];
+            if !itemType then continue; end
+
+            for xIndex = itemPos.X, itemPos.X + (itemType.SizeX - 1) do
+                for yIndex = itemPos.Y, itemPos.Y + (itemType.SizeY - 1) do
+                    occupied[xIndex][yIndex] = _itemID;
+                end
+            end
+        end
+
+        itemPos = item:Get("PosInInv", {});
+        if !itemPos.X or !itemPos.Y then return; end
+
+        itemTypeID = item:Get("ItemType", "");
+        itemType = bash.Item.Types[itemTypeID];
+        if !itemType then return; end
+
+
+    end
+
+    -- Add an item to an inventory (only changes owner).
+    function bash.Inventory.AddItem(invID, itemID)
+        -- TODO: Handle non-registered inventories.
+        local inv = bash.TableNet.Get(invID);
+        local item = bash.TableNet.Get(itemID);
+        if !inv then return; end
+        if !item then return; end
+
         local contents = inv:Get("Contents", {});
         local oldInvID = item:Get("Owner");
 
@@ -191,7 +258,6 @@ if SERVER then
 
             oldContents[itemID] = nil;
             oldInv:Set("Contents", oldContents);
-            --bash.Inventory.RemoveItem(oldInvID, itemID);
         end
     end
 
@@ -296,6 +362,24 @@ if SERVER then
     -- Engine hooks.
     --
 
+    -- Fetch all used IDs.
+    hook.Add("OnDatabaseConnected", "bash_InventoryFetchIDs", function()
+        bash.Util.MsgDebug(LOG_INV, "Fetching used InvIDs...");
+
+        bash.Database.Query("SELECT InvID FROM `bash_invs`;", function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then return; end
+
+            local index = 0;
+            for _, tab in pairs(results.data) do
+                bash.Inventory.IDs[tab.InvID] = true;
+                index = index + 1;
+            end
+
+            bash.Util.MsgDebug(LOG_INV, "Fetched %d InvIDs from the database.", index);
+        end);
+    end);
+
     -- Attach a character's inventory to owner.
     hook.Add("OnCharacterAttach", "bash_InventoryAttachChar", function(char, ent)
         local invs = char:Get("Inventory", {});
@@ -375,7 +459,7 @@ hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
         end
     end
 
-    bash.Inventory.AddType("invtype_basic", "Basic", 5, 5);
+    bash.Util.ProcessDir("engine/inventories", false, "SHARED");
 
     bash.Inventory.AddVar{
         ID = "InvNum",
@@ -421,4 +505,11 @@ hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
         Default = EMPTY_TABLE,
         Scope = NET_PUBLIC
     };
+
+    PrintTable(bash.Inventory.Types);
+end);
+
+-- Register inventory types (schema).
+hook.Add("CreateStructures", "bash_InventoryRegisterTypes", function()
+    bash.Util.ProcessDir("schema/inventories", false, "SHARED");
 end);

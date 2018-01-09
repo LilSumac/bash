@@ -16,6 +16,8 @@ local LOG_ITEM = {pre = "[ITEM]", col = color_limegreen};
 
 bash.Item           = bash.Item or {};
 bash.Item.Vars      = bash.Item.Vars or {};
+bash.Item.IDs       = bash.Item.IDs or {};
+bash.Item.Types     = bash.Item.Types or {};
 bash.Item.Cache     = bash.Item.Cache or {};
 bash.Item.Waiting   = bash.Item.Waiting or {};
 
@@ -42,7 +44,36 @@ function bash.Item.AddVar(data)
     end
 end
 
+-- Add a new item type struct.
+function bash.Item.Register(data)
+    bash.Item.Types[data.ID] = {
+        ID = data.ID,
+        Name = data.Name,
+        SizeX = data.SizeX,
+        SizeY = data.SizeY
+    };
+end
+
 if SERVER then
+
+    -- Create a new item blueprint.
+    function bash.Item.Register(data)
+
+    end
+
+    -- Get an ununused ItemID.
+    function bash.Item.GetUnusedID()
+        local id;
+        repeat
+            id = string.random(12, CHAR_ALPHANUM, "item_");
+        until !bash.Item.IDs[id];
+        return id;
+    end
+
+    -- Create a new item from scratch.
+    function bash.Item.Create(data, forceID)
+        -- TODO: This function.
+    end
 
     -- Fetch all data from the database tied to an item ID.
     function bash.Item.Fetch(id)
@@ -90,6 +121,24 @@ if SERVER then
     --
     -- Engine hooks.
     --
+
+    -- Fetch all used IDs.
+    hook.Add("OnDatabaseConnected", "bash_ItemFetchIDs", function()
+        bash.Util.MsgDebug(LOG_ITEM, "Fetching used ItemIDs...");
+
+        bash.Database.Query("SELECT ItemID FROM `bash_items`;", function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then return; end
+
+            local index = 0;
+            for _, tab in pairs(results.data) do
+                bash.Item.IDs[tab.ItemID] = true;
+                index = index + 1;
+            end
+
+            bash.Util.MsgDebug(LOG_ITEM, "Fetched %d ItemIDs from the database.", index);
+        end);
+    end);
 
     -- Push changes to SQL.
     hook.Add("TableUpdate", "bash_ItemPushToDatabase", function(regID, data)
@@ -209,6 +258,8 @@ end
 
 -- Create item structures.
 hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
+    bash.Util.ProcessDir("engine/items", false, "SHARED");
+
     bash.Item.AddVar{
         ID = "ItemNum",
         Type = "counter",
@@ -249,4 +300,9 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
         InSQL = true,
         MaxLength = 64
     };
+end);
+
+-- Register inventory types (schema).
+hook.Add("CreateStructures", "bash_ItemRegisterTypes", function()
+    bash.Util.ProcessDir("schema/items", false, "SHARED");
 end);

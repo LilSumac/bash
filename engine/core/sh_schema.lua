@@ -37,6 +37,14 @@ function bash.StartSchema()
     };
     SCHEMA.RefreshTime = SysTime();
 
+    -- Include all other schema components.
+    bash.Util.ProcessFile("sv_resources.lua");
+    bash.Util.ProcessDir("schema/external");
+    bash.Util.ProcessDir("schema/config");
+    bash.Util.ProcessDir("schema/hooks");
+    bash.Util.ProcessDir("schema/libraries");
+    bash.Util.ProcessDir("schema/derma");
+
     -- Hooks for init process.
     bash.Util.MsgLog(LOG_INIT, "Creating schema preliminary structures...");
     hook.Run("CreateStructures");

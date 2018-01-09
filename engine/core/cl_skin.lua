@@ -377,6 +377,31 @@ function SKIN:PaintTextEntry(panel, w, h)
 	panel:DrawTextEntryText(panel:GetTextColor(), panel:GetHighlightColor(), panel:GetCursorColor());
 end
 
+function SKIN:PaintMenu(panel, w, h)
+    surface.SetDrawColor(Color(200, 200, 200));
+    surface.DrawRect(0, 0, 22, h);
+    surface.SetDrawColor(Color(158, 167, 172));
+    surface.DrawRect(22, 0, w - 22, h);
+    surface.SetDrawColor(Color(50, 50, 50));
+    surface.DrawOutlinedRect(0, 0, w, h);
+end
+
+function SKIN:PaintMenuSpacer(panel, w, h)
+    surface.SetDrawColor(Color(0, 0, 0, 100));
+	surface.DrawRect(0, 0, w, h);
+end
+
+function SKIN:PaintMenuOption(panel, w, h)
+    if panel.m_bBackground and (panel.Hovered or panel.Highlight) then
+        surface.SetDrawColor(Color(225, 225, 255));
+        surface.DrawRect(1, 1, w - 2, h - 2);
+	end
+
+	if panel:GetChecked() then
+		self.tex.Menu_Check(5, (h / 2) - 7, 15, 15);
+	end
+end
+
 derma.DefineSkin("/bash/skin/", "Default skin for /bash/.", SKIN);
 
 hook.Add("ForceDermaSkin", "bash_SkinForce", function()

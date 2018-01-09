@@ -63,6 +63,7 @@ ERR_TYPES["QueryNumFailed"] = "The #%d SQL query in the statement failed!\nQuery
 ERR_TYPES["NoValidItem"] = "No item available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory type available with the ID '%s' in networked table '%s'!";
+ERR_TYPES["CharCreateFailed"] = "Failed to create character with ID '%s'.";
 
 ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";

@@ -136,7 +136,7 @@ function bash.Util.ProcessFile(file, forceScope)
 end
 
 -- Process all files in a directory relative to the root gamemode folder or CWD.
-function bash.Util.ProcessDir(dir, relative)
+function bash.Util.ProcessDir(dir, relative, forceScope)
     local src;
     if relative then
         local from = debug.getinfo(2);
@@ -144,13 +144,13 @@ function bash.Util.ProcessDir(dir, relative)
         src = src:GetPathFromFilename();
         src = src:Replace("gamemodes/", "");
     else
-        src = GM.FolderName .. "/";
+        src = (SCHEMA and SCHEMA.FolderName or GM.FolderName) .. "/";
     end
     src = src .. dir .. "/";
 
     local files, dirs = file.Find(src .. "*.lua", "LUA", nameasc);
     for _, file in pairs(files) do
         file = src .. file;
-        bash.Util.ProcessFile(file);
+        bash.Util.ProcessFile(file, forceScope);
     end
 end
