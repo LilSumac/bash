@@ -64,6 +64,11 @@ function bash.Inventory.GetRegistry()
     return bash.TableNet.Get("bash_InvRegistry");
 end
 
+-- Check to see if an inventory is currently attached to an entity.
+function bash.Inventory.IsInUse(id)
+    return bash.Inventory.GetRegistry():Get(id);
+end
+
 -- Checks to see if an inventory contains an item in a certain quantity.
 function bash.Inventory.HasItem(invID, id, amount)
     amount = amount or 1;
@@ -104,8 +109,36 @@ if SERVER then
     end
 
     -- Create a new inventory from scratch.
-    function bash.Inventory.Create(data, forceID)
+    function bash.Inventory.Create(data, forceID, silent)
         -- TODO: This function.
+        local invID = forceID or bash.Inventory.GetUnusedID();
+        data.InvID = invID;
+
+        local invData = {};
+        for id, var in pairs(bash.Inventory.Vars) do
+            if !var.InSQL or var.Type == "counter" then continue; end
+            invData[id] = data[id] or handleFunc(var.Default);
+        end
+        PrintTable(invData);
+
+        if !bash.Inventory.Types[invData.InvType] then return; end
+
+        bash.Util.MsgLog(LOG_INV, "Creating a new inventory with the ID '%s'...", invID);
+        bash.Inventory.IDs[invID] = true;
+
+        bash.Database.InsertRow("bash_invs", invData, function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then
+                bash.Util.MsgErr("InvCreateFailed", invID);
+                bash.Inventory.IDs[invID] = nil;
+                return;
+            end
+
+            bash.Util.MsgLog(LOG_INV, "Successfully created new inventory '%s'.", invID);
+            if !silent then bash.Inventory.Load(invID); end
+        end);
+
+        return invID;
     end
 
     -- Fetch all data from the database tied to an inventory ID.
@@ -115,6 +148,10 @@ if SERVER then
         bash.Database.Query(F("SELECT * FROM `bash_invs` WHERE InvID = \'%s\'; SELECT * FROM `bash_items` WHERE Owner = \'%s\';", id, id), function(resultsTab)
             local invResults = resultsTab[1];
             if !invResults.status then return; end
+            if invResults.affected == 0 then
+                bash.Util.MsgErr("InvNotFound", id);
+                return;
+            end
             local itemResults = resultsTab[2];
             if !itemResults.status then return; end
 
@@ -149,7 +186,7 @@ if SERVER then
     end
 
     -- Create a new instance of an inventory.
-    function bash.Inventory.Load(id)
+    function bash.Inventory.Load(id, ent, forceFetch, deleteOld)
         -- TODO: Finish this function.
         if !bash.Inventory.Cache[id] then
             bash.Util.MsgDebug(LOG_INV, "Request to load inventory '%s' is waiting on data.", id);
@@ -166,17 +203,17 @@ if SERVER then
             bash.TableNet.NewTable(invData, nil, id);
         end
 
-        bash.Inventory.LoadContents(id);
-        bash.Inventory.AttachTo(id, invData.Public.Owner);
+        bash.Inventory.LoadContents(id, ent);
+        bash.Inventory.AttachTo(id, ent, deleteOld);
     end
 
     -- Create all containing items in an inventory.
-    function bash.Inventory.LoadContents(id)
+    function bash.Inventory.LoadContents(id, ent)
         local inv = bash.TableNet.Get(id);
         if !inv then return; end
 
         for itemID, _ in pairs(inv:Get("Contents", {})) do
-            bash.Item.Load(itemID);
+            bash.Item.Load(itemID, ent, );
         end
     end
 
@@ -249,6 +286,7 @@ if SERVER then
         bash.Util.MsgDebug(LOG_INV, "Adding item '%s' to inventory '%s'.", itemID, invID);
 
         local ply = bash.Inventory.GetPlayerOwner(invID);
+        if !ply then return; end
         item:AddListener(ply, NET_PUBLIC);
 
         if invID != oldInvID then
@@ -295,7 +333,11 @@ if SERVER then
     end
 
     -- Associate an inventory with the given owner.
-    function bash.Inventory.AttachTo(id, ownerID)
+    function bash.Inventory.AttachTo(id, ent, deleteOld)
+        if !isent(ent) then return; end
+        bash.Inventory.DetachFrom()
+
+
         -- TODO: Finish this function.
         local inv = bash.TableNet.Get(id);
         if !inv then return; end
@@ -310,6 +352,10 @@ if SERVER then
             ent = (curUser and ents.GetByIndex(curUser)) or nil;
         elseif ownerID:sub(1, 5) == "item_" then
             invType = INV_ITEM;
+
+            local reg = bash.Item.GetRegistry();
+            local curItem = reg:Get(ownerID);
+            ent = (curUser and ents.GetByIndex(curUser)) or nil;
         elseif ownerID:sub(1, 6) == "store_" then
             invType = INV_STORE;
             -- TODO: Find active storage entity.
@@ -331,15 +377,23 @@ if SERVER then
                 if !curItem then continue; end
                 curItem:AddListener(ent, NET_PUBLIC);
             end
-        elseif invType == INV_ITEM then
-
-        elseif invType == INV_STORE then
-            -- TODO: Link to storage entity.
         end
+
+        local reg = bash.Item.GetRegistry();
+        local index = ent:EntIndex();
+        reg:SetData{
+            Public = {
+                [index] = id,
+                [id] = index
+            }
+        };
+
+        local inv = bash.TableNet.Get(id);
+        hook.Run("OnInventoryAttach", inv, ent);
     end
 
     -- Dissociate an inventory associated with an entity.
-    function bash.Inventory.DetachFrom(id, ent)
+    function bash.Inventory.DetachFrom(id, ent, delete)
         local inv = bash.TableNet.Get(id);
         if !inv then return; end
         if !isent(ent) and !isplayer(ent) then return; end
@@ -353,8 +407,15 @@ if SERVER then
                 curItem = bash.TableNet.Get(itemID);
                 curItem:RemoveListener(ent, NET_PUBLIC);
             end
-        elseif isent(ent) then
-            -- TODO: Remove link to storage entity/item.
+        end
+
+        local reg = bash.Inventory.GetRegistry();
+        local index = ent:EntIndex();
+        reg:Delete(index, id);
+        hook.Run("OnInventoryDetach", inv, ent);
+
+        if delete then
+            bash.TableNet.DeleteTable(id);
         end
     end
 
@@ -384,7 +445,7 @@ if SERVER then
     hook.Add("OnCharacterAttach", "bash_InventoryAttachChar", function(char, ent)
         local invs = char:Get("Inventory", {});
         for slot, inv in pairs(invs) do
-            bash.Inventory.Load(inv);
+            bash.Inventory.Load(inv, ent);
         end
     end);
 
@@ -498,12 +559,6 @@ hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
         Default = "",
         Scope = NET_PUBLIC,
         InSQL = true
-    };
-    bash.Inventory.AddVar{
-        ID = "Spaces",
-        Type = "table",
-        Default = EMPTY_TABLE,
-        Scope = NET_PUBLIC
     };
 
     PrintTable(bash.Inventory.Types);

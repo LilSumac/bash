@@ -13,9 +13,16 @@ function ITEM:SetItem(itemID)
         self.ItemID = itemID;
         self.ItemObj = bash.TableNet.Get(itemID);
         self.ItemName = self.ItemObj:Get("ItemNum");
+
         local pos = self.ItemObj:Get("PosInInv", {});
         self.PosX = pos.X;
         self.PosY = pos.Y;
+
+        local itemTypeID = self.ItemObj:Get("ItemType", "");
+        local itemType = bash.Item.Types[itemTypeID];
+        self.SizeX = itemType.Static.SizeX;
+        self.SizeY = itemType.Static.SizeY;
+
         self.InvID = self.ItemObj:Get("Owner", "");
     end
 end
@@ -26,8 +33,8 @@ function ITEM:ClearItem()
     self.ItemName = nil;
     self.PosX = -1;
     self.PosY = -1;
-    self.SizeX = 2;
-    self.SizeY = 2;
+    self.SizeX = -1;
+    self.SizeY = -1;
     self.InvID = "";
 end
 

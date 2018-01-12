@@ -16,7 +16,7 @@ function CHAR:Init()
         if ent != LocalPlayer() then return; end
         if !LocalPlayer().WaitingOn then return; end
 
-        if LocalPlayer().WaitingOn == char:Get("CharID") then
+        if LocalPlayer().WaitingOn == char:Get("CharID") or LocalPlayer().WaitingOn == char:Get("Name") then
             LocalPlayer().WaitingOn = false;
             self:Remove();
         end
@@ -53,6 +53,30 @@ function CHAR:RepopulateList()
         if LocalPlayer():IsCharacter(char.CharID) then
             curChar:SetEnabled(false);
         end
+    end
+
+    local create = self.ListContainer:Add("DButton");
+    create:SetText("Create Character");
+    create:Dock(TOP);
+    create:DockMargin(0, 0, 0, 5);
+    create.DoClick = function(_self)
+        Derma_StringRequest(
+            "Create a Character",
+            "Please give a valid name for your character.",
+            "John Doe",
+            function(text)
+                local createReq = vnet.CreatePacket("bash_Net_CharacterCreateRequest");
+                createReq:String(text);
+                createReq:AddServer();
+                createReq:Send();
+
+                LocalPlayer().WaitingOn = text;
+                self:RemoveList();
+                self.WaitingOnChar = true;
+            end,
+            function() end,
+            "Create"
+        );
     end
 end
 

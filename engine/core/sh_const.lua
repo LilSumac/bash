@@ -64,6 +64,11 @@ ERR_TYPES["NoValidItem"] = "No item available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory type available with the ID '%s' in networked table '%s'!";
 ERR_TYPES["CharCreateFailed"] = "Failed to create character with ID '%s'.";
+ERR_TYPES["InvCreateFailed"] = "Failed to create inventory with ID '%s'.";
+ERR_TYPES["ItemCreateFailed"] = "Failed to create item with ID '%s'.";
+ERR_TYPES["CharNotFound"] = "Failed to find an character with the ID '%s'.";
+ERR_TYPES["ItemNotFound"] = "Failed to find an item with the ID '%s'.";
+ERR_TYPES["InvNotFound"] = "Failed to find an inventory with the ID '%s'.";
 
 ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
