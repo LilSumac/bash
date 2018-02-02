@@ -79,22 +79,22 @@ do
 					local v = tbl[ i ];
 					if v == nil then
 						output[ #output + 1 ] = '!';
-						continue
-					end
-					local tv = type( v );
-					-- HANDLE POINTERS
-					if( tv == 'string' )then
-						local pid = cache[ v ];
-						if( pid )then
-							output[ #output + 1 ] = '('..pid..')';
-						else
-							cacheSize = cacheSize + 1;
-							cache[ v ] = cacheSize;
-
-							self.string( self, v, output, cache );
-						end
 					else
-						self[ tv ]( self, v, output, cache );
+						local tv = type( v );
+						-- HANDLE POINTERS
+						if( tv == 'string' )then
+							local pid = cache[ v ];
+							if( pid )then
+								output[ #output + 1 ] = '('..pid..')';
+							else
+								cacheSize = cacheSize + 1;
+								cache[ v ] = cacheSize;
+
+								self.string( self, v, output, cache );
+							end
+						else
+							self[ tv ]( self, v, output, cache );
+						end
 					end
 				end
 			end

@@ -326,7 +326,7 @@ do
 
         --print("returning writing", prog + 3, true)
 
-        return prog + 3, true // 3 bytes for data length prefix and fraction type
+        return prog + 3, true -- 3 bytes for data length prefix and fraction type
     end
 
     local function writeMisc(typ, val, prog)
@@ -541,7 +541,7 @@ do
 
                     local function specificDequeue() return dequeue(ind) end
 
-                    local frac = math_max(package_fraction_current, math_floor((chunk_size_current - 14 - #tc * 5) / #qc))  //  "14" is the max size of extra data per packet.
+                    local frac = math_max(package_fraction_current, math_floor((chunk_size_current - 14 - #tc * 5) / #qc))  --  "14" is the max size of extra data per packet.
                     local prog, totalfails, suc = 0, 0, false
 
                     Start(msg_name)
@@ -566,7 +566,7 @@ do
                         prog, suc = writePacket(pck, prog, frac, specificDequeue)
 
                         if suc then
-                            frac = math_max(frac, math_floor((chunk_size_current - prog - 14) / #qc))   //  Without this, it could write multiple pieces of remaining packets, wasting some bytes.
+                            frac = math_max(frac, math_floor((chunk_size_current - prog - 14) / #qc))   --  Without this, it could write multiple pieces of remaining packets, wasting some bytes.
                         else
                             totalfails = totalfails + 1
 
@@ -956,7 +956,7 @@ do
 
             lastFlush = nao
 
-            local frac = math_max(package_fraction_current, math_floor((chunk_size_current - 20) / #queue_outgoing))    //  "20" is the estimated max size of extra data per packet.
+            local frac = math_max(package_fraction_current, math_floor((chunk_size_current - 20) / #queue_outgoing))    --  "20" is the estimated max size of extra data per packet.
             local prog = 0
 
             Start(msg_name)
@@ -1268,17 +1268,21 @@ local function _addplys(self, plys)
         local ply;
         if type(val) == "table" then
             _addplys(self, val);
-            continue;
-        elseif (type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer())) and key:IsValid() then
-            ply = key;
-        elseif (type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer())) and val:IsValid() then
-            ply = val;
         else
-            -- assume the value is at fault, not the key
-            error("cannot add a " .. type(val) .. " as target(s) (" .. tostring(val) .. ")");
+            if (type(key) == "Player" or (type(key) == "Entity" and key:IsPlayer())) and key:IsValid() then
+                ply = key;
+            elseif (type(val) == "Player" or (type(val) == "Entity" and val:IsPlayer())) and val:IsValid() then
+                ply = val;
+            else
+                -- assume the value is at fault, not the key
+                error("cannot add a " .. type(val) .. " as target(s) (" .. tostring(val) .. ")");
+            end
         end
-
-        self.Targets[#self.Targets + 1] = ply;
+        
+        if ply then
+            self.Targets[#self.Targets + 1] = ply;
+            self.Targets[ply] = true;
+        end
     end
 end
 

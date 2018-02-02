@@ -70,7 +70,6 @@ if !tmysql4 then
     local status, mod = pcall(require, "tmysql4");
     if !status then
         bash.Util.MsgErr("NoDBModule");
-        return;
     else
         bash.Util.MsgLog(LOG_INIT, "tmysql4 module loaded.");
     end
@@ -78,6 +77,8 @@ end
 
 -- Connect to the database.
 function bash.Database.Connect()
+    if !tmysql then return; end
+
     local obj, err = tmysql.initialize(
         DB_HOST, DB_USER, DB_PASS, DB_DATA,
         DB_PORT, nil, CLIENT_MULTI_STATEMENTS
@@ -184,6 +185,8 @@ end
 
 -- Check to see if all tables in database struct exist in the database.
 function bash.Database.CheckTables()
+    if !bash.Database.Connected then return; end
+
     if table.IsEmpty(bash.Database.Tables) then
         bash.Util.MsgDebug(LOG_DB, "No tables registered in database. Skipping...");
         return;
@@ -224,6 +227,8 @@ end
 
 -- Select a row from the database with certain conditions.
 function bash.Database.SelectRow(tab, cols, conds, callback, ...)
+    if !bash.Database.Connected then return; end 
+
     cols = cols or "*";
     local query = Format("SELECT %s FROM %s", cols, tab);
     if conds and conds != "" then
@@ -254,6 +259,7 @@ end
 
 -- Insert a new row into the database with data.
 function bash.Database.InsertRow(tab, data, callback, ...)
+    if !bash.Database.Connected then return; end
     if !bash.Database.Tables[tab] then return; end
 
     bash.Database.CastData(tab, data, CAST_IN);
@@ -275,6 +281,8 @@ end
 
 -- Update an existing row in the database.
 function bash.Database.UpdateRow(tab, data, cond, callback, ...)
+    if !bash.Database.Connected then return; end
+
     bash.Database.CastData(tab, data, CAST_IN);
     local query = Format("UPDATE %s SET ", tab);
     local vals = {};
@@ -295,6 +303,8 @@ end
 -- Delete a row from the database.
 function bash.Database.DeleteRow(tab, cond, callback, ...)
     -- TODO: Finish this function.
+    if !bash.Database.Connected then return; end
+    
     local query = Format("DELETE FROM %s WHERE %s;", tab, cond);
     bash.Database.Query(query, callback, ...);
 end
