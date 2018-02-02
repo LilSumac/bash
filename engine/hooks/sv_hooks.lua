@@ -38,6 +38,7 @@ end
 gameevent.Listen("player_disconnect");
 hook.Add("player_disconnect", "bash_RemoveClientData", function(data)
     if data.bot == 0 then
+        bash.ClientData = bash.ClientData or {};
         bash.ClientData[data.networkid] = nil;
     end
 end);

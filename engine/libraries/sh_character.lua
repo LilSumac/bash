@@ -112,43 +112,62 @@ if SERVER then
     -- Create a new character from scratch.
     function bash.Character.Create(data, ply, forceID)
         -- TODO: This function.
-        local charID = forceID;
-        if !charID then
-            charID = bash.Character.GetUnusedID();
-        end
+        local charID = forceID or bash.Character.GetUnusedID();
         data.CharID = charID;
 
         local charData = {};
         for id, var in pairs(bash.Character.Vars) do
-            if !var.InSQL then continue; end
+            if !var.InSQL or var.Type == "counter" then continue; end
             charData[id] = data[id] or handleFunc(var.Default);
         end
 
         -- Create new inventory.
         local invID = bash.Inventory.GetUnusedID();
+        local invData = {};
 
-        -- TODO: Add default items.
+        -- Create new items.
         local items = {};
+        local money = bash.Item.Create({
+            ItemType = "money",
+            Owner = invID,
+            PosInInv = {
+                X = 1,
+                Y = 1
+            },
+            DynamicData = {
+                Stack = 4000
+            }
+        }, nil, true);
+        items[money] = true;
         hook.Run("GetStarterItems", items, charData);
 
-        bash.Inventory.Create({}, invID);
+        bash.Inventory.Create({
+            InvType = "invtype_basic",
+            Contents = items,
+            Owner = charID
+        }, invID, true);
+
         charData["Inventory"]["Primary"] = invID;
 
         bash.Util.MsgLog(LOG_CHAR, "Creating a new character with the ID '%s' and name '%s'...", charData.CharID, charData.Name);
+        bash.Character.IDs[charID] = true;
 
         bash.Database.InsertRow("bash_chars", charData, function(resultsTab)
             local results = resultsTab[1];
             if !results.status then
                 bash.Util.MsgErr("CharCreateFailed", charID);
+                bash.Character.IDs[charID] = nil;
                 return;
             end
 
             bash.Util.MsgLog(LOG_CHAR, "Successfully created new character '%s'.", charID);
 
             if ply then
-                bash.Character.Load(charID, ply, true);
+                bash.Character.Load(charID, ply, true, true);
             end
         end);
+
+        return charID;
     end
 
     -- Fetch all data from the database tied to a character ID.
@@ -158,6 +177,10 @@ if SERVER then
         bash.Database.Query(F("SELECT * FROM `bash_chars` WHERE CharID = \'%s\';", id), function(resultsTab)
             local results = resultsTab[1];
             if !results.status then return; end
+            if results.affected == 0 then
+                bash.Util.MsgErr("CharNotFound", id);
+                return;
+            end
 
             local fetchData, charData = results.data[1], {};
             if !fetchData then return; end
@@ -173,17 +196,17 @@ if SERVER then
             local wait = bash.Character.Waiting[id];
             if wait then
                 bash.Character.Waiting[id] = nil;
-                bash.Character.Load(id, wait._ent, wait._deleteOld);
+                bash.Character.Load(id, wait._ent, false, wait._deleteOld);
             end
         end);
     end
 
     -- Create a new instance of a character.
-    function bash.Character.Load(id, ent, deleteOld)
+    function bash.Character.Load(id, ent, forceFetch, deleteOld)
         -- TODO: Finish this function.
-        if ent:GetCharacter() and ent:GetCharacter():Get("CharID") == id then return; end
+        if ent:IsCharacter(id) then return; end
 
-        if !bash.Character.Cache[id] then
+        if !bash.Character.Cache[id] or forceFetch then
             bash.Util.MsgDebug(LOG_CHAR, "Request to load character '%s' is waiting on data.", id);
 
             bash.Character.Waiting[id] = {
@@ -220,6 +243,7 @@ if SERVER then
         bash.Character.DetachFrom(oldOwner, false);
 
         bash.Util.MsgLog(LOG_CHAR, "Attaching character '%s' to entity '%s'...", id, tostring(ent));
+
         -- Add both for two-way lookup.
         reg:SetData{
             Public = {
@@ -311,7 +335,17 @@ if SERVER then
     vnet.Watch("bash_Net_CharacterLoadRequest", function(pck)
         local ply = pck.Source;
         local id = pck:String();
-        bash.Character.Load(id, ply, true);
+        bash.Character.Load(id, ply, true, true);
+    end);
+
+    -- Watch for character creation requests.
+    vnet.Watch("bash_Net_CharacterCreateRequest", function(pck)
+        local ply = pck.Source;
+        local name = pck:String();
+        bash.Character.Create({
+            SteamID = ply:SteamID(),
+            Name = name
+        }, ply);
     end);
 
 elseif CLIENT then
@@ -356,7 +390,6 @@ elseif CLIENT then
         if regID != "bash_CharRegistry" then return; end
 
         local handled, ent, entInd, oldCharID = {};
-        PrintTable(deleted);
         for key, val in pairs(deleted) do
             if isstring(key) then
                 oldCharID = key;
@@ -367,7 +400,6 @@ elseif CLIENT then
             else continue; end
             if handled[entInd] then continue; end
             ent = ents.GetByIndex(entInd);
-            MsgN(ent);
             if !isent(ent) and !isplayer(ent) then continue; end
 
             bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", oldCharID, tostring(ent));
@@ -454,7 +486,8 @@ hook.Add("CreateStructures_Engine", "bash_CharacterStructures", function()
         Type = "string",
         Default = "models/breen.mdl",
         Scope = NET_PUBLIC,
-        InSQL = true
+        InSQL = true,
+        MaxLength = 128
     };
     bash.Character.AddVar{
         ID = "Inventory",

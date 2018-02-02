@@ -22,6 +22,26 @@ bash.Item.Cache     = bash.Item.Cache or {};
 bash.Item.Waiting   = bash.Item.Waiting or {};
 
 --
+-- Entity functions.
+--
+
+-- Get an entity's assigned character, if any.
+function Entity:GetItem()
+    local reg = bash.Item.GetRegistry();
+    if !reg then return; end
+
+    local index = self:EntIndex();
+    local itemID = reg:Get(index);
+
+    return bash.TableNet.Get(itemID);
+end
+
+-- Check if an entity has a certain item attached.
+function Entity:IsItem(id)
+    return self:GetItem() and self:GetItem():Get("ItemID") == id;
+end
+
+--
 -- Item functions.
 --
 
@@ -46,20 +66,37 @@ end
 
 -- Add a new item type struct.
 function bash.Item.Register(item)
-    bash.Item.Types[item.ID] = {
-        ID = item.ID,
-        Name = item.Name,
-        SizeX = item.SizeX,
-        SizeY = item.SizeY
-    };
+    bash.Util.MsgDebug(LOG_ITEM, "Registering item type with ID '%s'...", item.Static.ID);
+
+    local itemData = {};
+
+    -- Static fields.
+    itemData.Static             = item.Static or {};
+    itemData.Static.ID          = item.Static.ID or "bash_itemid";
+    itemData.Static.Name        = item.Static.Name or "Item";
+    itemData.Static.SizeX       = item.Static.SizeX or 1;
+    itemData.Static.SizeY       = item.Static.SizeY or 1;
+    itemData.Static.CanStack    = item.Static.CanStack or false;
+    itemData.Static.MaxStack    = item.Static.MaxStack or 1;
+
+    -- Dynamic fields.
+    itemData.Dynamic = item.Dynamic or {};
+    itemData.Dynamic.Stack = item.Dynamic.Stack or 1;
+
+    bash.Item.Types[itemData.Static.ID] = itemData;
+end
+
+-- Get the item registry.
+function bash.Item.GetRegistry()
+    return bash.TableNet.Get("bash_ItemRegistry");
+end
+
+-- Check to see if an item is currently attached to an entity.
+function bash.Item.IsInUse(id)
+    return bash.Item.GetRegistry():Get(id);
 end
 
 if SERVER then
-
-    -- Create a new item blueprint.
-    function bash.Item.Register(data)
-
-    end
 
     -- Get an ununused ItemID.
     function bash.Item.GetUnusedID()
@@ -71,8 +108,42 @@ if SERVER then
     end
 
     -- Create a new item from scratch.
-    function bash.Item.Create(data, forceID)
+    function bash.Item.Create(data, forceID, silent)
         -- TODO: This function.
+        local itemID = forceID or bash.Item.GetUnusedID();
+        data.ItemID = itemID;
+
+        local itemData = {};
+        for id, var in pairs(bash.Item.Vars) do
+            if !var.InSQL or var.Type == "counter" then continue; end
+            itemData[id] = data[id] or handleFunc(var.Default);
+        end
+
+        if !bash.Item.Types[itemData.ItemType] then return; end
+
+        data.DynamicData = data.DynamicData or {};
+        local dynData = itemData.DynamicData;
+        local itemStruct = bash.Item.Types[itemData.ItemType];
+        for id, def in pairs(itemStruct.Dynamic) do
+            dynData[id] = data.DynamicData[id] or handleFunc(def);
+        end
+
+        bash.Util.MsgLog(LOG_ITEM, "Creating a new item with the ID '%s'...", itemID);
+        bash.Item.IDs[itemID] = true;
+
+        bash.Database.InsertRow("bash_items", itemData, function(resultsTab)
+            local results = resultsTab[1];
+            if !results.status then
+                bash.Util.MsgErr("ItemCreateFailed", itemID);
+                bash.Item.IDs[itemID] = nil;
+                return;
+            end
+
+            bash.Util.MsgLog(LOG_ITEM, "Successfully created new item '%s'.", itemID);
+            if !silent then bash.Item.Load(itemID); end
+        end);
+
+        return itemID;
     end
 
     -- Fetch all data from the database tied to an item ID.
@@ -82,6 +153,10 @@ if SERVER then
         bash.Database.Query(F("SELECT * FROM `bash_items` WHERE ItemID = \'%s\';", id), function(resultsTab)
             local results = resultsTab[1];
             if !results.status then return; end
+            if results.affected == 0 then
+                bash.Util.MsgErr("ItemNotFound", id);
+                return;
+            end
 
             local fetchData, itemData = results.data[1], {};
             if !fetchData then return; end
@@ -92,20 +167,24 @@ if SERVER then
             bash.Item.Cache[fetchData.ItemID] = itemData;
             bash.Util.MsgDebug(LOG_ITEM, "Item '%s' fetched from database.", id);
 
-            if bash.Item.Waiting[id] then
+            local wait = bash.Item.Waiting[id];
+            if wait then
                 bash.Item.Waiting[id] = nil;
-                bash.Item.Load(id);
+                bash.Item.Load(id, wait._ent, false, wait._deleteOld);
             end
         end);
     end
 
     -- Create a new instance of an item.
-    function bash.Item.Load(id, forceFetch)
+    function bash.Item.Load(id, ent, forceFetch, deleteOld)
         -- TODO: Finish this function.
         if !bash.Item.Cache[id] or forceFetch then
             bash.Util.MsgDebug(LOG_ITEM, "Request to load item '%s' is waiting on data.", id);
 
-            bash.Item.Waiting[id] = true;
+            bash.Item.Waiting[id] = {
+                _ent = ent,
+                _deleteOld = deleteOld
+            };
             bash.Item.Fetch(id);
             return;
         end
@@ -115,6 +194,52 @@ if SERVER then
         if !bash.TableNet.IsRegistered(id) then
             local itemData = bash.Item.Cache[id];
             bash.TableNet.NewTable(itemData, nil, id);
+        end
+
+        bash.Item.AttachTo(id, ent, deleteOld);
+    end
+
+    -- Associate an item with an entity.
+    function bash.Item.AttachTo(id, ent, deleteOld)
+        if !isent(ent) then return; end
+        bash.Item.DetachFrom(ent, deleteOld);
+
+        local reg = bash.Item.GetRegistry();
+        local index = ent:EntIndex();
+        local oldIndex = reg:Get(id);
+        local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
+        bash.Item.DetachFrom(oldOwner, false);
+
+        bash.Util.MsgLog(LOG_ITEM, "Attaching item '%s' to entity '%s'...", id, tostring(ent));
+
+        -- Add both for two-way lookup.
+        reg:SetData{
+            Public = {
+                [index] = id,
+                [id] = index
+            }
+        };
+
+        local item = bash.TableNet.Get(id);
+        hook.Run("OnItemAttach", item, ent);
+    end
+
+    -- Disassociate an item from an entity.
+    function bash.Item.DetachFrom(ent, delete)
+        if !isent(ent) then return; end
+        if !ent:GetItem() then return; end
+
+        local reg = bash.Item.GetRegistry();
+        local item = ent:GetItem();
+        local itemID = item:Get("ItemID");
+        local index = ent:EntIndex();
+        bash.Util.MsgLog(LOG_ITEM, "Detaching item '%s' from entity '%s'...", itemID, tostring(ent));
+
+        reg:Delete(index, itemID);
+        hook.Run("OnItemDetach", item, ent);
+
+        if delete then
+            bash.TableNet.DeleteTable(itemID);
         end
     end
 
@@ -277,12 +402,20 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
         MaxLength = 17
     };
     bash.Item.AddVar{
+        ID = "ItemType",
+        Type = "string",
+        Default = "",
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 64
+    };
+    bash.Item.AddVar{
         ID = "Owner",
         Type = "string",
         Default = "",
         Scope = NET_PUBLIC,
         InSQL = true,
-        MaxLength = 32
+        MaxLength = 64
     };
     bash.Item.AddVar{
         ID = "PosInInv",
@@ -299,6 +432,14 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
         Scope = NET_PUBLIC,
         InSQL = true,
         MaxLength = 64
+    };
+    bash.Item.AddVar{
+        ID = "DynamicData",
+        Type = "table",
+        Default = EMPTY_TABLE,
+        Scope = NET_PUBLIC,
+        InSQL = true,
+        MaxLength = 512
     };
 end);
 

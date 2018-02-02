@@ -129,7 +129,10 @@ function GRID:AddItem(itemID, force)
     if !pos.X or !pos.Y then return; end
 
     -- TODO: Add item structs!
-    local sizeX, sizeY = 2, 2;
+    local itemTypeID = item:Get("ItemType", "");
+    local itemType = bash.Item.Types[itemTypeID];
+    if !itemType then return; end
+    local sizeX, sizeY = itemType.Static.SizeX, itemType.Static.SizeY;
     if !self:CanFit(pos.X, pos.Y, sizeX, sizeY) and !force then return; end
 
     local newItem = vgui.Create("bash_TestInvItem", self);

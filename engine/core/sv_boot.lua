@@ -247,10 +247,27 @@ if !bash.Tested then
     end);
 
     concommand.Add("testhook", function(ply, cmd, args)
-        MsgN("testing hook");
-        local items = {};
-        hook.Run("GetStarterItems", items);
-        PrintTable(items);
+        local money = bash.Item.Create({
+            ItemType = "money",
+            DynamicData = {
+                Stack = 4000
+            }
+        });
+        MsgN(money);
+    end);
+
+    concommand.Add("testinv", function(ply, cmd, args)
+        local trace = ply:GetEyeTrace();
+        local pos = trace.HitPos;
+        pos.z = pos.z + 20;
+
+        local someBox = ents.Create("prop_physics");
+        someBox:SetModel("models/props_junk/wood_crate001a.mdl");
+        someBox:SetPos(pos);
+        someBox:Spawn();
+        someBox:Activate();
+
+        bash.Inventory.AttachTo()
     end);
 
 end
