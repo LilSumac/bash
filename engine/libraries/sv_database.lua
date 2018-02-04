@@ -152,7 +152,7 @@ function bash.Database.Query(query, callback, ...)
 
         return true;
     else
-        bash.Util.MsgErr("DBNotConnected");
+        bash.Util.MsgErr("NoDBConnection");
         return false;
     end
 end
@@ -223,6 +223,7 @@ end
 -- Check to see if all columns in database struct exist in the database.
 function bash.Database.CheckColumns()
     -- TODO: Finish this function.
+    if !bash.Database.Connected then return; end
 end
 
 -- Select a row from the database with certain conditions.

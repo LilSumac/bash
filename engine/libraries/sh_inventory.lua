@@ -213,7 +213,8 @@ if SERVER then
         if !inv then return; end
 
         for itemID, _ in pairs(inv:Get("Contents", {})) do
-            bash.Item.Load(itemID, ent, );
+            -- TODO: What did he mean by this?
+            --bash.Item.Load(itemID, ent, );
         end
     end
 

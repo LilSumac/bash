@@ -10,6 +10,8 @@ local bash = bash;
 
 local LOG_ITEM = {pre = "[ITEM]", col = color_limegreen};
 
+local Entity = FindMetaTable("Entity");
+
 --
 -- Global storage.
 --

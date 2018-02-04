@@ -58,6 +58,7 @@ ERR_TYPES["HookError"] = "The '%s' hook from '%s' has failed! Result: %s";
 ERR_TYPES["SchemaOnBase"] = "Tried loading the engine as the schema! Call bash.StartSchema() in a separate gamemode.";
 ERR_TYPES["NoDBModule"] = "No tmysql4 module found! This is required and must be resolved.";
 ERR_TYPES["NoDBConnect"] = "Could not connect to database: %s";
+ERR_TYPES["NoDBConnection"] = "Database is not connected!";
 ERR_TYPES["QueryFailed"] = "The SQL query failed!\nQuery: %s\nError: %s";
 ERR_TYPES["QueryNumFailed"] = "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s";
 ERR_TYPES["NoValidItem"] = "No item available with the Registry ID '%s'!";
