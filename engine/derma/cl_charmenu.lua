@@ -14,12 +14,22 @@ function CHAR:Init()
 
     hook.Add("OnCharacterAttach", "bash_CharMenuWatchForLoad", function(char, ent)
         if ent != LocalPlayer() then return; end
-        if !LocalPlayer().WaitingOn then return; end
 
-        if LocalPlayer().WaitingOn == char:Get("CharID") or LocalPlayer().WaitingOn == char:Get("Name") then
+        local id = char:GetField("CharID");
+        if LocalPlayer().WaitingOn == id or LocalPlayer().WaitingOnCreate then
             LocalPlayer().WaitingOn = false;
+            LocalPlayer().WaitingOnCreate = false;
             self:Remove();
         end
+    end);
+
+    hook.Add("OnRequestCharacterDigest", "bash_CharMenuWatchForDigestRequest", function()
+        self.WaitingOnDigest = true;
+    end);
+
+    hook.Add("OnReceiveCharacterDigest", "bash_CharMenuWatchForDigest", function()
+        self.WaitingOnDigest = false;
+        self:RepopulateList();
     end);
 
     timer.Simple(5, function()
@@ -64,17 +74,20 @@ function CHAR:RepopulateList()
             "Create a Character",
             "Please give a valid name for your character.",
             "John Doe",
+
             function(text)
                 local createReq = vnet.CreatePacket("bash_Net_CharacterCreateRequest");
                 createReq:String(text);
                 createReq:AddServer();
                 createReq:Send();
 
-                LocalPlayer().WaitingOn = text;
+                LocalPlayer().WaitingOnCreate = true;
                 self:RemoveList();
                 self.WaitingOnChar = true;
             end,
+
             function() end,
+            
             "Create"
         );
     end

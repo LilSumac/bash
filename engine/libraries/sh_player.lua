@@ -1,30 +1,21 @@
 --[[
-    Player management functionality.
+    Base 'player' library extentions.
 ]]
 
 --
 -- Local storage.
 --
 
-local bash      = bash;
-local pairs     = pairs;
-local player    = player;
-
---
--- Global storage.
---
-
-bash.Player = bash.Player or {};
+local next = next;
+local table = table;
+local type = type;
 
 --
 -- Player functions.
 --
 
--- Old player.GetAll function.
-bash.Player.GetAll = player.GetAll;
-
 -- Get a table of all players as keys.
-function bash.Player.GetAllAsKeys()
+function player.GetAllAsKeys()
     local plys = {};
     for _, ply in pairs(player.GetAll()) do
         plys[ply] = true;
@@ -33,7 +24,7 @@ function bash.Player.GetAllAsKeys()
 end
 
 -- Get a table of all initialized players as values.
-function bash.Player.GetInitialized()
+function player.GetInitialized()
     local plys = {};
     for _, ply in pairs(player.GetAll()) do
         if ply.Initialized then
@@ -44,7 +35,7 @@ function bash.Player.GetInitialized()
 end
 
 -- Get a table of all initialized players as keys.
-function bash.Player.GetInitializedAsKeys()
+function player.GetInitializedAsKeys()
     local plys = {};
     for _, ply in pairs(player.GetAll()) do
         if ply.Initialized then

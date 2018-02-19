@@ -6,9 +6,12 @@
 util.AddNetworkString("bash_Net_SendClientData");
 util.AddNetworkString("bash_Net_RespondToClient");
 
+-- TODO: Squash all these references.
+--[[
 util.AddNetworkString("bash_Net_TableNetUpdate");
 util.AddNetworkString("bash_Net_TableNetDelete");
 util.AddNetworkString("bash_Net_TableNetDeleteEntry");
+]]
 
 util.AddNetworkString("bash_Net_CharacterDigestRequest");
 util.AddNetworkString("bash_Net_CharacterDigestReturn");

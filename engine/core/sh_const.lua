@@ -70,6 +70,10 @@ ERR_TYPES["ItemCreateFailed"] = "Failed to create item with ID '%s'.";
 ERR_TYPES["CharNotFound"] = "Failed to find an character with the ID '%s'.";
 ERR_TYPES["ItemNotFound"] = "Failed to find an item with the ID '%s'.";
 ERR_TYPES["InvNotFound"] = "Failed to find an inventory with the ID '%s'.";
+ERR_TYPES["CharNoOwnerSet"] = "No owner set for character with ID '%s'.";
+ERR_TYPES["CharNoOwnerAvailable"] = "The owner of character with ID '%s' is not available.";
+ERR_TYPES["InvNoOwnerSet"] = "No owner set for inventory with ID '%s'.";
+ERR_TYPES["InvNoOwnerAvailable"] = "The owner of inventory with ID '%s' is not available.";
 
 ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";

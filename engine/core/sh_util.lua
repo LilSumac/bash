@@ -154,3 +154,4 @@ function bash.Util.ProcessDir(dir, relative, forceScope)
         bash.Util.ProcessFile(file, forceScope);
     end
 end
+

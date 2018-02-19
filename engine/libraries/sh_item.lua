@@ -27,7 +27,7 @@ bash.Item.Waiting   = bash.Item.Waiting or {};
 -- Entity functions.
 --
 
--- Get an entity's assigned character, if any.
+-- Get an entity's assigned item, if any.
 function Entity:GetItem()
     local reg = bash.Item.GetRegistry();
     if !reg then return; end
@@ -67,7 +67,7 @@ function bash.Item.AddVar(data)
 end
 
 -- Add a new item type struct.
-function bash.Item.Register(item)
+function bash.Item.RegisterType(item)
     bash.Util.MsgDebug(LOG_ITEM, "Registering item type with ID '%s'...", item.Static.ID);
 
     local itemData = {};
@@ -86,6 +86,11 @@ function bash.Item.Register(item)
     itemData.Dynamic.Stack = item.Dynamic.Stack or 1;
 
     bash.Item.Types[itemData.Static.ID] = itemData;
+end
+
+-- Get an item type.
+function bash.Item.GetType(itemID)
+    return bash.Item.Types[itemID];
 end
 
 -- Get the item registry.
@@ -110,95 +115,68 @@ if SERVER then
     end
 
     -- Create a new item from scratch.
-    function bash.Item.Create(data, forceID, silent)
-        -- TODO: This function.
+    function bash.Item.Create(data, forceID, temp)
+        local itemDefaults = tabnet.GetSchemaDefaults("bash_Item");
+        for fieldName, def in pairs(itemDefaults) do
+            if data[fieldName] == nil then
+                data[fieldName] = def;
+            end 
+        end 
+
         local itemID = forceID or bash.Item.GetUnusedID();
+        bash.Item.IDs[itemID] = true;
         data.ItemID = itemID;
+        data.IsTemp = temp;
 
-        local itemData = {};
-        for id, var in pairs(bash.Item.Vars) do
-            if !var.InSQL or var.Type == "counter" then continue; end
-            itemData[id] = data[id] or handleFunc(var.Default);
+        local itemType = bash.Item.Types[data.ItemType];
+        if !itemType then
+            bash.Util.MsgErr("ItemCreateFailed", itemID);
+            bash.Item.IDs[itemID] = nil;
+            return false;
         end
-
-        if !bash.Item.Types[itemData.ItemType] then return; end
-
+        
         data.DynamicData = data.DynamicData or {};
-        local dynData = itemData.DynamicData;
-        local itemStruct = bash.Item.Types[itemData.ItemType];
-        for id, def in pairs(itemStruct.Dynamic) do
-            dynData[id] = data.DynamicData[id] or handleFunc(def);
+
+        for name, val in pairs(itemType.Dynamic) do
+            if data.DynamicData[name] == nil then
+                data.DynamicData[name] = val;
+            end
         end
 
         bash.Util.MsgLog(LOG_ITEM, "Creating a new item with the ID '%s'...", itemID);
-        bash.Item.IDs[itemID] = true;
 
-        bash.Database.InsertRow("bash_items", itemData, function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then
-                bash.Util.MsgErr("ItemCreateFailed", itemID);
-                bash.Item.IDs[itemID] = nil;
-                return;
-            end
+        local newItem;
+        if temp then
+            newItem = tabnet.CreateTable(data, nil, "bash_Item", itemID);
+        else
+            newItem = tabnet.GetDBProvider():CreateTable("bash_Item", data, true);
+        end
 
-            bash.Util.MsgLog(LOG_ITEM, "Successfully created new item '%s'.", itemID);
-            if !silent then bash.Item.Load(itemID); end
-        end);
-
-        return itemID;
-    end
-
-    -- Fetch all data from the database tied to an item ID.
-    function bash.Item.Fetch(id)
-        bash.Util.MsgDebug(LOG_ITEM, "Fetching item '%s' from database...", id);
-
-        bash.Database.Query(F("SELECT * FROM `bash_items` WHERE ItemID = \'%s\';", id), function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then return; end
-            if results.affected == 0 then
-                bash.Util.MsgErr("ItemNotFound", id);
-                return;
-            end
-
-            local fetchData, itemData = results.data[1], {};
-            if !fetchData then return; end
-            for id, var in pairs(bash.Item.Vars) do
-                itemData[var.Scope] = itemData[var.Scope] or {};
-                itemData[var.Scope][id] = fetchData[id] or handleFunc(var.Default);
-            end
-            bash.Item.Cache[fetchData.ItemID] = itemData;
-            bash.Util.MsgDebug(LOG_ITEM, "Item '%s' fetched from database.", id);
-
-            local wait = bash.Item.Waiting[id];
-            if wait then
-                bash.Item.Waiting[id] = nil;
-                bash.Item.Load(id, wait._ent, false, wait._deleteOld);
-            end
-        end);
-    end
-
-    -- Create a new instance of an item.
-    function bash.Item.Load(id, ent, forceFetch, deleteOld)
-        -- TODO: Finish this function.
-        if !bash.Item.Cache[id] or forceFetch then
-            bash.Util.MsgDebug(LOG_ITEM, "Request to load item '%s' is waiting on data.", id);
-
-            bash.Item.Waiting[id] = {
-                _ent = ent,
-                _deleteOld = deleteOld
-            };
-            bash.Item.Fetch(id);
+        if !newItem then
+            bash.Util.MsgErr("ItemCreateFailed", itemID);
+            bash.Item.IDs[itemID] = nil;
             return;
         end
 
+        hook.Run("OnItemCreate", newItem, temp);
+        return newItem;
+    end
+
+    -- Create a new instance of an item.
+    function bash.Item.Load(id)
         bash.Util.MsgLog(LOG_ITEM, "Loading item '%s'...", id);
 
-        if !bash.TableNet.IsRegistered(id) then
-            local itemData = bash.Item.Cache[id];
-            bash.TableNet.NewTable(itemData, nil, id);
+        local item = tabnet.GetTable(id);
+        if !item then
+            item = tabnet.GetDBProvider():LoadTable("bash_Item", id);
+        end 
+
+        if !item then
+            bash.Util.MsgErr("ItemNotFound", id);
+            return;
         end
 
-        bash.Item.AttachTo(id, ent, deleteOld);
+        return item;
     end
 
     -- Associate an item with an entity.
@@ -250,43 +228,22 @@ if SERVER then
     --
 
     -- Fetch all used IDs.
-    hook.Add("OnDatabaseConnected", "bash_ItemFetchIDs", function()
+    hook.Add("InitPostEntity", "bash_ItemFetchIDs", function()
         bash.Util.MsgDebug(LOG_ITEM, "Fetching used ItemIDs...");
 
-        bash.Database.Query("SELECT ItemID FROM `bash_items`;", function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then return; end
+        tabnet.GetDBProvider():GetTableData(
+            "bash_Item",
+            {"ItemID"},
+            nil,
 
-            local index = 0;
-            for _, tab in pairs(results.data) do
-                bash.Item.IDs[tab.ItemID] = true;
-                index = index + 1;
+            function(data)
+                for _, item in pairs(data) do
+                    bash.Item.IDs[item.ItemID] = true;
+                end
+
+                bash.Util.MsgDebug(LOG_ITEM, "Cached %d ItemIDs.", #data);
             end
-
-            bash.Util.MsgDebug(LOG_ITEM, "Fetched %d ItemIDs from the database.", index);
-        end);
-    end);
-
-    -- Push changes to SQL.
-    hook.Add("TableUpdate", "bash_ItemPushToDatabase", function(regID, data)
-        local item = bash.TableNet.Get(regID);
-        if !item then return; end
-        local itemID = item:Get("ItemID");
-        if !itemID then return; end
-        MsgN("ITEM UPDATE");
-
-        local sqlData, var = {};
-        for id, val in pairs(data) do
-            var = bash.Item.Vars[id];
-            if !var or !var.InSQL then continue; end
-            sqlData[id] = val;
-        end
-        PrintTable(sqlData);
-
-        if table.IsEmpty(sqlData) then return; end
-        bash.Database.UpdateRow("bash_items", sqlData, F("ItemID = \'%s\'", itemID), function(results)
-            bash.Util.MsgDebug(LOG_ITEM, "Updated item '%s' in database.", itemID);
-        end);
+        );
     end);
 
     --
@@ -296,82 +253,71 @@ if SERVER then
     -- Watch for item move requests.
     vnet.Watch("bash_Net_ItemMoveRequest", function(pck)
         -- TODO: Clean this up.
-        local droppedItemID = pck:String();
-        local currentItemID = pck:String();
-        local droppedInvID = pck:String();
-        local currentInvID = pck:String();
-        local droppedItemPos = pck:Table();
-        local currentItemPos = pck:Table();
+        local data = pck:Table();
 
-        local droppedItem = bash.TableNet.Get(droppedItemID);
+        local droppedItem = tabnet.GetTable(data.DroppedItemID);
         if !droppedItem then return; end
-        local currentItem = bash.TableNet.Get(currentItemID);
+        local currentItem = tabnet.GetTable(data.CurrentItemID);
 
         if currentItem then
             -- TODO: Try to combine, else swap.
             MsgN("Combine/swap two items.")
 
-            if droppedInvID != currentInvID then
+            if data.DroppedInvID != data.CurrentInvID then
                 -- Change owners and swap.
-                local oldInv = bash.TableNet.Get(droppedInvID);
+                local oldInv = tabnet.GetTable(data.DroppedInvID);
                 if !oldInv then return; end
-                local newInv = bash.TableNet.Get(currentInvID);
+                local newInv = tabnet.GetTable(data.CurrentInvID);
                 if !newInv then return; end
 
-                local oldContents = oldInv:Get("Contents", {});
-                oldContents[droppedItemID] = nil;
-                oldContents[currentItemID] = true;
-                oldInv:Set("Contents", oldContents);
+                local oldContents = oldInv:GetField("Contents", {}, true);
+                oldContents[data.DroppedItemID] = nil;
+                oldContents[data.CurrentItemID] = true;
+                oldInv:SetField("Contents", oldContents);
 
-                local newContents = newInv:Get("Contents", {});
-                newContents[droppedItemID] = true;
-                newContents[currentItemID] = nil;
-                newInv:Set("Contents", newContents);
+                local newContents = newInv:GetField("Contents", {}, true);
+                newContents[data.DroppedItemID] = true;
+                newContents[data.CurrentItemID] = nil;
+                newInv:SetField("Contents", newContents);
 
-                droppedItem:SetData{
-                    Public = {
-                        ["Owner"] = currentInvID,
-                        ["PosInInv"] = currentItemPos
-                    }
+                droppedItem:SetFields{
+                    ["Owner"] = data.CurrentInvID,
+                    ["Position"] = data.CurrentItemPos
                 };
-                currentItem:SetData{
-                    Public = {
-                        ["Owner"] = droppedInvID,
-                        ["PosInInv"] = droppedItemPos
-                    }
+                currentItem:SetFields{
+                    ["Owner"] = data.DroppedInvID,
+                    ["Position"] = data.DroppedItemPos
                 };
             else
-                droppedItem:Set("PosInInv", currentItemPos);
-                currentItem:Set("PosInInv", droppedItemPos);
+                droppedItem:SetField("Position", data.CurrentItemPos);
+                currentItem:SetField("Position", data.DroppedItemPos);
             end
         else
-            if droppedInvID == currentInvID then
+            if data.DroppedInvID == data.CurrentInvID then
                 -- TODO: Just move the item.
                 MsgN("Move one item to empty spot.");
-                droppedItem:Set("PosInInv", currentItemPos);
+                droppedItem:SetField("Position", data.CurrentItemPos);
             else
                 -- TODO: See if the item can hold the item.
                 --       If so, move.
                 MsgN("Move one item to another inventory.");
 
-                local oldInv = bash.TableNet.Get(droppedInvID);
+                local oldInv = tabnet.GetTable(data.DroppedInvID);
                 if !oldInv then return; end
-                local newInv = bash.TableNet.Get(currentInvID);
+                local newInv = tabnet.GetTable(data.CurrentInvID);
                 if !newInv then return; end
 
-                local oldContents = oldInv:Get("Contents", {});
-                oldContents[droppedItemID] = nil;
-                oldInv:Set("Contents", oldContents);
+                local oldContents = oldInv:GetField("Contents", {}, true);
+                oldContents[data.DroppedItemID] = nil;
+                oldInv:SetField("Contents", oldContents);
 
-                local newContents = newInv:Get("Contents", {});
-                newContents[droppedItemID] = true;
-                newInv:Set("Contents", newContents);
+                local newContents = newInv:GetField("Contents", {}, true);
+                newContents[data.DroppedItemID] = true;
+                newInv:SetField("Contents", newContents);
 
-                droppedItem:SetData{
-                    Public = {
-                        ["Owner"] = currentInvID,
-                        ["PosInInv"] = currentItemPos
-                    }
+                droppedItem:SetFields{
+                    ["Owner"] = data.CurrentInvID,
+                    ["Position"] = data.CurrentItemPos
                 };
             end
         end
@@ -387,61 +333,66 @@ end
 hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
     bash.Util.ProcessDir("engine/items", false, "SHARED");
 
-    bash.Item.AddVar{
-        ID = "ItemNum",
-        Type = "counter",
-        Default = -1,
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        PrimaryKey = true
+    -- ItemID: Unique ID for an item.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "ItemID",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string",
+        IsPrimaryKey = true
     };
-    bash.Item.AddVar{
-        ID = "ItemID",
-        Type = "string",
-        Default = "",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 17
+
+    -- Owner: Unique ID of the 'owner' of the item.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "Owner",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string"
     };
-    bash.Item.AddVar{
-        ID = "ItemType",
-        Type = "string",
-        Default = "",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 64
+
+    -- Position: Table containing the coordinates of the item in its owning container.
+    -- X Y for inventory, X Y Z for world.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "Position",
+        FieldDefault = EMPTY_TABLE,
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "table"
     };
-    bash.Item.AddVar{
-        ID = "Owner",
-        Type = "string",
-        Default = "",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 64
+
+    -- ItemType: Type structure that the item follows.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "ItemType",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string"
     };
-    bash.Item.AddVar{
-        ID = "PosInInv",
-        Type = "table",
-        Default = EMPTY_TABLE,
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 64
+
+    -- Contents: Table of items within the inventory.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "DynamicData",
+        FieldDefault = EMPTY_TABLE,
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "table"
     };
-    bash.Item.AddVar{
-        ID = "PosInWorld",
-        Type = "table",
-        Default = EMPTY_TABLE,
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 64
-    };
-    bash.Item.AddVar{
-        ID = "DynamicData",
-        Type = "table",
-        Default = EMPTY_TABLE,
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 512
+
+    -- IsTemp: Whether or not the inventory is temporary (not saved in SQL).
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Item",
+        FieldName = "IsTemp",
+        FieldDefault = false,
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = false,
+        FieldType = "boolean"
     };
 end);
 

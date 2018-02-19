@@ -15,8 +15,8 @@ local bash = bash;
 -- TODO: Make this system better.
 
 -- Connection info. Edit this as needed.
-DB_HOST = "45.55.218.30";
-DB_USER = "tester";
-DB_PASS = "testpass";
-DB_DATA = "srp_db";
+DB_HOST = "localhost";
+DB_USER = "username";
+DB_PASS = "password";
+DB_DATA = "some_db";
 DB_PORT = 3306;

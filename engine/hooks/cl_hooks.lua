@@ -54,4 +54,4 @@ end);
 vnet.Watch("bash_Net_RespondToClient", function(pck)
     bash.ServerResponded = true;
     hook.Run("ServerResponded");
-end);
+end, {1});

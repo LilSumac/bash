@@ -125,10 +125,6 @@ hook.Add("HUDPaint", "asdf", function()
 end);
 ]]
 
-concommand.Add("printreg", function(ply, cmd, args)
-    PrintTable(bash.TableNet.Registry);
-end);
-
 concommand.Add("printchar", function(ply, cmd, args)
     MsgN(ply);
     local char = ply:GetCharacter();
@@ -209,10 +205,31 @@ concommand.Add("grid", function(ply, cmd, args)
     close:SetSize(16, 16);
     close:SetPos(frame:GetWide() - 20, 4);
 
-    local invs = char:Get("Inventory", {});
+    local invs = char:GetField("Inventory", {});
     local grid = vgui.Create("bash_TestInvGrid", frame);
     grid:AlignTop(24);
     grid:SetInv(invs["Primary"]);
+end);
+
+concommand.Add("gridground", function(ply, cmd, args)
+    local char = ply:GetCharacter();
+    if !char then return; end
+
+    local frame = vgui.Create("DFrame");
+    frame:SetSize(300, 300);
+    frame:Center();
+    frame:ShowCloseButton(false);
+    frame:MakePopup(true);
+    frame:SetSizable(true);
+
+    local close = vgui.Create("bash_Close", frame);
+    close:SetSize(16, 16);
+    close:SetPos(frame:GetWide() - 20, 4);
+
+    local invs = char:GetField("Inventory", {});
+    local grid = vgui.Create("bash_TestInvGrid", frame);
+    grid:AlignTop(24);
+    grid:SetInv("inv_ground");
 end);
 
 hook.Add("HUDPaint", "somebullshit", function()

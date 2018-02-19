@@ -9,21 +9,21 @@ function ITEM:Init()
 end
 
 function ITEM:SetItem(itemID)
-    if bash.TableNet.IsRegistered(itemID) then
+    if tabnet.GetTable(itemID) then
         self.ItemID = itemID;
-        self.ItemObj = bash.TableNet.Get(itemID);
-        self.ItemName = self.ItemObj:Get("ItemNum");
+        self.ItemObj = tabnet.GetTable(itemID);
+        self.ItemName = self.ItemObj:GetField("ItemID");
 
-        local pos = self.ItemObj:Get("PosInInv", {});
+        local pos = self.ItemObj:GetField("Position", {});
         self.PosX = pos.X;
         self.PosY = pos.Y;
 
-        local itemTypeID = self.ItemObj:Get("ItemType", "");
+        local itemTypeID = self.ItemObj:GetField("ItemType", "");
         local itemType = bash.Item.Types[itemTypeID];
         self.SizeX = itemType.Static.SizeX;
         self.SizeY = itemType.Static.SizeY;
 
-        self.InvID = self.ItemObj:Get("Owner", "");
+        self.InvID = self.ItemObj:GetField("Owner");
     end
 end
 
@@ -53,12 +53,21 @@ function ITEM:ReceiveItem(panels, dropped, index, x, y)
         local opts = DermaMenu(self:GetParent());
         opts:AddOption("Swap", function()
             local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
-            moveReq:String(ghost.ItemID);   -- Dropped item.
-            moveReq:String(self.ItemID);    -- Current item (none).
-            moveReq:String(ghost.InvID);    -- Dropped item inv.
-            moveReq:String(self.InvID);     -- Current item inv.
-            moveReq:Table({X = ghost.PosX, Y = ghost.PosY});    -- Dropped item pos.
-            moveReq:Table({X = self.PosX, Y = self.PosY});      -- Current item pos.
+            moveReq:Table({
+                DroppedItemID = ghost.ItemID,
+                DroppedInvID = ghost.InvID,
+                DroppedItemPos = {
+                    X = ghost.PosX,
+                    Y = ghost.PosY
+                },
+
+                CurrentItemID = self.ItemID,
+                CurrentInvID = self.InvID,
+                CurrentItemPos = {
+                    X = self.PosX,
+                    Y = self.PosY
+                }
+            });
             moveReq:AddServer();
             moveReq:Send();
         end);

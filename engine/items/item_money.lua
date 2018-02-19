@@ -14,4 +14,4 @@ ITEM.Static = {
 ITEM.Dynamic = {
     Stack = 1
 };
-bash.Item.Register(ITEM);
+bash.Item.RegisterType(ITEM);

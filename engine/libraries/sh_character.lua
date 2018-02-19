@@ -17,10 +17,7 @@ local Entity = FindMetaTable("Entity");
 --
 
 bash.Character              = bash.Character or {};
-bash.Character.Vars         = bash.Character.Vars or {};
 bash.Character.IDs          = bash.Character.IDs or {};
-bash.Character.Cache        = bash.Character.Cache or {};
-bash.Character.Waiting      = bash.Character.Waiting or {};
 bash.Character.Digest       = (CLIENT and (bash.Character.Digest or {})) or nil;
 
 --
@@ -29,51 +26,35 @@ bash.Character.Digest       = (CLIENT and (bash.Character.Digest or {})) or nil;
 
 -- Get an entity's assigned character, if any.
 function Entity:GetCharacter()
+    if self._CharCached then return self._CharCached; end
+
     local reg = bash.Character.GetRegistry();
     if !reg then return; end
 
     local index = self:EntIndex();
-    local charID = reg:Get(index);
+    local charID = reg:GetField(index);
 
-    return bash.TableNet.Get(charID);
+    self._CharCached = tabnet.GetTable(charID);
+    return self._CharCached;
 end
 
 -- Check if an entity has a certain character loaded.
 function Entity:IsCharacter(id)
-    return self:GetCharacter() and self:GetCharacter():Get("CharID") == id;
+    return self:GetCharacter() and self:GetCharacter():GetField("CharID") == id;
 end
 
 --
 -- Character functions.
 --
 
--- Add a new character variable struct.
-function bash.Character.AddVar(data)
-    bash.Character.Vars[data.ID] = {
-        ID = data.ID,
-        Type = data.Type,
-        Default = data.Default,
-        Scope = data.Scope,
-        InSQL = data.InSQL
-    };
-
-    if SERVER and data.InSQL then
-        bash.Database.AddColumn("bash_chars", {
-            Name = data.ID,
-            Type = data.Type,
-            MaxLength = data.MaxLength
-        }, data.PrimaryKey);
-    end
-end
-
 -- Get the character registry.
 function bash.Character.GetRegistry()
-    return bash.TableNet.Get("bash_CharRegistry");
+    return tabnet.GetTable("bash_CharRegistry");
 end
 
 -- Check to see if a character is currently in use.
 function bash.Character.IsInUse(id)
-    return bash.Character.GetRegistry():Get(id);
+    return bash.Character.GetRegistry():GetField(id) != nil;
 end
 
 if SERVER then
@@ -83,21 +64,18 @@ if SERVER then
         if !isplayer(ply) then return; end
         bash.Util.MsgDebug(LOG_CHAR, "Fetching character digest for '%s' from database...", ply:Name());
 
-        bash.Database.Query(F("SELECT CharNum, CharID, Name FROM `bash_chars` WHERE SteamID = \'%s\';", ply:SteamID()), function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then return; end
+        tabnet.GetDBProvider():GetTableData(
+            "bash_Character",
+            {"CharID", "Name"},
+            {Field = "Owner", EQ = ply:SteamID()},
 
-            local chars = {};
-            for _, charData in pairs(results.data) do
-                bash.Database.CastData("bash_chars", charData, CAST_OUT);
-                chars[charData.CharNum] = charData;
+            function(data)
+                local sendDigest = vnet.CreatePacket("bash_Net_CharacterDigestReturn");
+                sendDigest:Table(data);
+                sendDigest:AddTargets(ply);
+                sendDigest:Send();
             end
-
-            local sendDigest = vnet.CreatePacket("bash_Net_CharacterDigestReturn");
-            sendDigest:Table(chars);
-            sendDigest:AddTargets(ply);
-            sendDigest:Send();
-        end);
+        );
     end
 
     -- Get an ununused CharID.
@@ -110,171 +88,112 @@ if SERVER then
     end
 
     -- Create a new character from scratch.
-    function bash.Character.Create(data, ply, forceID)
-        -- TODO: This function.
+    function bash.Character.Create(data, forceID, loadOnCreate)
+        local charDefaults = tabnet.GetSchemaDefaults("bash_Character");
+        for fieldName, def in pairs(charDefaults) do
+            if data[fieldName] == nil then
+                data[fieldName] = def;
+            end 
+        end 
+
         local charID = forceID or bash.Character.GetUnusedID();
+        bash.Character.IDs[charID] = true;
         data.CharID = charID;
 
-        local charData = {};
-        for id, var in pairs(bash.Character.Vars) do
-            if !var.InSQL or var.Type == "counter" then continue; end
-            charData[id] = data[id] or handleFunc(var.Default);
-        end
+        bash.Util.MsgLog(LOG_CHAR, "Creating a new character with the ID '%s' and name '%s'...", charID, data.Name);
 
-        -- Create new inventory.
-        local invID = bash.Inventory.GetUnusedID();
-        local invData = {};
-
-        -- Create new items.
-        local items = {};
-        local money = bash.Item.Create({
-            ItemType = "money",
-            Owner = invID,
-            PosInInv = {
-                X = 1,
-                Y = 1
-            },
-            DynamicData = {
-                Stack = 4000
-            }
-        }, nil, true);
-        items[money] = true;
-        hook.Run("GetStarterItems", items, charData);
-
-        bash.Inventory.Create({
-            InvType = "invtype_basic",
-            Contents = items,
-            Owner = charID
-        }, invID, true);
-
-        charData["Inventory"]["Primary"] = invID;
-
-        bash.Util.MsgLog(LOG_CHAR, "Creating a new character with the ID '%s' and name '%s'...", charData.CharID, charData.Name);
-        bash.Character.IDs[charID] = true;
-
-        bash.Database.InsertRow("bash_chars", charData, function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then
-                bash.Util.MsgErr("CharCreateFailed", charID);
-                bash.Character.IDs[charID] = nil;
-                return;
-            end
-
-            bash.Util.MsgLog(LOG_CHAR, "Successfully created new character '%s'.", charID);
-
-            if ply then
-                bash.Character.Load(charID, ply, true, true);
-            end
-        end);
-
-        return charID;
-    end
-
-    -- Fetch all data from the database tied to a character ID.
-    function bash.Character.Fetch(id)
-        bash.Util.MsgDebug(LOG_CHAR, "Fetching character '%s' from database...", id);
-
-        bash.Database.Query(F("SELECT * FROM `bash_chars` WHERE CharID = \'%s\';", id), function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then return; end
-            if results.affected == 0 then
-                bash.Util.MsgErr("CharNotFound", id);
-                return;
-            end
-
-            local fetchData, charData = results.data[1], {};
-            if !fetchData then return; end
-            bash.Database.CastData("bash_chars", fetchData, CAST_OUT);
-            for id, var in pairs(bash.Character.Vars) do
-                charData[var.Scope] = charData[var.Scope] or {};
-                charData[var.Scope][id] = fetchData[id] or handleFunc(var.Default);
-            end
-
-            bash.Character.Cache[fetchData.CharID] = charData;
-            bash.Util.MsgDebug(LOG_CHAR, "Character '%s' fetched from database.", id);
-
-            local wait = bash.Character.Waiting[id];
-            if wait then
-                bash.Character.Waiting[id] = nil;
-                bash.Character.Load(id, wait._ent, false, wait._deleteOld);
-            end
-        end);
-    end
-
-    -- Create a new instance of a character.
-    function bash.Character.Load(id, ent, forceFetch, deleteOld)
-        -- TODO: Finish this function.
-        if ent:IsCharacter(id) then return; end
-
-        if !bash.Character.Cache[id] or forceFetch then
-            bash.Util.MsgDebug(LOG_CHAR, "Request to load character '%s' is waiting on data.", id);
-
-            bash.Character.Waiting[id] = {
-                _ent = ent,
-                _deleteOld = deleteOld
-            };
-            bash.Character.Fetch(id);
+        local newChar = tabnet.GetDBProvider():CreateTable("bash_Character", data, true);
+        if !newChar then
+            bash.Util.MsgErr("CharCreateFailed", charID);
+            bash.Character.IDs[charID] = nil;
             return;
         end
 
+        hook.Run("OnCharacterCreate", newChar);
+        if !table.IsEmpty(newChar:GetField("Inventory", {})) then
+            hook.Run("NewCharacterInventory", newChar);
+        end 
+
+        if loadOnCreate then bash.Character.Load(charID);
+        else tabnet.DeleteTable(charID); end
+    end
+
+    -- Create a new instance of a character.
+    function bash.Character.Load(id, forceOwner, deleteOld)
         bash.Util.MsgLog(LOG_CHAR, "Loading character '%s'...", id);
 
-        if !bash.TableNet.IsRegistered(id) then
-            local charData = bash.Character.Cache[id];
-            local list = {};
-            list.Public = NET_GLOBAL;
-            if isplayer(ent) then list.Private = {[ent] = true}; end
+        local char = tabnet.GetTable(id);
+        if !char then
+            char = tabnet.GetDBProvider():LoadTable("bash_Character", id, tabnet.LIST_GLOBAL);
+        end 
 
-            bash.TableNet.NewTable(charData, list, id);
+        if !char then
+            bash.Util.MsgErr("CharNotFound", id);
+            return;
         end
 
-        bash.Character.AttachTo(id, ent, deleteOld);
+        char:SetGlobal(true);
+        local owner = forceOwner;
+        if !owner then
+            local ownerID = char:GetField("Owner");
+            if !ownerID then
+                bash.Util.MsgErr("CharNoOwnerSet", id);
+                return;
+            end
+
+            owner = player.GetBySteamID(ownerID);
+            -- TODO: Add NPC functionality.
+            if !owner then
+                bash.Util.MsgErr("CharNoOwnerAvailable", id);
+                return;
+            end 
+        end
+
+        bash.Character.AttachTo(char, owner, deleteOld);
     end
 
     -- Associate a character with an entity.
-    function bash.Character.AttachTo(id, ent, deleteOld)
+    function bash.Character.AttachTo(char, ent)
+        if !char then return; end 
         if !isent(ent) and !isplayer(ent) then return; end
-        bash.Character.DetachFrom(ent, deleteOld);
 
+        bash.Character.DetachCurrent(ent);
+
+        local id = char:GetField("CharID");
         local reg = bash.Character.GetRegistry();
         local index = ent:EntIndex();
-        local oldIndex = reg:Get(id);
+        local oldIndex = reg:GetField(id);
         local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
-        bash.Character.DetachFrom(oldOwner, false);
+        bash.Character.DetachCurrent(oldOwner, true);
 
         bash.Util.MsgLog(LOG_CHAR, "Attaching character '%s' to entity '%s'...", id, tostring(ent));
 
         -- Add both for two-way lookup.
-        reg:SetData{
-            Public = {
-                [index] = id,
-                [id] = index
-            }
+        reg:SetFields{
+            [index] = id,
+            [id] = index
         };
 
-        local char = bash.TableNet.Get(id);
-        char:AddListener(ent, NET_PRIVATE);
+        char:AddListener(ent, tabnet.SCOPE_PRIVATE);
         hook.Run("OnCharacterAttach", char, ent);
     end
 
     -- Dissociate the current character associated with an entity.
-    function bash.Character.DetachFrom(ent, delete)
+    function bash.Character.DetachCurrent(ent, keep)
         if !isent(ent) and !isplayer(ent) then return; end
         if !ent:GetCharacter() then return; end
 
         local reg = bash.Character.GetRegistry();
         local char = ent:GetCharacter();
-        local charID = char:Get("CharID");
+        local charID = char:GetField("CharID");
         local index = ent:EntIndex();
         bash.Util.MsgLog(LOG_CHAR, "Detaching character '%s' from entity '%s'...", charID, tostring(ent));
 
-        reg:Delete(index, charID);
-        char:RemoveListener(ent, NET_PRIVATE);
+        reg:ClearField(index, charID);
+        char:RemoveListener(ent, tabnet.SCOPE_PRIVATE);
         hook.Run("OnCharacterDetach", char, ent);
 
-        if delete then
-            bash.TableNet.DeleteTable(charID);
-        end
+        if !keep then tabnet.DeleteTable(charID); end
     end
 
     --
@@ -282,43 +201,33 @@ if SERVER then
     --
 
     -- Fetch all used IDs.
-    hook.Add("OnDatabaseConnected", "bash_CharacterFetchIDs", function()
+    hook.Add("InitPostEntity", "bash_CharacterFetchIDs", function()
         bash.Util.MsgDebug(LOG_CHAR, "Fetching used CharIDs...");
 
-        bash.Database.Query("SELECT CharID FROM `bash_chars`;", function(resultsTab)
-            local results = resultsTab[1];
-            if !results.status then return; end
+        tabnet.GetDBProvider():GetTableData(
+            "bash_Character",
+            {"CharID"},
+            nil,
 
-            local index = 0;
-            for _, tab in pairs(results.data) do
-                bash.Character.IDs[tab.CharID] = true;
-                index = index + 1;
+            function(data)
+                for _, char in pairs(data) do
+                    bash.Character.IDs[char.CharID] = true;
+                end
+
+                bash.Util.MsgDebug(LOG_CHAR, "Cached %d CharIDs.", #data);
             end
-
-            bash.Util.MsgDebug(LOG_CHAR, "Fetched %d CharIDs from the database.", index);
-        end);
+        );
     end);
 
-    -- Push changes to SQL.
-    hook.Add("TableUpdate", "bash_CharacterPushToDatabase", function(regID, data)
-        local char = bash.TableNet.Get(regID);
+    -- Watch for entity removals.
+    hook.Add("EntityRemoved", "bash_CharacterDeleteOnRemoved", function(ent)
+        local char = ent:GetCharacter();
         if !char then return; end
-        local charID = char:Get("CharID");
-        if !charID then return; end
-        MsgN("CHAR UPDATE");
 
-        local sqlData, var = {};
-        for id, val in pairs(data) do
-            var = bash.Character.Vars[id];
-            if !var or !var.InSQL then continue; end
-            sqlData[id] = val;
+        if SERVER then
+            tabnet.GetDBProvider():SaveTable(char);
+            bash.Character.DetachCurrent(ent);
         end
-        PrintTable(sqlData);
-
-        if table.IsEmpty(sqlData) then return; end
-        bash.Database.UpdateRow("bash_chars", sqlData, F("CharID = \'%s\'", charID), function(results)
-            bash.Util.MsgDebug(LOG_CHAR, "Updated character '%s' in database.", charID);
-        end);
     end);
 
     --
@@ -329,35 +238,33 @@ if SERVER then
     vnet.Watch("bash_Net_CharacterDigestRequest", function(pck)
         local ply = pck.Source;
         bash.Character.GetDigest(ply);
-    end);
+    end, {1});
 
     -- Watch for character loading requests.
     vnet.Watch("bash_Net_CharacterLoadRequest", function(pck)
         local ply = pck.Source;
         local id = pck:String();
         bash.Character.Load(id, ply, true, true);
-    end);
+    end, {1});
 
     -- Watch for character creation requests.
     vnet.Watch("bash_Net_CharacterCreateRequest", function(pck)
         local ply = pck.Source;
         local name = pck:String();
         bash.Character.Create({
-            SteamID = ply:SteamID(),
+            Owner = ply:SteamID(),
             Name = name
-        }, ply);
-    end);
+        }, nil, true);
+    end, {1});
 
 elseif CLIENT then
 
     function bash.Character.RequestDigest()
-        if bash.CharMenu then
-            bash.CharMenu.WaitingOnDigest = true;
-        end
-
         local digestReq = vnet.CreatePacket("bash_Net_CharacterDigestRequest");
         digestReq:AddServer();
         digestReq:Send();
+        
+        hook.Run("OnRequestCharacterDigest");
     end
 
     --
@@ -371,41 +278,36 @@ elseif CLIENT then
     end);
 
     -- Watch for character attaches.
-    hook.Add("TableUpdate", "bash_CharacterWatchForAttach", function(regID, data)
-        if regID != "bash_CharRegistry" then return; end
+    hook.Add("OnUpdateTable", "bash_CharacterWatchForAttach", function(tab, name, newVal, oldVal)
+        if tab._RegistryID != "bash_CharRegistry" then return; end
 
-        local ent;
-        for entID, charID in pairs(data) do
-            if isstring(entID) then continue; end
-            ent = ents.GetByIndex(entID);
-            if !isent(ent) and !isplayer(ent) then continue; end
+        -- Kinda hacky. Meh.
+        local entInd = (isnumber(name) and name) or newVal;
+        local ent = ents.GetByIndex(entInd);
+        if !isent(ent) and !isplayer(ent) then return; end
 
-            bash.Util.MsgDebug(LOG_CHAR, "Attaching character '%s' to entity '%s'...", charID, tostring(ent));
-            hook.Run("OnCharacterAttach", bash.TableNet.Get(charID), ent);
-        end
+        local char = tabnet.GetTable(newVal);
+        if !char then return; end
+
+        bash.Util.MsgDebug(LOG_CHAR, "Attaching character '%s' to entity '%s'...", newVal, tostring(ent));
+        hook.Run("OnCharacterAttach", char, ent);
     end);
 
     -- Watch for character detaches.
-    hook.Add("TableDeleteEntry", "bash_CharacterWatchForDetach", function(regID, deleted)
-        if regID != "bash_CharRegistry" then return; end
+    hook.Add("OnClearTable", "bash_CharacterWatchForDetach", function(tab, name, val)
+        if tab._RegistryID != "bash_CharRegistry" then return; end
 
-        local handled, ent, entInd, oldCharID = {};
-        for key, val in pairs(deleted) do
-            if isstring(key) then
-                oldCharID = key;
-                entInd = val;
-            elseif isnumber(key) then
-                entInd = key;
-                oldCharID = val;
-            else continue; end
-            if handled[entInd] then continue; end
-            ent = ents.GetByIndex(entInd);
-            if !isent(ent) and !isplayer(ent) then continue; end
+        -- Kinda hacky. Meh.
+        local entInd = (isnumber(name) and name) or val;
+        local oldCharID = (isstring(name) and name) or val;
+        local ent = ents.GetByIndex(entInd);
+        if !isent(ent) and !isplayer(ent) then return; end
 
-            bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", oldCharID, tostring(ent));
-            hook.Run("OnCharacterDetach", bash.TableNet.Get(oldCharID), ent);
-            handled[entInd] = true;
-        end
+        local char = tabnet.GetTable(oldCharID);
+        if !char then return; end
+
+        bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", oldCharID, tostring(ent));
+        hook.Run("OnCharacterDetach", char, ent);
     end);
 
     --
@@ -418,14 +320,8 @@ elseif CLIENT then
         bash.Character.Digest = digest;
 
         bash.Util.MsgDebug(LOG_CHAR, "Received character digest! Entries: %d", table.Count(digest));
-
-        -- TODO: Refresh character menu.
-        if bash.CharMenu then
-            bash.CharMenu.WaitingOnDigest = false;
-            bash.CharMenu:RepopulateList();
-            return;
-        end
-    end);
+        hook.Run("OnReceiveCharacterDigest");
+    end, {1});
 
 end
 
@@ -436,79 +332,70 @@ end
 -- Create character structures.
 hook.Add("CreateStructures_Engine", "bash_CharacterStructures", function()
     if SERVER then
-        if !bash.TableNet.IsRegistered("bash_CharRegistry") then
-            bash.TableNet.NewTable(nil, NET_GLOBAL, "bash_CharRegistry");
+        if !tabnet.GetTable("bash_CharRegistry") then
+            tabnet.CreateTable(nil, tabnet.LIST_GLOBAL, nil, "bash_CharRegistry");
         end
     end
 
-    bash.Character.AddVar{
-        ID = "CharNum",
-        Type = "counter",
-        Default = -1,
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        PrimaryKey = true
+    -- CharID: Unique ID for a character.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "CharID",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string",
+        IsPrimaryKey = true
     };
-    bash.Character.AddVar{
-        ID = "SteamID",
-        Type = "string",
-        Default = "STEAMID",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 18
-    };
-    bash.Character.AddVar{
-        ID = "CharID",
-        Type = "string",
-        Default = "CHARID",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 17
-    };
-    bash.Character.AddVar{
-        ID = "Name",
-        Type = "string",
-        Default = "John Doe",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 32
-    };
-    bash.Character.AddVar{
-        ID = "Description",
-        Type = "string",
-        Default = "A real character.",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 512
-    };
-    bash.Character.AddVar{
-        ID = "BaseModel",
-        Type = "string",
-        Default = "models/breen.mdl",
-        Scope = NET_PUBLIC,
-        InSQL = true,
-        MaxLength = 128
-    };
-    bash.Character.AddVar{
-        ID = "Inventory",
-        Type = "table",
-        Default = EMPTY_TABLE,
-        Scope = NET_PRIVATE,
-        InSQL = true
-    };
-end);
 
--- Watch for entity removals.
-hook.Add("EntityRemoved", "bash_CharacterDeleteOnRemoved", function(ent)
-    local char = ent:GetCharacter();
-    if !char then return; end
+    -- Owner: Unique ID for the 'owner' of the character. SteamID for players.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "Owner",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string"
+    };
 
-    if SERVER then
-        bash.Character.DetachFrom(ent, true);
-        -- TODO: Push changes to SQL?
-    elseif CLIENT then
-        local charID = char:Get("CharID");
-        bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", charID, tostring(ent));
-        hook.Run("OnCharacterDetach", bash.TableNet.Get(charID), ent);
-    end
+    -- Name: Name of the character.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "Name",
+        FieldDefault = "...",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string"
+    };
+
+    -- Description: Short piece of text describing the character.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "Description",
+        FieldDefault = "...",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        FieldSecure = false,
+        IsInSQL = true,
+        FieldType = "string"
+    };
+
+    -- BaseModel: The model of the character when nothing is worn.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "BaseModel",
+        FieldDefault = "",
+        FieldScope = tabnet.SCOPE_PUBLIC,
+        IsInSQL = true,
+        FieldType = "string"
+    };
+
+    -- Inventory: Table of active inventories owned by the character.
+    tabnet.EditSchemaField{
+        SchemaName = "bash_Character",
+        FieldName = "Inventory",
+        FieldDefault = EMPTY_TABLE,
+        FieldScope = tabnet.SCOPE_PRIVATE,
+        IsInSQL = true,
+        FieldType = "table"
+    };
 end);

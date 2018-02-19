@@ -11,44 +11,41 @@ function GRID:Init()
     self:Receiver("bash_TestDrag", self.ReceiveItem, {"Someshit"});
 
     self.HookID = string.random(12);
-    hook.Add("TableUpdate", "bash_InventoryWatchForUpdate_" .. self.HookID, function(regID, data)
+    hook.Add("OnUpdateTable", "bash_InventoryWatchForUpdate_" .. self.HookID, function(item, name, newVal, oldVal)
         -- TODO: Update on inv/item changes.
         if !self.InvObj then return; end
-        local item = bash.TableNet.Get(regID);
-        if !item:Get("ItemID") then return; end
+        local itemID = item:GetField("ItemID");
+        if !itemID then return; end
 
-        MsgN("FRAME HOOK");
-        MsgN(regID);
-        PrintTable(data);
-
-        if data["Owner"] then
-            if data["Owner"] == self.InvID then
-                -- TODO: Item was added to this inv.
-                self:AddItem(regID);
+        if name == "Owner" then
+            if newVal == self.InvID then
+                self:AddItem(itemID);
             else
-                -- TODO: Item was removed from this inv.
-                self:RemoveItem(regID);
+                self:RemoveItem(itemID);
             end
         end
 
-        if item:Get("Owner") != self.InvID then return; end
+        if item:GetField("Owner") != self.InvID then return; end
 
-        if data["PosInInv"] then
-            local panel = self.Items[regID];
-            if panel then
-                self:RemoveItem(regID);
+        if name == "Position" then
+            if newVal.X != oldVal.X or newVal.Y != oldVal.Y then
+                local panel = self.Items[itemID];
+                if panel then
+                    self:RemoveItem(itemID);
+                end
+    
+                self:AddItem(itemID, true);
             end
-
-            -- Force new panels in case of swap.
-            self:AddItem(regID, true);
         end
     end);
 
-    hook.Add("TableDelete", "bash_InventoryWatchForDelete_" .. self.HookID, function(regID, data)
+    hook.Add("OnDeleteTable", "bash_InventoryWatchForDelete_" .. self.HookID, function(inv)
         -- TODO: Update on inv/item delete.
         if !self.InvObj then return; end
+        local invID = inv:GetField("InvID");
+        if !invID then return; end
 
-        if self.InvID == regID then
+        if self.InvID == invID then
             self:Remove();
         end
     end);
@@ -60,13 +57,13 @@ end
 
 function GRID:SetInv(invID)
     -- Check for invalid inventories.
-    local invObj = bash.TableNet.Get(invID);
-    if !invObj then
+    local inv = tabnet.GetTable(invID);
+    if !inv then
         bash.Util.MsgErr("NoValidInvTable", invID);
         return;
     end
 
-    local invTypeID = invObj:Get("InvType", "");
+    local invTypeID = inv:GetField("InvType", "");
     local invType = bash.Inventory.Types[invTypeID];
     if !invType then
         bash.Util.MsgErr("NoValidInvType", invTypeID, invID);
@@ -77,7 +74,7 @@ function GRID:SetInv(invID)
 
     -- Setup member variables.
     self.InvID = invID;
-    self.InvObj = invObj;
+    self.InvObj = inv;
     self.InvType = invType;
     self.GridSizeX = invType.SizeX;
     self.GridSizeY = invType.SizeY;
@@ -93,11 +90,11 @@ function GRID:SetInv(invID)
     end
 
     -- Load inventory contents.
-    local contents = invObj:Get("Contents", {});
+    local contents = inv:GetField("Contents", {});
+    local item;
     for itemID, _ in pairs(contents) do
         self:AddItem(itemID);
     end
-    PrintTable(self.Occupied);
 end
 
 function GRID:ClearInv()
@@ -119,19 +116,20 @@ function GRID:ClearInv()
 end
 
 function GRID:AddItem(itemID, force)
-    local item = bash.TableNet.Get(itemID);
+    local item = tabnet.GetTable(itemID);
     if !item then
         bash.Util.MsgErr("NoValidItem", itemID);
         return;
     end
 
-    local pos = item:Get("PosInInv", {});
+    local pos = item:GetField("Position", {});
     if !pos.X or !pos.Y then return; end
 
     -- TODO: Add item structs!
-    local itemTypeID = item:Get("ItemType", "");
+    local itemTypeID = item:GetField("ItemType", "");
     local itemType = bash.Item.Types[itemTypeID];
     if !itemType then return; end
+
     local sizeX, sizeY = itemType.Static.SizeX, itemType.Static.SizeY;
     if !self:CanFit(pos.X, pos.Y, sizeX, sizeY) and !force then return; end
 
@@ -183,7 +181,7 @@ function GRID:ReceiveItem(panels, dropped, index, x, y)
     local ghostY = math.floor(y / BLOCK_SIZE);
     local ghostW = ghost.SizeX;
     local ghostH = ghost.SizeY;
-    if (ghostX + 1) == ghost.PosX and (ghostY + 1) == ghost.PosY then return; end
+    if (self.InvID == ghost.InvID) and (ghostX + 1) == ghost.PosX and (ghostY + 1) == ghost.PosY then return; end
     if !self:CanFit(ghostX + 1, ghostY + 1, ghost.SizeX, ghost.SizeY, ghost.ItemID) then
         self.GhostX = -1;
         self.GhostY = -1;
@@ -210,36 +208,24 @@ function GRID:ReceiveItem(panels, dropped, index, x, y)
         local toInv = self.InvID;
 
         local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
-        moveReq:String(ghost.ItemID);       -- Dropped item.
-        moveReq:String("");                 -- Current item (none).
-        moveReq:String(fromInv);            -- Dropped item inv.
-        moveReq:String(toInv);              -- Current item inv.
-        moveReq:Table({X = ghost.PosX, Y = ghost.PosY});    -- Dropped item pos.
-        moveReq:Table({X = ghostX + 1, Y = ghostY + 1});    -- Current item pos.
+        moveReq:Table({
+            DroppedItemID = ghost.ItemID,
+            DroppedInvID = fromInv,
+            DroppedItemPos = {
+                X = ghost.PosX,
+                Y = ghost.PosY
+            },
+
+            CurrentItemID = nil,
+            CurrentInvID = toInv,
+            CurrentItemPos = {
+                X = ghostX + 1,
+                Y = ghostY + 1
+            }
+        });
         moveReq:AddServer();
         moveReq:Send();
     end
-
-    --[[
-    if !dropped then return; end
-
-    local dropItem = panels[1];
-    if !dropItem then return; end
-    if dropItem == self then return; end
-    if dropItem.DragID != dropItem.ItemID then return; end
-    local fromInv = dropItem.InvID;
-    local toInv = self.InvID;
-
-    local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
-    moveReq:String(dropItem.ItemID);    -- Dropped item.
-    moveReq:String(self.ItemID);        -- Current item.
-    moveReq:String(fromInv);            -- Dropped item inv.
-    moveReq:String(toInv);              -- Current item inv.
-    moveReq:Table({X = dropItem.GridX, Y = dropItem.GridY});    -- Dropped item pos.
-    moveReq:Table({X = self.GridX, Y = self.GridY});            -- Current item pos.
-    moveReq:AddServer();
-    moveReq:Send();
-    ]]
 end
 
 function GRID:Paint(w, h)
@@ -268,6 +254,11 @@ function GRID:Paint(w, h)
         surface.DrawRect(ghostX, ghostY, ghostW, ghostH);
         draw.SimpleText(self.GhostPanel.ItemName, "ChatFont", ghostX + (ghostW / 2), ghostY + (ghostH / 2), col, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
     end
+end
+
+function GRID:OnRemove()
+    hook.Remove("OnUpdateTable", "bash_InventoryWatchForUpdate_" .. self.HookID);
+    hook.Remove("OnDeleteTable", "bash_InventoryWatchForDelete_" .. self.HookID);
 end
 
 vgui.Register("bash_TestInvGrid", GRID, "DPanel");

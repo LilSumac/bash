@@ -155,8 +155,10 @@ if !bash.Tested then
         --bash.Inventory.FetchItems("inv_asdf");
     end);
 
+    --[[
     concommand.Add("addtoinv", function(ply, cmd, args)
-        bash.TableNet.NewTable({
+        -- TODO: Fix thtis.
+        tabnet.NewTable({
             Public = {
                 ItemNum = 999,
                 ItemID = "item_testing",
@@ -165,14 +167,10 @@ if !bash.Tested then
         }, nil, "item_testing");
         bash.Inventory.AddItem("inv_asdf", "item_testing");
     end);
+    ]]
 
     concommand.Add("removefrominv", function(ply, cmd, args)
         bash.Inventory.RemoveItem("inv_asdf", "item_testing");
-    end);
-
-
-    concommand.Add("printreg", function(ply, cmd, args)
-        PrintTable(bash.TableNet.Registry);
     end);
 
     concommand.Add("changename", function(ply, cmd, args)
@@ -186,16 +184,16 @@ if !bash.Tested then
     bash.Inventory.Load("inv_ground");
 
     concommand.Add("addground", function(ply, cmd, args)
-        local ground = bash.TableNet.Get("inv_ground");
+        local ground = tabnet.GetTable("inv_ground");
         if !ground then return; end
 
-        local contents = ground:Get("Contents", {});
-        ground:AddListener(ply, NET_PUBLIC);
+        local contents = ground:GetField("Contents", {});
+        ground:AddListener(ply, tabnet.SCOPE_PUBLIC);
         local curItem;
         for itemID, _ in pairs(contents) do
-            curItem = bash.TableNet.Get(itemID);
+            curItem = bash.Item.Load(itemID);
             if !curItem then continue; end
-            curItem:AddListener(ply, NET_PUBLIC);
+            curItem:AddListener(ply, tabnet.SCOPE_PUBLIC);
         end
 
         bash.Util.MsgDebug(LOG_DEF, "Added '%s' to ground inventory.", tostring(ply));
@@ -204,41 +202,39 @@ if !bash.Tested then
     concommand.Add("domove", function(ply, cmd, args)
         -- Move item_asdf to (4, 4) in inv_ground
 
-        local item = bash.TableNet.Get("item_asdf");
+        local item = tabnet.GetTable("item_asdf");
         if !item then return; end
-        local oldInvID = item:Get("Owner");
+        local oldInvID = item:GetField("Owner");
         if !oldInvID or oldInvID == "inv_ground" then return; end
-        local oldInv = bash.TableNet.Get(oldInvID);
+        local oldInv = tabnet.GetTable(oldInvID);
         if !oldInv then return; end
-        local newInv = bash.TableNet.Get("inv_ground");
+        local newInv = tabnet.GetTable("inv_ground");
         if !newInv then return; end
 
-        local oldContents = oldInv:Get("Contents", {});
+        local oldContents = oldInv:GetField("Contents", {});
         oldContents["item_asdf"] = nil;
-        oldInv:Set("Contents", oldContents);
+        oldInv:SetField("Contents", oldContents);
 
-        local newContents = newInv:Get("Contents", {});
+        local newContents = newInv:GetField("Contents", {});
         newContents["item_asdf"] = true;
-        newInv:Set("Contents", newContents);
+        newInv:SetField("Contents", newContents);
 
-        item:SetData{
-            Public = {
-                ["Owner"] = "inv_ground",
-                ["PosInInv"] = {X = 4, Y = 4}
-            }
+        item:SetFields{
+            ["Owner"] = "inv_ground",
+            ["PosInInv"] = {X = 4, Y = 4}
         };
     end);
 
     concommand.Add("dointer", function(ply, cmd, args)
         timer.Simple(3, function()
-            local item1 = bash.TableNet.Get("item_asdf");
+            local item1 = tabnet.GetTable("item_asdf");
             if !item1 then return; end
-            local item2 = bash.TableNet.Get("item_lala");
+            local item2 = tabnet.GetTable("item_lala");
 
             local newPos1 = {X = 2, Y = 3};
-            item1:Set("PosInInv", newPos1);
+            item1:SetField("PosInInv", newPos1);
             local newPos2 = {X = 3, Y = 3};
-            item2:Set("PosInInv", newPos2);
+            item2:SetField("PosInInv", newPos2);
         end);
     end);
 
@@ -268,6 +264,43 @@ if !bash.Tested then
         someBox:Activate();
 
         bash.Inventory.AttachTo()
+    end);
+
+    hook.Add("OnCharacterCreate", "ASDFASDF", function(char)
+        local charID = char:GetField("CharID");
+        local invs = char:GetField("Inventory", {}, true);
+
+        local newInv = bash.Inventory.Create({
+            InvType = "invtype_basic",
+            Owner = charID
+        });
+
+        if !newInv then return; end
+
+        invs["Primary"] = newInv:GetField("InvID");
+        char:SetField("Inventory", invs);
+        tabnet.DeleteTable(newInv:GetField("InvID"));
+    end);
+
+    hook.Add("NewCharacterInventory", "ASDFASDFASDFASDF", function(char)
+        local invs = char:GetField("Inventory", {});
+        local primaryInvID = invs["Primary"];
+        local primaryInv = bash.Inventory.Load(primaryInvID);
+        if !primaryInv then return; end
+
+        local openSpot = bash.Inventory.GetOpenSpot(primaryInv, "money", true);
+        if !openSpot then return; end
+
+        local money = bash.Item.Create({
+            ItemType = "money",
+            DynamicData = {
+                Stack = 4000
+            }
+        });
+
+        bash.Inventory.AddItem(primaryInv, money, openSpot);
+        tabnet.DeleteTable(money:GetField("ItemID"));
+        tabnet.DeleteTable(primaryInv:GetField("InvID"));
     end);
 
 end
