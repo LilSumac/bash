@@ -52,9 +52,19 @@ function bash.Character.GetRegistry()
     return tabnet.GetTable("bash_CharRegistry");
 end
 
+-- Get an entity who is playing as a certain character.
+function bash.Character.GetEntityOwner(id)
+    local reg = bash.Character.GetRegistry();
+    if !reg then return; end
+
+    local curUser = reg:GetField(id);
+    local ent = (curUser and ents.GetByIndex(curUser)) or nil;
+    return ent;
+end
+
 -- Check to see if a character is currently in use.
 function bash.Character.IsInUse(id)
-    return bash.Character.GetRegistry():GetField(id) != nil;
+    return bash.Character.GetEntityOwner(id) != nil;
 end
 
 if SERVER then
@@ -191,6 +201,7 @@ if SERVER then
 
         reg:ClearField(index, charID);
         char:RemoveListener(ent, tabnet.SCOPE_PRIVATE);
+        ent._CharCached = nil;
         hook.Run("OnCharacterDetach", char, ent);
 
         if !keep then tabnet.DeleteTable(charID); end
@@ -308,6 +319,7 @@ elseif CLIENT then
 
         bash.Util.MsgDebug(LOG_CHAR, "Detaching character '%s' from entity '%s'...", oldCharID, tostring(ent));
         hook.Run("OnCharacterDetach", char, ent);
+        ent._CharCached = nil;
     end);
 
     --

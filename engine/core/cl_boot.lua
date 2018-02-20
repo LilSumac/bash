@@ -208,6 +208,7 @@ concommand.Add("grid", function(ply, cmd, args)
     local invs = char:GetField("Inventory", {});
     local grid = vgui.Create("bash_TestInvGrid", frame);
     grid:AlignTop(24);
+    PrintTable(char);
     grid:SetInv(invs["Primary"]);
 end);
 
@@ -244,7 +245,15 @@ hook.Add("HUDPaint", "somebullshit", function()
 
     if traceEnt:GetCharacter() then
         local char = traceEnt:GetCharacter();
-        draw.SimpleText(char:Get("Name"), "ChatFont", CENTER_X, CENTER_Y, color_red, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+
+        draw.SimpleText(char:GetField("Name"), "ChatFont", CENTER_X, CENTER_Y, color_red, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
+    elseif traceEnt:GetItem() then
+        local item = traceEnt:GetItem();
+        local itemTypeID = item:GetField("ItemType");
+        local itemType = bash.Item.Types[itemTypeID];
+        if !itemType then return; end 
+
+        draw.SimpleText(itemType.Static.Name, "ChatFont", CENTER_X, CENTER_Y, color_red, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER);
     end
 end);
 

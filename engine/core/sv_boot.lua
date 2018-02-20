@@ -187,16 +187,7 @@ if !bash.Tested then
         local ground = tabnet.GetTable("inv_ground");
         if !ground then return; end
 
-        local contents = ground:GetField("Contents", {});
-        ground:AddListener(ply, tabnet.SCOPE_PUBLIC);
-        local curItem;
-        for itemID, _ in pairs(contents) do
-            curItem = bash.Item.Load(itemID);
-            if !curItem then continue; end
-            curItem:AddListener(ply, tabnet.SCOPE_PUBLIC);
-        end
-
-        bash.Util.MsgDebug(LOG_DEF, "Added '%s' to ground inventory.", tostring(ply));
+        bash.Inventory.AddPlayerListener(ground, ply);
     end);
 
     concommand.Add("domove", function(ply, cmd, args)

@@ -71,37 +71,63 @@ function ITEM:ReceiveItem(panels, dropped, index, x, y)
             moveReq:AddServer();
             moveReq:Send();
         end);
+
         opts:AddOption("Combine", function() end);
         opts:AddSpacer();
+
         local sub = opts:AddSubMenu("Some sub.");
         local subIcon = sub:AddOption("Icon thing.");
         subIcon:SetIcon("icon16/bug.png");
+        
         opts:SetPos(posX + x, posY + y);
         opts:Open();
     else
         self:GetParent():ReceiveItem(panels, dropped, index, posX + x, posY + y);
     end
+end
 
-    --[[
-    if !dropped then return; end
+function ITEM:OnMousePressed(mouse)
+    if mouse == MOUSE_LEFT then
+        self:DragMousePress(MOUSE_LEFT);
+    elseif mouse == MOUSE_RIGHT then
+        local itemTypeID = self.ItemObj:GetField("ItemType", "");
+        local itemType = bash.Item.Types[itemTypeID];
+        if !itemType then return; end 
 
-    local dropItem = panels[1];
-    if !dropItem then return; end
-    if dropItem == self then return; end
-    if dropItem.DragID != dropItem.ItemID then return; end
-    local fromInv = dropItem.InvID;
-    local toInv = self.InvID;
+        local opts = DermaMenu(self:GetParent());
+        local added = 0;
 
-    local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
-    moveReq:String(dropItem.ItemID);    -- Dropped item.
-    moveReq:String(self.ItemID);        -- Current item.
-    moveReq:String(fromInv);            -- Dropped item inv.
-    moveReq:String(toInv);              -- Current item inv.
-    moveReq:Table({X = dropItem.GridX, Y = dropItem.GridY});    -- Dropped item pos.
-    moveReq:Table({X = self.GridX, Y = self.GridY});            -- Current item pos.
-    moveReq:AddServer();
-    moveReq:Send();
-    ]]
+        for name, func in pairs(itemType.Functions) do 
+            if !func.ShowInInv then continue; end
+            if !func.CanShow(self.ItemObj) then continue; end
+
+            opts:AddOption(func.MenuName or name, function()
+                if func.RunOnClient then
+                    func.Run(LocalPlayer(), self.ItemObj, {});
+                else
+                    local sendData = (func.GetSendData and func.GetSendData(self.ItemObj)) or {};
+                    local sendUse = vnet.CreatePacket("bash_Net_ItemFuncRequest");
+                    sendUse:Table({
+                        ItemID = self.ItemID,
+                        UseFunc = name,
+                        SendData = sendData
+                    });
+                    sendUse:AddServer();
+                    sendUse:Send();
+                end
+            end);
+
+            added = added + 1;
+        end
+
+        if added > 0 then
+            local posX, posY = gui.MousePos();
+            opts:SetPos(posX, posY);
+            opts:Open();
+        else
+            opts:Remove();
+        end 
+    end 
 end
 
 function ITEM:Paint(w, h)

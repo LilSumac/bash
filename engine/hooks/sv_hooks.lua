@@ -43,6 +43,9 @@ hook.Add("player_disconnect", "bash_RemoveClientData", function(data)
     end
 end);
 
+-- Override the base AllowPlayerPickup.
+function GM:AllowPlayerPickup(ply, ent) return false; end
+
 -- Override the base DoPlayerDeath.
 function GM:DoPlayerDeath(ply, attacker, dmgInfo) end
 
@@ -64,4 +67,4 @@ vnet.Watch("bash_Net_SendClientData", function(pck)
     if first then
         bash.PlayerPreInit(ply);
     end
-end);
+end, {1});

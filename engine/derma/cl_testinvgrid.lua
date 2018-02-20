@@ -30,7 +30,7 @@ function GRID:Init()
         if name == "Position" then
             if newVal.X != oldVal.X or newVal.Y != oldVal.Y then
                 local panel = self.Items[itemID];
-                if panel then
+                if ispanel(panel) then
                     self:RemoveItem(itemID);
                 end
     
@@ -39,14 +39,20 @@ function GRID:Init()
         end
     end);
 
-    hook.Add("OnDeleteTable", "bash_InventoryWatchForDelete_" .. self.HookID, function(inv)
+    hook.Add("OnDeleteTable", "bash_InventoryWatchForDelete_" .. self.HookID, function(obj)
         -- TODO: Update on inv/item delete.
-        if !self.InvObj then return; end
-        local invID = inv:GetField("InvID");
-        if !invID then return; end
+        local itemID = obj:GetField("ItemID");
+        local invID = obj:GetField("InvID");
 
-        if self.InvID == invID then
-            self:Remove();
+        if itemID then
+            local panel = self.Items[itemID];
+            if ispanel(panel) then
+                self:RemoveItem(itemID);
+            end
+        elseif invID then
+            if self.InvID == invID then
+                self:Remove();
+            end
         end
     end);
 end
@@ -57,6 +63,7 @@ end
 
 function GRID:SetInv(invID)
     -- Check for invalid inventories.
+    MsgN(invID);
     local inv = tabnet.GetTable(invID);
     if !inv then
         bash.Util.MsgErr("NoValidInvTable", invID);
@@ -149,7 +156,7 @@ end
 
 function GRID:RemoveItem(itemID)
     local panel = self.Items[itemID];
-    if !panel then return; end
+    if !ispanel(panel) then return; end
 
     for xIndex = panel.PosX, panel.PosX + (panel.SizeX - 1) do
         for yIndex = panel.PosY, panel.PosY + (panel.SizeY - 1) do
@@ -159,6 +166,7 @@ function GRID:RemoveItem(itemID)
 
     panel:ClearItem();
     panel:Remove();
+    self.Items[itemID] = nil;
 end
 
 function GRID:CanFit(posX, posY, sizeX, sizeY, ignoreItem)

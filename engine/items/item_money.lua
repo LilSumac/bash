@@ -6,6 +6,7 @@ local ITEM = {};
 ITEM.Static = {
     ID = "money",
     Name = "Money",
+    WorldModel = "models/props_lab/box01a.mdl",
     SizeX = 2,
     SizeY = 2,
     CanStack = true,

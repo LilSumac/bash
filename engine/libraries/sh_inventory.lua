@@ -341,16 +341,18 @@ if SERVER then
     -- Add an item to an inventory.
     function bash.Inventory.AddItem(inv, item, forcePos)
         -- TODO: Handle non-registered inventories.
-        if !inv or !item then return; end
+        if !inv or !item then return false; end
         local invID = inv:GetField("InvID");
         local itemID = item:GetField("ItemID");
 
         local pos = forcePos or bash.Inventory.GetOpenSpot(inv, item:GetField("ItemType"));
-        if !pos or !pos.X or !pos.Y then return; end
+        if !pos or !pos.X or !pos.Y then return false; end
 
         local contents = inv:GetField("Contents", {}, true);
         local oldInvID = item:GetField("Owner");
+        MsgN(oldInvID);
         local oldOwner = bash.Inventory.GetPlayerOwner(oldInvID);
+        MsgN(tostring(oldOwner));
 
         bash.Util.MsgDebug(LOG_INV, "Adding item '%s' to inventory '%s'...", itemID, invID);
 
@@ -365,43 +367,45 @@ if SERVER then
         };
 
         local ply = bash.Inventory.GetPlayerOwner(invID);
-        if !ply then return; end
-        item:AddListener(ply, tabnet.SCOPE_PUBLIC);
+        if !ply then return false; end
+        item:AddListener(ply, tabnet.SCOPE_PRIVATE);
 
         if oldInvID != "" and invID != oldInvID then
             local oldInv = tabnet.GetTable(oldInvID);
-            if !oldInv then return; end
-            
-            local oldContents = oldInv:GetField("Contents", {}, true);
-            oldContents[itemID] = nil;
-            oldInv:SetField("Contents", oldContents);
+            if oldInv then
+                local oldContents = oldInv:GetField("Contents", {}, true);
+                oldContents[itemID] = nil;
+                oldInv:SetField("Contents", oldContents);
 
-            if isplayer(oldOwner) and ply != oldOwner then
-                item:RemoveListener(oldOwner);
+                if isplayer(oldOwner) and ply != oldOwner then
+                    MsgN("REMOVING ODL!");
+                    MsgN(ply);
+                    MsgN(oldOwner);
+                    item:RemoveListener(oldOwner);
+                end
             end
         end
+
+        return true;
     end
 
-    --[[
     -- Remove an item from an inventory.
-    function bash.Inventory.RemoveItem(invID, itemID)
+    function bash.Inventory.RemoveItem(inv, item)
         -- TODO: Handle non-registered inventories.
-        local inv = tabnet.GetTable(invID);
-        local item = tabnet.GetTable(itemID);
-        if !inv then return; end
-        if !item then return; end
+        if !inv or !item then return; end
 
-        local contents = inv:GetField("Contents", {});
+        local itemID = item:GetField("ItemID");
+        local invID = inv:GetField("InvID");
+        local contents = inv:GetField("Contents", {}, true);
         contents[itemID] = nil;
         inv:SetField("Contents", contents);
         item:SetField("Owner", "");
 
         local ply = bash.Inventory.GetPlayerOwner(invID);
-        item:RemoveListener(ply, NET_PUBLIC);
+        item:RemoveListener(ply);
 
         bash.Util.MsgDebug(LOG_INV, "Removing item '%s' from inventory '%s'.", itemID, invID);
     end
-    ]]
 
     -- Get an inventory's player owner, if any.
     function bash.Inventory.GetPlayerOwner(id)
@@ -416,6 +420,47 @@ if SERVER then
         local ent = (curUser and ents.GetByIndex(curUser)) or nil;
         return ent;
     end
+
+    -- Add a player to an inventory's (and its items') listeners.
+    function bash.Inventory.AddPlayerListener(inv, ply)
+        if !inv or !isplayer(ply) then return; end
+
+        local invID = inv:GetField("InvID");
+        local contents = inv:GetField("Contents", {});
+
+        bash.Util.MsgDebug(LOG_INV, "Adding '%s' to listeners for inventory '%s'...", tostring(ply), invID);
+
+        inv:AddListener(ply, tabnet.SCOPE_PUBLIC);
+        local curItem;
+        for itemID, _ in pairs(contents) do
+            curItem = bash.Item.Load(itemID);
+            if !curItem then continue; end
+
+            curItem:AddListener(ply, tabnet.SCOPE_PRIVATE);
+        end
+    end
+
+    -- Remove a player from an inventory's (and its items') listeners.
+    function bash.Inventory.RemovePlayerListener(inv, ply, delete)
+        if !inv or !isplayer(ply) then return; end
+
+        local invID = inv:GetField("InvID");
+        local contents = inv:GetField("Contents", {});
+        local curItem;
+
+        bash.Util.MsgDebug(LOG_INV, "Removing '%s' from listeners for inventory '%s'...", tostring(ply), invID);
+
+        for itemID, _ in pairs(contents) do
+            curItem = bash.Item.Load(itemID);
+            if !curItem then continue; end
+
+            curItem:RemoveListener(ply);
+            if delete then tabnet.DeleteTable(itemID); end
+        end
+
+        inv:RemoveListener(ply);
+        if delete then tabnet.DeleteTable(invID); end 
+    end 
 
     --[[
     -- Associate an inventory with the given owner.
@@ -539,15 +584,7 @@ if SERVER then
             inv = bash.Inventory.Load(invID);
             if !inv then continue; end
 
-            inv:AddListener(ent, tabnet.SCOPE_PUBLIC);
-            
-            invCont = inv:GetField("Contents", {});
-            for itemID, _ in pairs(invCont) do
-                item = bash.Item.Load(itemID);
-                if !item then continue; end
-
-                item:AddListener(ent, tabnet.SCOPE_PUBLIC);
-            end 
+            bash.Inventory.AddPlayerListener(inv, ent);
         end
     end);
 
@@ -560,16 +597,8 @@ if SERVER then
         for slot, invID in pairs(invs) do 
             inv = tabnet.GetTable(invID);
             if !inv then continue; end
-            
-            invCont = inv:GetField("Contents", {});
-            for itemID, _ in pairs(invCont) do
-                item = tabnet.GetTable(itemID);
-                if !item then continue; end
 
-                tabnet.DeleteTable(itemID);
-            end 
-
-            tabnet.DeleteTable(invID);
+            bash.Inventory.RemovePlayerListener(inv, ent, true);
         end
     end);
 

@@ -19,3 +19,4 @@ util.AddNetworkString("bash_Net_CharacterLoadRequest");
 util.AddNetworkString("bash_Net_CharacterCreateRequest");
 
 util.AddNetworkString("bash_Net_ItemMoveRequest");
+util.AddNetworkString("bash_Net_ItemFuncRequest");
