@@ -1,5 +1,5 @@
 # bash
-The experimental base for Garry's Mod serious RP gamemodes.
+An experimental GMod gamemode base.
 
 **Status**: In Development
 
