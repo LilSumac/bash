@@ -28,7 +28,7 @@ function GRID:Init()
         if item:GetField("Owner") != self.InvID then return; end
 
         if name == "Position" then
-            if newVal.X != oldVal.X or newVal.Y != oldVal.Y then
+            if newVal.x != oldVal.x or newVal.y != oldVal.y then
                 local panel = self.Items[itemID];
                 if ispanel(panel) then
                     self:RemoveItem(itemID);
@@ -122,6 +122,14 @@ function GRID:ClearInv()
     self.Items = {};
 end
 
+function GRID:ClearGhost()
+    self.GhostX = -1;
+    self.GhostY = -1;
+    self.GhostSizeX = -1;
+    self.GhostSizeY = -1;
+    self.GhostPanel = nil;
+end
+
 function GRID:AddItem(itemID, force)
     local item = tabnet.GetTable(itemID);
     if !item then
@@ -130,7 +138,7 @@ function GRID:AddItem(itemID, force)
     end
 
     local pos = item:GetField("Position", {});
-    if !pos.X or !pos.Y then return; end
+    if !pos.x or !pos.y then return; end
 
     -- TODO: Add item structs!
     local itemTypeID = item:GetField("ItemType", "");
@@ -138,15 +146,15 @@ function GRID:AddItem(itemID, force)
     if !itemType then return; end
 
     local sizeX, sizeY = itemType.Static.SizeX, itemType.Static.SizeY;
-    if !self:CanFit(pos.X, pos.Y, sizeX, sizeY) and !force then return; end
+    if !self:CanFit(pos.x, pos.y, sizeX, sizeY) and !force then return; end
 
     local newItem = vgui.Create("bash_TestInvItem", self);
     newItem:SetSize(sizeX * BLOCK_SIZE, sizeY * BLOCK_SIZE);
-    newItem:SetPos((pos.X - 1) * BLOCK_SIZE, (pos.Y - 1) * BLOCK_SIZE);
+    newItem:SetPos((pos.x - 1) * BLOCK_SIZE, (pos.y - 1) * BLOCK_SIZE);
     newItem:SetItem(itemID);
 
-    for xIndex = pos.X, pos.X + (sizeX - 1) do
-        for yIndex = pos.Y, pos.Y + (sizeY - 1) do
+    for xIndex = pos.x, pos.x + (sizeX - 1) do
+        for yIndex = pos.y, pos.y + (sizeY - 1) do
             self.Occupied[xIndex][yIndex] = itemID;
         end
     end
@@ -185,17 +193,21 @@ end
 
 function GRID:ReceiveItem(panels, dropped, index, x, y)
     local ghost = panels[1];
+    if ghost:IsDisabled() then
+        self:ClearGhost();
+        return;
+    end 
+
     local ghostX = math.floor(x / BLOCK_SIZE);
     local ghostY = math.floor(y / BLOCK_SIZE);
     local ghostW = ghost.SizeX;
     local ghostH = ghost.SizeY;
-    if (self.InvID == ghost.InvID) and (ghostX + 1) == ghost.PosX and (ghostY + 1) == ghost.PosY then return; end
+    if (self.InvID == ghost.InvID) and (ghostX + 1) == ghost.PosX and (ghostY + 1) == ghost.PosY then
+        self:ClearGhost();
+        return;
+    end
     if !self:CanFit(ghostX + 1, ghostY + 1, ghost.SizeX, ghost.SizeY, ghost.ItemID) then
-        self.GhostX = -1;
-        self.GhostY = -1;
-        self.GhostSizeX = -1;
-        self.GhostSizeY = -1;
-        self.GhostPanel = nil;
+        self:ClearGhost();
         return;
     end
 
@@ -206,31 +218,52 @@ function GRID:ReceiveItem(panels, dropped, index, x, y)
         self.GhostSizeY = ghost.SizeY;
         self.GhostPanel = ghost;
     else
-        self.GhostX = -1;
-        self.GhostY = -1;
-        self.GhostSizeX = -1;
-        self.GhostSizeY = -1;
-        self.GhostPanel = nil;
+        self:ClearGhost();
 
         local fromInv = ghost.InvID;
         local toInv = self.InvID;
 
         local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
         moveReq:Table({
+            WasLeftClick = true,    -- TODO: Work.
+            DroppedItemID = ghost.ItemID,
+            DroppedItemPos = {
+                x = ghost.PosX,
+                y = ghost.PosY
+            },
+            DroppedItemOwner = fromInv,
+
+            TargetItemID = nil,
+            TargetItemPos = nil,
+            TargetItemOwner = nil,
+            TargetPos = {
+                x = ghostX + 1,
+                y = ghostY + 1
+            },
+            TargetOwner = toInv
+        });
+
+        ghost:SetDisabled(true);
+
+        --[[
+        local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
+        moveReq:Table({
             DroppedItemID = ghost.ItemID,
             DroppedInvID = fromInv,
             DroppedItemPos = {
-                X = ghost.PosX,
-                Y = ghost.PosY
+                x = ghost.PosX,
+                y = ghost.PosY
             },
 
             CurrentItemID = nil,
             CurrentInvID = toInv,
             CurrentItemPos = {
-                X = ghostX + 1,
-                Y = ghostY + 1
+                x = ghostX + 1,
+                y = ghostY + 1
             }
         });
+        ]]
+
         moveReq:AddServer();
         moveReq:Send();
     end
@@ -252,7 +285,7 @@ function GRID:Paint(w, h)
         surface.DrawLine(1, yIndex * yInterval, w - 1, yIndex * yInterval);
     end
 
-    if self.GhostX != -1 and self.GhostY != -1 then
+    if ispanel(self.GhostPanel) and self.GhostX != -1 and self.GhostY != -1 then
         local ghostX = (self.GhostX * BLOCK_SIZE);
         local ghostY = (self.GhostY * BLOCK_SIZE);
         local ghostW = (self.GhostSizeX * BLOCK_SIZE);

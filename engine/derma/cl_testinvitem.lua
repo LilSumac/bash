@@ -3,6 +3,8 @@ local ITEM = {};
 function ITEM:Init()
     self:ClearItem();
     self.GhostHovering = false;
+    self.Disabled = false;
+    self.DisabledTime = nil;
 
     self:Receiver("bash_TestDrag", self.ReceiveItem, {"Someshit"});
     self:Droppable("bash_TestDrag");
@@ -15,8 +17,8 @@ function ITEM:SetItem(itemID)
         self.ItemName = self.ItemObj:GetField("ItemID");
 
         local pos = self.ItemObj:GetField("Position", {});
-        self.PosX = pos.X;
-        self.PosY = pos.Y;
+        self.PosX = pos.x;
+        self.PosY = pos.y;
 
         local itemTypeID = self.ItemObj:GetField("ItemType", "");
         local itemType = bash.Item.Types[itemTypeID];
@@ -38,13 +40,30 @@ function ITEM:ClearItem()
     self.InvID = "";
 end
 
+function ITEM:SetDisabled(disable)
+    self.DisabledTime = (disable and CurTime()) or nil;
+    self.Disabled = disable;
+end 
+
+function ITEM:IsDisabled()
+    return self.Disabled;
+end 
+
 function ITEM:DragHoverEnd()
     self.GhostHovering = false;
     self.GhostPanel = nil;
 end
 
 function ITEM:ReceiveItem(panels, dropped, index, x, y)
+    if self:IsDisabled() then return; end
+
     local ghost = panels[1];
+    if ghost:IsDisabled() then
+        local grid = self:GetParent();
+        grid:ClearGhost();
+        return;
+    end 
+
     self.GhostHovering = !dropped;
     self.GhostPanel = ghost;
 
@@ -54,20 +73,46 @@ function ITEM:ReceiveItem(panels, dropped, index, x, y)
         opts:AddOption("Swap", function()
             local moveReq = vnet.CreatePacket("bash_Net_ItemMoveRequest");
             moveReq:Table({
+                WasLeftClick = true,    -- TODO: Work.
+                DroppedItemID = ghost.ItemID,
+                DroppedItemPos = {
+                    x = ghost.PosX,
+                    y = ghost.PosY
+                },
+                DroppedItemOwner = ghost.InvID,
+    
+                TargetItemID = self.ItemID,
+                TargetItemPos = {
+                    x = self.PosX,
+                    y = self.PosY
+                },
+                TargetItemOwner = self.InvID
+            });
+
+            local grid = self:GetParent();
+            grid:ClearGhost();
+
+            ghost:SetDisabled(true);
+            self:SetDisabled(true);
+            
+            --[[
+            moveReq:Table({
                 DroppedItemID = ghost.ItemID,
                 DroppedInvID = ghost.InvID,
                 DroppedItemPos = {
-                    X = ghost.PosX,
-                    Y = ghost.PosY
+                    x = ghost.PosX,
+                    y = ghost.PosY
                 },
 
                 CurrentItemID = self.ItemID,
                 CurrentInvID = self.InvID,
                 CurrentItemPos = {
-                    X = self.PosX,
-                    Y = self.PosY
+                    x = self.PosX,
+                    y = self.PosY
                 }
             });
+            ]]
+
             moveReq:AddServer();
             moveReq:Send();
         end);
@@ -132,15 +177,24 @@ end
 
 function ITEM:Paint(w, h)
     local col;
-    if self:IsHovered() then
-        if self.GhostHovering then
-            if self.GhostPanel != self then
-                -- One item hovered over another.
-                col = Color(200, 200, 255, 150);
+    if self:IsDisabled() then
+        if self.DisabledTime and CurTime() - self.DisabledTime > 0.5 then
+            self:SetDisabled(false);
+            return;
+        end
+
+        col = Color(255, 200, 200, 150);
+    else 
+        if self:IsHovered() then
+            if self.GhostHovering then
+                if self.GhostPanel != self then
+                    -- One item hovered over another.
+                    col = Color(200, 200, 255, 150);
+                end
+            else
+                -- Item hovered over.
+                col = Color(200, 255, 200, 150);
             end
-        else
-            -- Item hovered over.
-            col = Color(200, 255, 200, 150);
         end
     end
     -- Idle.

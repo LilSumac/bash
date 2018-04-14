@@ -1,13 +1,13 @@
 --[[
-    Money item.
+    Junk item.
 ]]
 
 local ITEM = {};
 ITEM.Static = {
-    ID = "money",
-    Name = "Money",
+    ID = "junk",
+    Name = "Junk",
     WorldModel = "models/props_lab/box01a.mdl",
-    Size = ITEM_MED,
+    Size = ITEM_LARGE,
     SizeX = 2,
     SizeY = 2,
     CanStack = true,

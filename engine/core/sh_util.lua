@@ -75,6 +75,7 @@ end
 
 -- Send something to the output if debug mode is enabled.
 function bash.Util.MsgDebug(log, text, ...)
+    --if 1 == 1 then return; end 
     -- TODO: Add the real debug mode condition.
     --if !bash.DebugMode then return; end
 

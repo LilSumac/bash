@@ -10,6 +10,8 @@ local bash = bash;
 
 local LOG_INV = {pre = "[INV]", col = color_limegreen};
 
+local Entity = FindMetaTable("Entity");
+
 --
 -- Global storage.
 --
@@ -21,41 +23,150 @@ INV_STORE = "Storage";
 bash.Inventory          = bash.Inventory or {};
 bash.Inventory.IDs      = bash.Inventory.IDs or {};
 bash.Inventory.Types    = bash.Inventory.Types or {};
-bash.Inventory.Viewing  = (CLIENT and (bash.Inventory.Viewing or {})) or nil;
+
+--
+-- Entity functions.
+--
+
+-- Get an entity's associated inventory, if any.
+function Entity:GetInventory()
+    if !isent(self) then return; end
+
+    local lookup = bash.Inventory.GetLookup();
+    if !lookup then return; end
+
+    local entInd = self:EntIndex();
+    local invID = lookup:GetField(entInd);
+    return tabnet.GetTable(invID);
+end
+
+-- Check if an entity has an inventory associated with it.
+function Entity:IsInventory()
+    return self:GetInventory() != nil;
+end
+
+-- Check if an entity has a certain inventory associated with it.
+function Entity:IsSpecificInventory(invID)
+    return self:IsInventory() and self:GetInventory():GetField("InvID") == invID;
+end
+
+if SERVER then
+
+    -- Attach an inventory to an entity.
+    function Entity:AttachInventory(inv)
+        if !inv or !inv:GetField("InvID") then return; end 
+        if !isent(self) then return; end
+
+        self:DetachInventory();
+
+        local id = inv:GetField("InvID");
+        local lookup = bash.Inventory.GetLookup();
+        local index = self:EntIndex();
+        local oldIndex = lookup:GetField(id);
+        local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
+
+        if isent(oldOwner) then oldOwner:DetachInventory(true); end
+
+        bash.Util.MsgDebug(LOG_INV, "Attaching inventory '%s' to entity '%s'...", id, tostring(self));
+
+        lookup:SetFields{
+            [id] = index,
+            [index] = id
+        };
+        inv:ClearListeners();
+        hook.Run("OnInventoryAttach", inv, self);
+    end
+
+    -- Detach an entity from its current inventory.
+    function Entity:DetachInventory(keep)
+        if !isent(self) then return; end
+        if !self:IsInventory() then return; end
+
+        local lookup = bash.Inventory.GetLookup();
+        local inv = ent:GetInventory();
+        local id = inv:GetField("InvID");
+        local index = ent:EntIndex();
+
+        bash.Util.MsgDebug(LOG_INV, "Detaching inventory '%s' from entity '%s'...", id, tostring(self));
+
+        lookup:ClearField(id, index);
+        hook.Run("OnInventoryDetach", inv, self);
+
+        if !keep then tabnet.DeleteTable(id); end
+    end 
+
+end
 
 --
 -- Inventory functions.
 --
 
--- Add a new inventory type struct.
-function bash.Inventory.RegisterType(inv)
-    bash.Inventory.Types[inv.ID] = {
-        ID = inv.ID,
-        Name = inv.Name,
-        SizeX = inv.SizeX,
-        SizeY = inv.SizeY
-    };
+-- Get the inventory lookup table.
+function bash.Inventory.GetLookup()
+    return tabnet.GetTable("bash_InvLookup");
 end
 
--- Get an inventory type struct.
-function bash.Inventory.GetType(invID)
-    return bash.Inventory.Types[invID];
+-- Get an entity who is associated with a certain inventory.
+function bash.Inventory.GetActiveEntity(invID)
+    local lookup = bash.Inventory.GetLookup();
+    if !lookup then return; end
+
+    local curEnt = lookup:GetField(invID);
+    local ent = (curEnt and ents.GetByIndex(curEnt)) or nil;
+    return ent;
 end
 
--- Get the inventory registry.
-function bash.Inventory.GetRegistry()
-    return tabnet.GetTable("bash_InvRegistry");
-end
-
--- Check to see if an inventory is currently attached to an entity.
-function bash.Inventory.IsInUse(id)
-    return bash.Inventory.GetRegistry():Get(id);
-end
-
--- Checks to see if an inventory contains an item in a certain quantity.
-function bash.Inventory.HasItem(inv, id, amount)
-    amount = amount or 1;
+-- Get the player whose character 'owns' a certain inventory.
+function bash.Inventory.GetPlayerOwner(invID)
+    local inv = tabnet.GetTable(invID);
     if !inv then return; end
+
+    local ownerID = inv:GetField("Owner");
+    if ownerID:sub(1, 5) != "char_" then return; end
+
+    local lookup = bash.Character.GetLookup();
+    local curUser = lookup:GetField(ownerID);
+    local ent = (curUser and ents.GetByIndex(curUser)) or nil;
+    return ent;
+end
+
+-- Check to see if an inventory is currently associated with an entity.
+function bash.Inventory.HasActiveEntity(invID)
+    return bash.Inventory.GetActiveEntity(invID) != nil;
+end
+
+-- Check to see if an inventory contains a specific item.
+function bash.Inventory.HasSpecificItem(invID, itemID)
+    local inv, invLoaded;
+    if CLIENT then
+        inv = tabnet.GetTable(invID);
+    elseif SERVER then
+        inv, invLoaded = bash.Inventory.Load(invID);
+    end
+
+    if !inv then return; end
+
+    local invCont = inv:GetField("Contents", {});
+    local hasItem = (invCont[itemID] != nil);
+
+    if SERVER and invLoaded then
+        bash.Inventory.Unload(invID);
+    end
+
+    return hasItem;
+end 
+
+-- Checks to see if an inventory contains an item of a certain type.
+function bash.Inventory.HasItemType(invID, id, amount)
+    local inv, invLoaded;
+    if CLIENT then
+        inv = tabnet.GetTable(invID);
+    elseif SERVER then
+        inv, invLoaded = bash.Inventory.Load(invID);
+    end
+    
+    if !inv then return; end
+    amount = amount or 1;
 
     local invCont = inv:GetField("Contents", {});
     local count, curItem = 0;
@@ -65,65 +176,131 @@ function bash.Inventory.HasItem(inv, id, amount)
         if !curItem then continue; end
         if curItem:GetField("ItemType") != id then continue; end
 
-        count = count + curItem:GetField("Stack");
-        if count >= amount then return true, curItem; end
-    end
+        count = count + bash.Item.GetDynamicData(curItem, "Stack");
+        if count >= amount then
+            if SERVER and invLoaded then
+                bash.Inventory.Unload(invID);
+            end
 
-    return false;
-end
-
--- Checks to see if an inventory contains a unique item.
-function bash.Inventory.HasUniqueItem(inv, id)
-    if !inv then return; end
-
-    local invCont = inv:GetField("Contents", {});
-    local curItem;
-    for itemID, _ in pairs(invCont) do
-        curItem = tabnet.GetTable(itemID);
-        -- TODO: Remove invalid items?
-        if !curItem then continue; end
-        if curItem:GetField("ItemID") == id then return true; end
-    end
-
-    return false;
-end
-
--- Get a table structure representing the grid of an inventory.
-function bash.Inventory.GetContentGrid(inv)
-    if !inv then return; end
-    local invTypeID = inv:GetField("InvType", "");
-    local invType = bash.Inventory.GetType(invTypeID);
-    if !invType then return; end
-    
-    local occupied = {};
-    for xIndex = 1, invType.SizeX do
-        occupied[xIndex] = occupied[xIndex] or {};
-        for yIndex = 1, invType.SizeY do
-            occupied[xIndex][yIndex] = 0;
+            return true, itemID;
         end
     end
 
-    local curItem, itemPos, itemTypeID, itemType;
+    if SERVER and invLoaded then
+        bash.Inventory.Unload(invID);
+    end
+
+    return false;
+end
+
+--[[ TODO: Remove.
+-- Get the size of an inventory's contents.
+function bash.Inventory.GetContentSize(invID)
+    local inv, invLoaded;
+    if CLIENT then
+        inv = tabnet.GetTable(invID);
+    elseif SERVER then
+        inv, invLoaded = bash.Inventory.Load(invID);
+    end
+
+    if !inv then return -1; end
+
+    local size = 0;
+    local curItem, curItemTypeID, curItemType;
     for itemID, _ in pairs(inv:GetField("Contents", {})) do
-        curItem = tabnet.GetTable(itemID);
+        if CLIENT then
+            curItem = tabnet.GetTable(itemID);
+        elseif SERVER then 
+            curItem, curItemLoaded = bash.Item.Load(itemID);
+        end 
+
         if !curItem then continue; end
 
-        itemPos = curItem:GetField("PosInInv", {});
-        if !itemPos.X or !itemPos.Y then continue; end
+        curItemTypeID = curItem:GetField("ItemType");
+        curItemType = bash.Item.GetType(curItemTypeID);
+        if !curItemType then
+            if SERVER and curItemLoaded then
+                bash.Item.Unload(itemID);
+            end
+    
+            continue;
+        end 
 
-        itemTypeID = curItem:GetField("ItemType", "");
-        itemType = bash.Item.Types[itemTypeID];
-        if !itemType then continue; end
+        size = size + curItemType.Static.Size;
+    end
 
-        for xIndex = itemPos.X, itemPos.X + (itemType.SizeX - 1) do
-            for yIndex = itemPos.Y, itemPos.Y + (itemType.SizeY - 1) do
-                occupied[xIndex][yIndex] = itemID;
+    return size;
+end
+]]
+
+-- Check to see if an inventory has space for an item type.
+function bash.Inventory.HasSpace(invID, itemTypeID, amount)
+    local inv, invLoaded;
+    if CLIENT then
+        inv = tabnet.GetTable(invID);
+    elseif SERVER then
+        inv, invLoaded = bash.Inventory.Load(invID);
+    end
+    if !inv then return false; end
+
+    local invTypeID = inv:GetField("InvType");
+    local invType = bash.Inventory.GetType(invTypeID);
+    if !invType then
+        if SERVER and invLoaded then
+            bash.Inventory.Unload(invID);
+        end
+
+        return false;
+    end
+
+    if itemTypeID and amount then
+
+    else
+        local positions = {};
+        local curItem, curItemLoaded, curItemPos;
+        for itemID, _ in pairs(inv:GetField("Contents", {})) do
+            if CLIENT then
+                curItem = tabnet.GetTable(itemID);
+            elseif SERVER then
+                curItem, curItemLoaded = bash.Item.Load(itemID);
+            end
+            if !curItem then continue; end
+
+            curItemPos = curItem:GetField("Position", {});
+            if curItemPos.x and curItemPos.y then
+                positions[#positions + 1] = curItemPos;
+            end
+
+            if curItemLoaded then
+                bash.Item.Unload(itemID);
             end
         end
+
+        
     end
 
-    return occupied;
-end 
+    if SERVER and invLoaded then
+        bash.Inventory.Unload(invID);
+    end
+
+    return true;
+end
+
+-- Add a new inventory type struct.
+function bash.Inventory.RegisterType(invType)
+    bash.Inventory.Types[invType.ID] = {
+        ID = invType.ID,
+        Name = invType.Name,
+        SizeX = invType.SizeX,
+        SizeY = invType.SizeY,
+        MaxItemSize =invType.MaxItemSize
+    };
+end
+
+-- Get an inventory type struct.
+function bash.Inventory.GetType(invTypeID)
+    return bash.Inventory.Types[invTypeID];
+end
 
 if SERVER then
 
@@ -156,7 +333,7 @@ if SERVER then
             return false;
         end
 
-        bash.Util.MsgLog(LOG_INV, "Creating a new inventory with the ID '%s'...", invID);
+        bash.Util.MsgDebug(LOG_INV, "Creating a new inventory with the ID '%s'...", invID);
 
         local newInv;
         if temp then
@@ -175,381 +352,196 @@ if SERVER then
         return newInv;
     end
 
-    -- Find the first available open spot in an inventory for a certain item type.
-    function bash.Inventory.GetOpenSpot(inv, addItemID, canMerge)
-        if !inv then return; end
+    -- Load an inventory from the database.
+    function bash.Inventory.Load(invID, loadContents)
+        bash.Util.MsgDebug(LOG_INV, "Loading inventory '%s'...", invID);
 
-        local invTypeID = inv:GetField("InvType");
-        local invType = bash.Inventory.GetType(invTypeID);
-        if !invType then return; end
-
-        local addItemType = bash.Item.GetType(addItemID);
-        if !addItemType then return; end
-        local addItemW = addItemType.Static.SizeX;
-        local addItemH = addItemType.Static.SizeY;
-
-        local occupied = bash.Inventory.GetContentGrid(inv);
-        local canFit;
-        for xIndex = 1, invType.SizeX - (addItemW - 1) do
-            for yIndex = 1, invType.SizeY - (addItemH - 1) do
-                -- TODO: Add stacking.
-                
-                canFit = true;
-
-                for wIndex = 0, (addItemW - 1) do
-                    for hIndex = 0, (addItemH - 1) do
-                        if occupied[xIndex + wIndex][yIndex + hIndex] != 0 then
-                            canFit = false;
-                            break;
-                        end
-                    end
-
-                    if !canFit then break; end
-                end
-
-                if canFit then
-                    return {X = xIndex, Y = yIndex};
-                end
-
-            end
-        end 
-    end
-
-    -- Create a new instance of an inventory.
-    function bash.Inventory.Load(id)
-        bash.Util.MsgLog(LOG_INV, "Loading inventory '%s'...", id);
-
-        local inv = tabnet.GetTable(id);
-        if !inv then
-            inv = tabnet.GetDBProvider():LoadTable("bash_Inventory", id);
-        end 
-
-        if !inv then
-            bash.Util.MsgErr("InvNotFound", id);
-            return;
-        end
-
-        return inv;
-
-        --[[
-        local owner = forceOwner;
-        if !owner then
-            local ownerID = inv:GetField("Owner");
-            if !ownerID then
-                bash.Util.MsgErr("InvNoOwnerSet", id);
-                return;
-            end
-
-            owner = bash.Character.GetPlayerOwner(ownerID);
-            -- TODO: Add NPC functionality.
-            if !owner then
-                bash.Util.MsgErr("InvNoOwnerAvailable", id);
-                return;
-            end 
-        end
-
-        bash.Inventory.AttachTo(char, owner, deleteOld);
-
-
-        -- TODO: Finish this function.
-        if !bash.Inventory.Cache[id] then
-            bash.Util.MsgDebug(LOG_INV, "Request to load inventory '%s' is waiting on data.", id);
-
-            bash.Inventory.Waiting[id] = true;
-            bash.Inventory.Fetch(id);
-            return;
-        end
-
-        bash.Util.MsgLog(LOG_INV, "Loading inventory '%s'...", id);
-
-        local invData = bash.Inventory.Cache[id];
-        if !tabnet.GetTable(id) then
-            -- TODO: Fix this.
-            --tabnet.CreateTable(invData, nil, id);
-        end
-
-        bash.Inventory.LoadContents(id, ent);
-        bash.Inventory.AttachTo(id, ent, deleteOld);
-        ]]
-    end
-
-    --[[
-    -- Create all containing items in an inventory.
-    function bash.Inventory.LoadContents(id, ent)
-        local inv = tabnet.GetTable(id);
-        if !inv then return; end
-
-        for itemID, _ in pairs(inv:Get("Contents", {})) do
-            -- TODO: What did he mean by this?
-            --bash.Item.Load(itemID, ent, );
-        end
-    end
-
-    -- Attempts to insert an item into an inventory (changes owner and position).
-    function bash.Inventory.InsertItem(invID, itemID)
-        -- TODO: Handle non-registered inventories.
+        local loadedFromDB = false;
         local inv = tabnet.GetTable(invID);
-        local item = tabnet.GetTable(itemID);
+        if !inv then
+            inv = tabnet.GetDBProvider():LoadTable("bash_Inventory", invID);
+            loadedFromDB = true;
+        end 
+
+        if !inv then
+            bash.Util.MsgErr("InvNotFound", invID);
+            return;
+        end
+
+        if loadContents then
+            local contents = inv:GetField("Contents", {});
+            local item;
+            for itemID, _ in pairs(contents) do
+                item = bash.Item.Load(itemID);
+                -- TODO: Remove invalid items?
+            end
+        end
+
+        return inv, loadedFromDB;
+    end
+
+    -- Unload an inventory and all of its contents.
+    function bash.Inventory.Unload(invID)
+        local inv = tabnet.GetTable(invID);
         if !inv then return; end
-        if !item then return; end
 
         local contents = inv:GetField("Contents", {});
-        if contents[itemID] then return; end
-
-        local invTypeID = inv:GetField("InvType", "");
-        local invType = bash.Inventory.Types[invTypeID];
-        if !invType then return; end
-
-        local occupied = {};
-        for xIndex = 1, invType.SizeX do
-            occupied[xIndex] = occupied[xIndex] or {};
-            for yIndex = 1, invType.SizeY do
-                occupied[xIndex][yIndex] = 0;
-            end
+        for itemID, _ in pairs(contents) do
+            bash.Item.Unload(itemID);
         end
 
-        local curItem, itemPos, itemTypeID, itemType;
-        for _itemID, _ in pairs(contents) do
-            curItem = tabnet.GetTable(_itemID);
-            if !curItem then continue; end
-
-            itemPos = curItem:GetField("PosInInv", {});
-            if !itemPos.X or !itemPos.Y then continue; end
-
-            itemTypeID = curItem:GetField("ItemType", "");
-            itemType = bash.Item.Types[itemTypeID];
-            if !itemType then continue; end
-
-            for xIndex = itemPos.X, itemPos.X + (itemType.SizeX - 1) do
-                for yIndex = itemPos.Y, itemPos.Y + (itemType.SizeY - 1) do
-                    occupied[xIndex][yIndex] = _itemID;
-                end
-            end
-        end
-
-        itemPos = item:GetField("PosInInv", {});
-        if !itemPos.X or !itemPos.Y then return; end
-
-        itemTypeID = item:GetField("ItemType", "");
-        itemType = bash.Item.Types[itemTypeID];
-        if !itemType then return; end
-
-
+        hook.Run("OnInventoryUnload", inv);
+        tabnet.DeleteTable(invID);
     end
-    ]]
+
+    -- Delete an inventory from the database.
+    function bash.Inventory.Delete(invID)
+        local inv = bash.Inventory.Load(invID);
+        local curEnt = bash.Inventory.GetActiveEntity(invID);
+        if isent(curEnt) then
+            curEnt:DetachInventory(true);
+            curEnt:Remove();
+        end
+
+        hook.Run("OnInventoryDelete", inv);
+        tabnet.GetDBProvider().EraseTable(inv);
+    end
 
     -- Add an item to an inventory.
-    function bash.Inventory.AddItem(inv, item, forcePos)
-        -- TODO: Handle non-registered inventories.
-        if !inv or !item then return false; end
-        local invID = inv:GetField("InvID");
-        local itemID = item:GetField("ItemID");
+    function bash.Inventory.AddItem(invID, itemID, newPos)
+        if invID == "!WORLD!" then return; end 
 
-        local pos = forcePos or bash.Inventory.GetOpenSpot(inv, item:GetField("ItemType"));
-        if !pos or !pos.X or !pos.Y then return false; end
+        local inv, invLoaded = bash.Inventory.Load(invID);
+        if !inv then return false; end 
+        local item, itemLoaded = bash.Item.Load(itemID);
+        if !item then
+            if invLoaded then
+                bash.Inventory.Unload(invID);
+            end
 
-        local contents = inv:GetField("Contents", {}, true);
+            return false;
+        end
+
         local oldInvID = item:GetField("Owner");
-        MsgN(oldInvID);
-        local oldOwner = bash.Inventory.GetPlayerOwner(oldInvID);
-        MsgN(tostring(oldOwner));
+        if oldInvID == invID then
+            if invLoaded then
+                bash.Inventory.Unload(invID);
+            end
+            if itemLoaded then
+                bash.Item.Unload(itemID);
+            end 
+
+            return false;
+        elseif oldInvID != "" and oldInvID != "!WORLD!" then
+            bash.Inventory.RemoveItem(oldInvID, itemID, true);
+        end
 
         bash.Util.MsgDebug(LOG_INV, "Adding item '%s' to inventory '%s'...", itemID, invID);
 
+        local oldItemEnt = bash.Item.GetActiveEntity(itemID);
+        if isent(oldItemEnt) then
+            oldItemEnt:DetachItem(true);
+            oldItemEnt:Remove();
+        end
+
+        local contents = inv:GetField("Contents", {}, true);
         contents[itemID] = true;
         inv:SetField("Contents", contents);
-        item:SetFields{
-            ["Owner"] = invID,
-            ["Position"] = {
-                X = pos.X,
-                Y = pos.Y
-            }
-        };
+
+        if newPos and newPos.x and newPos.y then
+            item:SetFields{
+                ["Owner"] = invID,
+                ["Position"] = newPos
+            };
+        else
+            item:SetField("Owner", invID);
+        end
 
         local ply = bash.Inventory.GetPlayerOwner(invID);
-        if !ply then return false; end
-        item:AddListener(ply, tabnet.SCOPE_PRIVATE);
-
-        if oldInvID != "" and invID != oldInvID then
-            local oldInv = tabnet.GetTable(oldInvID);
-            if oldInv then
-                local oldContents = oldInv:GetField("Contents", {}, true);
-                oldContents[itemID] = nil;
-                oldInv:SetField("Contents", oldContents);
-
-                if isplayer(oldOwner) and ply != oldOwner then
-                    MsgN("REMOVING ODL!");
-                    MsgN(ply);
-                    MsgN(oldOwner);
-                    item:RemoveListener(oldOwner);
-                end
-            end
-        end
+        if isplayer(ply) then
+            item:AddListener(ply, tabnet.SCOPE_PRIVATE);
+        end 
 
         return true;
     end
 
     -- Remove an item from an inventory.
-    function bash.Inventory.RemoveItem(inv, item)
-        -- TODO: Handle non-registered inventories.
-        if !inv or !item then return; end
+    function bash.Inventory.RemoveItem(invID, itemID, keepListener)
+        if invID == "!WORLD!" then return; end 
 
-        local itemID = item:GetField("ItemID");
-        local invID = inv:GetField("InvID");
+        local inv, invLoaded = bash.Inventory.Load(invID);
+        if !inv then return; end
+        local item, itemLoaded = bash.Item.Load(itemID);
+        if !item then
+            if invLoaded then
+                bash.Inventory.Unload(invID);
+            end
+            
+            return;
+        end
+
+        bash.Util.MsgDebug(LOG_INV, "Removing item '%s' from inventory '%s'.", itemID, invID);
+
         local contents = inv:GetField("Contents", {}, true);
         contents[itemID] = nil;
         inv:SetField("Contents", contents);
         item:SetField("Owner", "");
+    
+        if !keepListener then
+            local ply = bash.Inventory.GetPlayerOwner(invID);
+            item:RemoveListener(ply);
+        end
 
-        local ply = bash.Inventory.GetPlayerOwner(invID);
-        item:RemoveListener(ply);
-
-        bash.Util.MsgDebug(LOG_INV, "Removing item '%s' from inventory '%s'.", itemID, invID);
-    end
-
-    -- Get an inventory's player owner, if any.
-    function bash.Inventory.GetPlayerOwner(id)
-        local inv = tabnet.GetTable(id);
-        if !inv then return; end
-
-        local ownerID = inv:GetField("Owner");
-        if ownerID:sub(1, 5) != "char_" then return; end
-
-        local reg = bash.Character.GetRegistry();
-        local curUser = reg:GetField(ownerID);
-        local ent = (curUser and ents.GetByIndex(curUser)) or nil;
-        return ent;
+        if invLoaded then
+            bash.Inventory.Unload(invID);
+        end
+        if itemLoaded then
+            bash.Item.Unload(itemID);
+        end 
     end
 
     -- Add a player to an inventory's (and its items') listeners.
-    function bash.Inventory.AddPlayerListener(inv, ply)
+    function bash.Inventory.AddPlayerListener(invID, ply)
+        local inv = tabnet.GetTable(invID);
         if !inv or !isplayer(ply) then return; end
 
-        local invID = inv:GetField("InvID");
         local contents = inv:GetField("Contents", {});
 
         bash.Util.MsgDebug(LOG_INV, "Adding '%s' to listeners for inventory '%s'...", tostring(ply), invID);
 
-        inv:AddListener(ply, tabnet.SCOPE_PUBLIC);
         local curItem;
         for itemID, _ in pairs(contents) do
-            curItem = bash.Item.Load(itemID);
+            curItem = tabnet.GetTable(itemID);
             if !curItem then continue; end
 
             curItem:AddListener(ply, tabnet.SCOPE_PRIVATE);
         end
+
+        inv:AddListener(ply, tabnet.SCOPE_PUBLIC);
     end
 
     -- Remove a player from an inventory's (and its items') listeners.
-    function bash.Inventory.RemovePlayerListener(inv, ply, delete)
+    function bash.Inventory.RemovePlayerListener(invID, ply, unload)
+        local inv = tabnet.GetTable(invID);
         if !inv or !isplayer(ply) then return; end
 
-        local invID = inv:GetField("InvID");
         local contents = inv:GetField("Contents", {});
-        local curItem;
 
         bash.Util.MsgDebug(LOG_INV, "Removing '%s' from listeners for inventory '%s'...", tostring(ply), invID);
 
+
+        local curItem;
         for itemID, _ in pairs(contents) do
             curItem = bash.Item.Load(itemID);
             if !curItem then continue; end
 
             curItem:RemoveListener(ply);
-            if delete then tabnet.DeleteTable(itemID); end
+            if unload then bash.Item.Unload(itemID); end
         end
 
         inv:RemoveListener(ply);
-        if delete then tabnet.DeleteTable(invID); end 
+        if unload then bash.Inventory.Unload(invID); end 
     end 
-
-    --[[
-    -- Associate an inventory with the given owner.
-    function bash.Inventory.AttachTo(id, ent, deleteOld)
-        if !isent(ent) then return; end
-        bash.Inventory.DetachFrom()
-
-
-        -- TODO: Finish this function.
-        local inv = bash.TableNet.Get(id);
-        if !inv then return; end
-        if ownerID == "" then return; end
-
-        local invType, ent;
-        if ownerID:sub(1, 5) == "char_" then
-            invType = INV_CHAR;
-
-            local reg = bash.Character.GetRegistry();
-            local curUser = reg:Get(ownerID);
-            ent = (curUser and ents.GetByIndex(curUser)) or nil;
-        elseif ownerID:sub(1, 5) == "item_" then
-            invType = INV_ITEM;
-
-            local reg = bash.Item.GetRegistry();
-            local curItem = reg:Get(ownerID);
-            ent = (curUser and ents.GetByIndex(curUser)) or nil;
-        elseif ownerID:sub(1, 6) == "store_" then
-            invType = INV_STORE;
-            -- TODO: Find active storage entity.
-        end
-
-        if !isent(ent) and !isplayer(ent) then
-            bash.Util.MsgDebug(LOG_INV, "No owner '%s' available for inventory '%s'.", ownerID, id);
-            return;
-        end
-
-        bash.Util.MsgDebug(LOG_INV, "Attaching inventory '%s' to owner '%s'.", id, ownerID);
-
-        if invType == INV_CHAR then
-            if !isplayer(ent) then return; end
-            inv:AddListener(ent, NET_PUBLIC);
-            local curItem;
-            for itemID, _ in pairs(inv:Get("Contents", {})) do
-                curItem = bash.TableNet.Get(itemID);
-                if !curItem then continue; end
-                curItem:AddListener(ent, NET_PUBLIC);
-            end
-        end
-
-        local reg = bash.Item.GetRegistry();
-        local index = ent:EntIndex();
-        reg:SetData{
-            Public = {
-                [index] = id,
-                [id] = index
-            }
-        };
-
-        local inv = bash.TableNet.Get(id);
-        hook.Run("OnInventoryAttach", inv, ent);
-    end
-
-    -- Dissociate an inventory associated with an entity.
-    function bash.Inventory.DetachFrom(id, ent, delete)
-        local inv = bash.TableNet.Get(id);
-        if !inv then return; end
-        if !isent(ent) and !isplayer(ent) then return; end
-
-        bash.Util.MsgDebug(LOG_INV, "Detaching inventory '%s' from entity '%s'...", id, tostring(ent));
-
-        if isplayer(ent) then
-            inv:RemoveListener(ent, NET_PUBLIC);
-            local curItem;
-            for itemID, _ in pairs(inv:Get("Contents", {})) do
-                curItem = bash.TableNet.Get(itemID);
-                curItem:RemoveListener(ent, NET_PUBLIC);
-            end
-        end
-
-        local reg = bash.Inventory.GetRegistry();
-        local index = ent:EntIndex();
-        reg:Delete(index, id);
-        hook.Run("OnInventoryDetach", inv, ent);
-
-        if delete then
-            bash.TableNet.DeleteTable(id);
-        end
-    end
-    ]]
 
     --
     -- Engine hooks.
@@ -579,12 +571,12 @@ if SERVER then
         if !isplayer(ent) then return; end
 
         local invs = char:GetField("Inventory", {});
-        local inv, invCont, item;
+        local inv;
         for slot, invID in pairs(invs) do 
-            inv = bash.Inventory.Load(invID);
+            inv = bash.Inventory.Load(invID, true);
             if !inv then continue; end
 
-            bash.Inventory.AddPlayerListener(inv, ent);
+            bash.Inventory.AddPlayerListener(invID, ent);
         end
     end);
 
@@ -595,11 +587,66 @@ if SERVER then
         local invs = char:GetField("Inventory", {});
         local inv;
         for slot, invID in pairs(invs) do 
-            inv = tabnet.GetTable(invID);
-            if !inv then continue; end
-
-            bash.Inventory.RemovePlayerListener(inv, ent, true);
+            bash.Inventory.RemovePlayerListener(invID, ent);
         end
+    end);
+
+    -- Unload a character's inventories.
+    hook.Add("OnCharacterUnload", "bash_InventoryUnloadChar", function(char)
+        local invs = char:GetField("Inventory", {});
+        for slot, invID in pairs(invs) do
+            bash.Inventory.Unload(invID);
+        end 
+    end);
+
+    -- Delete a character's inventories.
+    hook.Add("OnCharacterDelete", "bash_InventoryDeleteChar", function(char)
+        local invs = char:GetField("Inventory", {});
+        for slot, invID in pairs(invs) do
+            bash.Inventory.Delete(invID);
+        end
+    end);
+
+elseif CLIENT then
+
+    --
+    -- Engine hooks.
+    --
+
+    -- Watch for inventory attaches.
+    -- TODO: See if this is necessary.
+    hook.Add("OnUpdateTable", "bash_InventoryWatchForAttach", function(tab, name, newVal, oldVal)
+        if tab._RegistryID != "bash_InvLookup" then return; end
+        if type(name) != "number" then return; end
+
+        local entInd = name;
+        local invID = newVal;
+        local ent = ents.GetByIndex(entInd);
+        if !isent(ent) then return; end
+
+        local inv = tabnet.GetTable(invID);
+        if !inv then return; end
+
+        bash.Util.MsgDebug(LOG_INV, "Attaching inventory '%s' to entity '%s'...", invID, tostring(ent));
+        hook.Run("OnInventoryAttach", inv, ent);
+    end);
+
+    -- Watch for inventory detaches.
+    -- TODO: See if this is necessary.
+    hook.Add("OnClearTable", "bash_InventoryWatchForDetach", function(tab, name, val)
+        if tab._RegistryID != "bash_InvLookup" then return; end
+        if type(name) != "number" then return; end
+
+        local entInd = name;
+        local invID = val;
+        local ent = ents.GetByIndex(name);
+        if !isent(ent) then return; end
+
+        local inv = tabnet.GetTable(invID);
+        if !inv then return; end
+
+        bash.Util.MsgDebug(LOG_INV, "Detaching inventory '%s' from entity '%s'...", invID, tostring(ent));
+        hook.Run("OnInventoryDetach", inv, ent);
     end);
 
 end
@@ -611,8 +658,8 @@ end
 -- Create character structures.
 hook.Add("CreateStructures_Engine", "bash_InventoryStructures", function()
     if SERVER then
-        if !tabnet.GetTable("bash_InvRegistry") then
-            tabnet.CreateTable(nil, tabnet.LIST_GLOBAL, nil, "bash_InvRegistry");
+        if !tabnet.GetTable("bash_InvLookup") then
+            tabnet.CreateTable(nil, tabnet.LIST_GLOBAL, nil, "bash_InvLookup");
         end
     end
 

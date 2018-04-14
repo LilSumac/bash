@@ -210,6 +210,7 @@ concommand.Add("grid", function(ply, cmd, args)
     grid:AlignTop(24);
     PrintTable(char);
     grid:SetInv(invs["Primary"]);
+    frame:SetTitle(invs["Primary"]);
 end);
 
 concommand.Add("gridground", function(ply, cmd, args)
@@ -231,6 +232,30 @@ concommand.Add("gridground", function(ply, cmd, args)
     local grid = vgui.Create("bash_TestInvGrid", frame);
     grid:AlignTop(24);
     grid:SetInv("inv_ground");
+    frame:SetTitle("Ground");
+end);
+
+concommand.Add("invcont", function(ply, cmd, args)
+    local char = ply:GetCharacter();
+    if !char then return; end
+
+    local frame = vgui.Create("DFrame");
+    frame:SetSize(300, 300);
+    frame:Center();
+    frame:ShowCloseButton(false);
+    frame:MakePopup(true);
+    frame:SetSizable(true);
+
+    local close = vgui.Create("bash_Close", frame);
+    close:SetSize(16, 16);
+    close:SetPos(frame:GetWide() - 20, 4);
+
+    local invs = char:GetField("Inventory", {});
+    local cont = vgui.Create("bash_InvContainer", frame);
+    cont:SetWide(300);
+    cont:AlignTop(24);
+    cont:SetInventory(invs["Primary"]);
+    frame:SetTitle(invs["Primary"]);
 end);
 
 hook.Add("HUDPaint", "somebullshit", function()

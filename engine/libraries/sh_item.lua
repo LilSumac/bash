@@ -17,106 +17,229 @@ local Entity = FindMetaTable("Entity");
 --
 
 bash.Item           = bash.Item or {};
-bash.Item.Vars      = bash.Item.Vars or {};
 bash.Item.IDs       = bash.Item.IDs or {};
 bash.Item.Types     = bash.Item.Types or {};
-bash.Item.Cache     = bash.Item.Cache or {};
-bash.Item.Waiting   = bash.Item.Waiting or {};
+
+-- Item size enum.
+ITEM_TINY = 0;
+ITEM_SMALL = 1;
+ITEM_MED = 2;
+ITEM_LARGE = 3;
+ITEM_HUGE = 4;
 
 --
 -- Entity functions.
 --
 
--- Get an entity's assigned item, if any.
+-- Get an entity's associated item, if any.
 function Entity:GetItem()
-    local reg = bash.Item.GetRegistry();
-    if !reg then return; end
+    if !isent(self) then return; end
 
-    local index = self:EntIndex();
-    local itemID = reg:GetField(index);
+    local lookup = bash.Item.GetLookup();
+    if !lookup then return; end
 
+    local entInd = self:EntIndex();
+    local itemID = lookup:GetField(entInd);
     return tabnet.GetTable(itemID);
 end
 
--- Check if an entity has an item attached.
+-- Check if an entity has an item associated with it.
 function Entity:IsItem()
     return self:GetItem() != nil;
 end
 
--- Check if an entity has a certain item attached.
-function Entity:IsSpecificItem(id)
-    return self:IsItem() and self:GetItem():GetField("ItemID") == id;
+-- Check if an entity has a certain item associated with it.
+function Entity:IsSpecificItem(itemID)
+    return self:IsItem() and self:GetItem():GetField("ItemID") == itemID;
+end
+
+if SERVER then
+
+    -- Attach an item to an entity.
+    function Entity:AttachItem(item)
+        if !item or !item:GetField("ItemID") then return; end 
+        if !isent(self) then return; end
+
+        self:DetachItem();
+
+        local id = item:GetField("ItemID");
+        local lookup = bash.Item.GetLookup();
+        local index = self:EntIndex();
+        local oldIndex = lookup:GetField(id);
+        local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
+
+        if isent(oldOwner) then oldOwner:DetachItem(true); end
+
+        bash.Util.MsgDebug(LOG_ITEM, "Attaching item '%s' to entity '%s'...", id, tostring(self));
+
+        lookup:SetFields{
+            [id] = index,
+            [index] = id
+        };
+        item:ClearListeners(tabnet.SCOPE_PRIVATE);
+        item:SetGlobal(true);
+        hook.Run("OnItemAttach", item, self);
+    end
+
+    -- Detach an entity from its current item.
+    function Entity:DetachItem(keep, noStorePos)
+        if !isent(self) then return; end
+        if !self:IsItem() then return; end
+
+        local lookup = bash.Item.GetLookup();
+        local pos = self:GetPos();
+        local item = self:GetItem();
+
+        if !noStorePos then
+            item:SetField("Position", {
+                x = pos.x,
+                y = pos.y,
+                z = pos.z
+            });
+        end
+
+        local id = item:GetField("ItemID");
+        local index = self:EntIndex();
+
+        bash.Util.MsgDebug(LOG_ITEM, "Detaching item '%s' from entity '%s'...", id, tostring(self));
+
+        lookup:ClearField(id, index);
+        item:SetGlobal(false);
+        hook.Run("OnItemDetach", item, self);
+
+        if !keep then tabnet.DeleteTable(id); end
+    end 
+
 end
 
 --
 -- Item functions.
 --
 
--- Add a new character variable struct.
-function bash.Item.AddVar(data)
-    bash.Item.Vars[data.ID] = {
-        ID = data.ID,
-        Type = data.Type,
-        Default = data.Default,
-        Scope = data.Scope,
-        InSQL = data.InSQL
-    };
+-- Get the item lookup table.
+function bash.Item.GetLookup()
+    return tabnet.GetTable("bash_ItemLookup");
+end
 
-    if SERVER and data.InSQL then
-        bash.Database.AddColumn("bash_items", {
-            Name = data.ID,
-            Type = data.Type,
-            MaxLength = data.MaxLength
-        }, data.PrimaryKey);
+-- Get an entity who is associated with a certain item.
+function bash.Item.GetActiveEntity(itemID)
+    local lookup = bash.Item.GetLookup();
+    if !lookup then return; end
+
+    local curEnt = lookup:GetField(itemID);
+    local ent = (curEnt and ents.GetByIndex(curEnt)) or nil;
+    return ent;
+end
+
+-- Get the player whose character 'owns' a certain item.
+function bash.Item.GetPlayerOwner(itemID)
+    local item = tabnet.GetTable(itemID);
+    if !item then return; end
+
+    local ownerID = item:GetField("Owner");
+    if ownerID:sub(1, 4) != "inv_" then return; end
+
+    return bash.Inventory.GetPlayerOwner(ownerID);
+end
+
+-- Check to see if an item is currently associated with an entity.
+function bash.Item.HasActiveEntity(itemID)
+    return bash.Item.GetActiveEntity(itemID) != nil;
+end
+
+-- Get a field in an item's static data.
+function bash.Item.GetStaticData(itemID, fieldName)
+    local item, itemLoaded;
+    if CLIENT then
+        item = tabnet.GetTable(itemID);
+    elseif SERVER then
+        item, itemLoaded = bash.Item.Load(itemID);
+    end 
+
+    if !item then return; end
+
+    local itemTypeID = item:GetField("ItemType", "");
+    local itemType = bash.Item.GetType(itemTypeID);
+    if !itemType then
+        if SERVER and itemLoaded then
+            bash.Item.Unload(itemID);
+        end
+
+        return;
+    end 
+
+    local val = itemType.Static[fieldName];
+
+    if SERVER and itemLoaded then
+        bash.Item.Unload(itemID);
     end
+
+    return val;
+end
+
+-- Get a field in an item's dynamic data.
+function bash.Item.GetDynamicData(itemID, fieldName)
+    local item, itemLoaded;
+    if CLIENT then
+        item = tabnet.GetTable(itemID);
+    elseif SERVER then
+        item, itemLoaded = bash.Item.Load(itemID);
+    end 
+
+    if !item then return; end
+
+    local dynamicData = item:GetField("DynamicData", {});
+    local val = dynamicData[fieldName];
+
+    if SERVER and itemLoaded then
+        bash.Item.Unload(itemID);
+    end
+
+    return val;
 end
 
 -- Add a new item type struct.
-function bash.Item.RegisterType(item)
-    bash.Util.MsgDebug(LOG_ITEM, "Registering item type with ID '%s'...", item.Static.ID);
+function bash.Item.RegisterType(itemType)
+    bash.Util.MsgDebug(LOG_ITEM, "Registering item type with ID '%s'...", itemType.Static.ID);
 
     local itemData = {};
 
     -- Static fields.
-    itemData.Static             = item.Static or {};
-    itemData.Static.ID          = item.Static.ID or "bash_itemid";
-    itemData.Static.Name        = item.Static.Name or "Item";
-    itemData.Static.WorldModel  = item.Static.WorldModel or "models/props_lab/box01a.mdl"
-    itemData.Static.SizeX       = item.Static.SizeX or 1;
-    itemData.Static.SizeY       = item.Static.SizeY or 1;
-    itemData.Static.CanStack    = item.Static.CanStack or false;
-    itemData.Static.MaxStack    = item.Static.MaxStack or 1;
+    itemData.Static             = itemType.Static or {};
+    itemData.Static.ID          = itemType.Static.ID or "bash_itemid";
+    itemData.Static.Name        = itemType.Static.Name or "Item";
+    itemData.Static.WorldModel  = itemType.Static.WorldModel or "models/props_lab/box01a.mdl"
+    itemData.Static.SizeX       = itemType.Static.SizeX or 2;
+    itemData.Static.SizeY       = itemType.Static.SizeY or 2;
+    itemData.Static.CanStack    = itemType.Static.CanStack or false;
+    itemData.Static.MaxStack    = itemType.Static.MaxStack or 1;
 
     -- Dynamic fields.
-    itemData.Dynamic = item.Dynamic or {};
-    itemData.Dynamic.Stack = item.Dynamic.Stack or 1;
+    itemData.Dynamic = itemType.Dynamic or {};
+    itemData.Dynamic.Stack = itemType.Dynamic.Stack or 1;
 
     -- Function fields.
-    itemData.Functions = itemData.Functions or {};
+    itemData.Functions = itemType.Functions or {};
+
+    -- DROP
     itemData.Functions.Drop = {
 
         ShowInInv = true,
+        ShowOnDrop = false,
         ShowInWorld = false,
 
         CanShow = function(item)
             -- TODO: Add if player is viewing another inventory, return false.
             -- Can basically replace all of this func.
             if !item then return false; end
+            local itemID = item:GetField("ItemID");
 
             local char = LocalPlayer():GetCharacter();
+            local charID = char:GetField("CharID");
             if !char then return false; end
+            if !bash.Character.HasSpecificItem(charID, itemID) then return false; end
 
-            local itemID = item:GetField("ItemID");
-            local inv, invCont;
-            for slot, invID in pairs(char:GetField("Inventory", {})) do
-                inv = tabnet.GetTable(invID);
-                if !inv then continue; end
-
-                invCont = inv:GetField("Contents", {});
-                if invCont[itemID] then return true; end
-            end
-
-            return false;
+            return true;
         end,
 
         MenuName = "Drop",
@@ -132,6 +255,7 @@ function bash.Item.RegisterType(item)
             local trace = util.TraceLine(traceTab);
             local itemPos = trace.HitPos;
             itemPos.z = itemPos.z + 2;
+            -- TODO: Add position constraints.
 
             return {
                 ItemPos = itemPos
@@ -139,19 +263,23 @@ function bash.Item.RegisterType(item)
         end,
 
         Run = function(ply, item, sendData)
-            if !item then MsgN("NO ITEM") return; end
-
+            if !item then return; end
+            
+            local itemID = item:GetField("ItemID");
             local invID = item:GetField("Owner");
             local owner = bash.Inventory.GetPlayerOwner(invID);
-            if owner != ply then MsgN("NOT SAME OWNER") return; end
+            if owner != ply then return; end
 
-            bash.Item.Drop(item, sendData.ItemPos);
+            bash.Item.SpawnInWorld(itemID, sendData.ItemPos);
         end
 
     };
+
+    -- PICKUP
     itemData.Functions.PickUp = {
 
         ShowInInv = false,
+        ShowOnDrop = false,
         ShowInWorld = true,
 
         CanShow = function(item, ent)
@@ -172,15 +300,72 @@ function bash.Item.RegisterType(item)
         RunOnServer = true,
 
         Run = function(ply, item, sendData)
-            if !item then MsgN("NO ITEM") return; end
+            if !item then return; end
 
+            local itemID = item:GetField("ItemID");
             local invID = item:GetField("Owner");
-            if invID != "!WORLD!" then MsgN("NOT IN WORLD") return; end
+            if invID != "!WORLD!" then return; end
 
             local char = ply:GetCharacter();
-            if !char then MsgN("NO CHAR") return; end
+            if !char then return; end
+            local charID = char:GetField("CharID");
 
-            bash.Item.PickUp(item, char);
+            if !bash.Character.GiveItem(charID, itemID) then
+                MsgN("Couldn't pick up idiot!");
+                -- TODO: Send notif.
+            end
+        end
+
+    };
+
+    -- STACK
+    itemData.Functions.Stack = {
+
+        ShowInInv = false,
+        ShowOnDrop = true,
+        ShowInWorld = false,
+
+        CanShow = function(sourceItem, targetItem)
+            if !sourceItem or !targetItem then return false; end
+            
+            local sourceItemTypeID = sourceItem:GetField("ItemType");
+            local targetItemTypeID = targetItem:GetField("ItemType");
+            if sourceItemTypeID != targetItemTypeID then return false; end 
+
+            local sourceItemType = bash.Item.GetType(sourceItemTypeID);
+            local targetItemType = bash.Item.GetType(targetItemTypeID);
+            if !sourceItemType or !targetItemType then return false; end
+            if !sourceItemType.Static.CanStack or !targetItemType.Static.CanStack then return false; end
+
+            local targetItemID = targetItem:GetField("ItemID");
+            local targetStackAmt = bash.Item.GetDynamicData(targetItemID, "Stack");
+            if targetStackAmt >= targetItemType.Static.MaxStack then return false; end
+
+            return true;
+        end,
+
+        MenuName = "Stack",
+
+        RunOnClient = false,
+        RunOnServer = true,
+
+        GetSendData = function(sourceItem, targetItem)
+            return {
+                TargetItemID = targetItem:GetField("ItemID")
+            };
+        end,
+
+        Run = function(ply, sourceItem, sendData)
+            if !sourceItem then return; end
+            local sourceItemID = sourceItem:GetField("ItemID");
+            if !sourceItemID then return; end
+            
+            local targetItemID = sendData.TargetItemID;
+            local targetItem = tabnet.GetTable(targetItemID);
+            if !targetItem then return; end 
+
+
+            --bash.Item.Stack(sourceItem,);
         end
 
     };
@@ -188,29 +373,9 @@ function bash.Item.RegisterType(item)
     bash.Item.Types[itemData.Static.ID] = itemData;
 end
 
--- Get an item type.
-function bash.Item.GetType(itemID)
-    return bash.Item.Types[itemID];
-end
-
--- Get the item registry.
-function bash.Item.GetRegistry()
-    return tabnet.GetTable("bash_ItemRegistry");
-end
-
--- Get an entity who is emulating a certain item.
-function bash.Item.GetEntityOwner(id)
-    local reg = bash.Item.GetRegistry();
-    if !reg then return; end
-
-    local curUser = reg:GetField(id);
-    local ent = (curUser and ents.GetByIndex(curUser)) or nil;
-    return ent;
-end
-
--- Check to see if an item is currently attached to an entity.
-function bash.Item.IsInUse(id)
-    return bash.Item.GetRegistry():Get(id);
+-- Get an item type struct.
+function bash.Item.GetType(itemTypeID)
+    return bash.Item.Types[itemTypeID];
 end
 
 if SERVER then
@@ -253,7 +418,7 @@ if SERVER then
             end
         end
 
-        bash.Util.MsgLog(LOG_ITEM, "Creating a new item with the ID '%s'...", itemID);
+        bash.Util.MsgDebug(LOG_ITEM, "Creating a new item with the ID '%s'...", itemID);
 
         local newItem;
         if temp then
@@ -274,11 +439,13 @@ if SERVER then
 
     -- Create a new instance of an item.
     function bash.Item.Load(id)
-        bash.Util.MsgLog(LOG_ITEM, "Loading item '%s'...", id);
+        bash.Util.MsgDebug(LOG_ITEM, "Loading item '%s'...", id);
 
+        local loadedFromDB = false;
         local item = tabnet.GetTable(id);
         if !item then
             item = tabnet.GetDBProvider():LoadTable("bash_Item", id);
+            loadedFromDB = true;
         end 
 
         if !item then
@@ -286,118 +453,250 @@ if SERVER then
             return;
         end
 
-        return item;
+        return item, loadedFromDB;
     end
 
-    -- Drop an item at a position.
-    function bash.Item.Drop(item, pos)
-        if !item or !pos then MsgN("NO DROP ARGS") return; end
+    -- Unload an item.
+    function bash.Item.Unload(itemID)
+        local item = tabnet.GetTable(itemID);
+        if !item then return; end
 
-        local itemID = item:GetField("ItemID");
+        hook.Run("OnItemUnload", item);
+        tabnet.DeleteTable(itemID);
+    end
+
+    -- Delete an item from the database.
+    function bash.Item.Delete(itemID)
+        local item = bash.Item.Load(itemID);
+        local curEnt = bash.Item.GetActiveEntity(itemID);
+        if isent(curEnt) then
+            curEnt:DetachItem(true);
+            curEnt:Remove();
+        end
+
+        hook.Run("OnItemDelete", item);
+        tabnet.GetDBProvider().EraseTable(item);
+    end 
+
+    -- Move an item between inventories.
+    function bash.Item.Move(itemID, newInvID, newPos)
+        local item, itemLoaded = bash.Item.Load(itemID);
+        if !item then return false; end
+
+        local sourceInvID = item:GetField("Owner");
+        local targetInvID = newInvID;
+
+        local targetInv, targetInvLoaded = bash.Inventory.Load(targetInvID);
+        if !targetInv then
+            if itemLoaded then
+                bash.Item.Unload(itemID);
+            end
+
+            return false;
+        end
+
         local itemTypeID = item:GetField("ItemType");
-        local itemType = bash.Item.Types[itemTypeID];
-        if !itemType then MsgN("NO DROP TYPE") return; end
+        if !bash.Inventory.HasSpace(targetInvID, itemTypeID, newPos) then
+            if itemLoaded then
+                bash.Item.Unload(itemID);
+            end
+            if targetInvLoaded then
+                bash.Inventory.Unload(targetInvID);
+            end
 
-        local invID = item:GetField("Owner");
-        local inv = tabnet.GetTable(invID);
-        if !inv then return; end
+            return false;
+        end 
 
-        bash.Inventory.RemoveItem(inv, item);
+        local result = bash.Inventory.AddItem(targetInvID, itemID, newPos);
+
+        if itemLoaded then
+            bash.Item.Unload(itemID);
+        end
+        if targetInvLoaded then
+            bash.Inventory.Unload(targetInvID);
+        end
+
+        return result;
+
+        --[[
+        local targetInvGrid = bash.Inventory.GetContentGrid(targetInvID);
+        local itemAtPosID = targetInvGrid[newPos.x][newPos.y];
+        if noSwap and itemAtPosID != 0 and itemAtPosID != itemID then
+            if itemLoaded then
+                bash.Item.Unload(itemID);
+            end
+            if targetInvLoaded then
+                bash.Inventory.Unload(targetInvID);
+            end
+
+            -- TODO: Send error msg.
+            MsgN("NO SWAP!")
+            return;
+        end
+
+        local itemAtPos, itemAtPosLoaded;
+        if itemAtPosID != 0 and itemAtPosID != itemID then
+            itemAtPos, itemAtPosLoaded = bash.Item.Load(itemAtPosID);
+        end
+
+        if itemAtPos then
+            local curPos = item:GetField("Position");
+            if sourceInvID == targetInvID then
+                local grid = bash.Inventory.GetContentGrid(sourceInvID);
+                if grid then
+                    for xIndex = 1, #grid do
+                        for yIndex = 1, #grid[xIndex] do
+                            if grid[xIndex][yIndex] == itemID or grid[xIndex][yIndex] == itemAtPosID then
+                                grid[xIndex][yIndex] = 0;
+                            end
+                        end 
+                    end 
+                end
+
+                local canSwap = true;
+
+                local itemTypeID = item:GetField("ItemType");
+                local itemType = bash.Item.GetType(itemTypeID);
+                if itemType then 
+                    for xIndex = newPos.x, (newPos.x + itemType.Static.SizeX - 1) do
+                        if grid[xIndex] == nil then
+                            -- TODO: Fit error.
+                            canSwap = false;
+                            break;
+                        end
+
+                        for yIndex = newPos.y, (newPos.y + itemType.Static.SizeY - 1) do
+                            if grid[xIndex][yIndex] != 0 then
+                                -- TODO: Fit error.
+                                canSwap = false;
+                                break;
+                            end
+
+                            grid[xIndex][yIndex] = itemID;
+                        end
+
+                        if !canSwap then break; end 
+                    end
+                else canSwap = false; end
+
+                local itemAtPosTypeID = itemAtPos:GetField("ItemType");
+                local itemAtPosType = bash.Item.GetType(itemAtPosTypeID);
+                if canSwap and itemAtPosType then 
+                    for xIndex = curPos.x, (curPos.x + itemAtPosType.Static.SizeX - 1) do
+                        if grid[xIndex] == nil then
+                            -- TODO: Fit error.
+                            canSwap = false;
+                            break;
+                        end
+
+                        for yIndex = curPos.y, (curPos.y + itemAtPosType.Static.SizeY - 1) do
+                            if grid[xIndex][yIndex] != 0 then
+                                -- TODO: Fit error.
+                                canSwap = false;
+                                break;
+                            end
+                        end
+
+                        if !canSwap then break; end
+                    end
+                else canSwap = false; end
+
+                if canSwap then
+                    item:SetFields{
+                        ["Owner"] = sourceInvID,
+                        ["Position"] = {
+                            x = newPos.x,
+                            y = newPos.y
+                        }
+                    };
+                    itemAtPos:SetFields{
+                        ["Owner"] = sourceInvID,
+                        ["Position"] = {
+                            x = curPos.x,
+                            y = curPos.y
+                        }
+                    };
+                end
+            else
+                if bash.Inventory.HasSpace(sourceInvID, itemAtPosID, false, curPos, itemID) and
+                   bash.Inventory.HasSpace(targetInvID, itemID, false, newPos, itemAtPosID) then
+                    bash.Inventory.AddItem(sourceInvID, itemAtPosID, curPos);
+                    bash.Inventory.AddItem(targetInvID, itemID, newPos);
+                else
+                    -- TODO: Error.
+                    MsgN("ITEM SWAP ERROR")
+                end 
+            end 
+        else
+            if bash.Inventory.HasSpace(targetInvID, itemID, false, newPos) then
+                if sourceInvID == targetInvID then
+                    item:SetFields{
+                        ["Owner"] = sourceInvID,
+                        ["Position"] = {
+                            x = newPos.x,
+                            y = newPos.y
+                        }
+                    };
+                else
+                    bash.Inventory.AddItem(targetInvID, itemID, newPos);
+                end
+            else 
+                -- TODO: Error.
+                MsgN("MOVE ERROR")
+            end
+        end 
+        ]]
+    end
+
+    -- Spawn an item as a world prop.
+    function bash.Item.SpawnInWorld(itemID, pos)
+        if !pos or !pos.x or !pos.y or !pos.z then return; end
+        local item, itemLoaded = bash.Item.Load(itemID);
+        if !item then return; end
+
+        local itemTypeID = item:GetField("ItemType", "");
+        local itemType = bash.Item.GetType(itemTypeID);
+        if !itemType then
+            if itemLoaded then
+                bash.Item.Unload(itemID);
+            end
+
+            return;
+        end
+
+        local oldInvID = item:GetField("Owner");
+        if oldInvID != "!WORLD!" then
+            bash.Inventory.RemoveItem(oldInvID, itemID);
+        end
 
         item:SetFields{
             ["Owner"] = "!WORLD!",
             ["Position"] = {
-                X = pos.x,
-                Y = pos.y,
-                Z = pos.z
+                x = pos.x,
+                y = pos.y,
+                z = pos.z
             }
         };
-        item:SetGlobal(true);
 
         local newItemEnt = ents.Create("prop_physics");
         newItemEnt:SetModel(itemType.Static.WorldModel);
-        newItemEnt:SetPos(pos);
+        newItemEnt:SetPos(Vector(pos.x, pos.y, pos.z));
         newItemEnt:Spawn();
         newItemEnt:Activate();
-
-        bash.Item.AttachTo(itemID, newItemEnt);
+        newItemEnt:AttachItem(item);
     end
 
-    -- Pickup an item and give it to a character.
-    function bash.Item.PickUp(item, char)
-        if !item or !char then MsgN("NO PICKUP ARGS") return; end
+    -- Set a field in an item's dynamic data.
+    function bash.Item.SetDynamicData(itemID, fieldName, val)
+        local item, itemLoaded = bash.Item.Load(itemID);
+        if !item then return; end
 
-        local itemID = item:GetField("ItemID");
-        local itemTypeID = item:GetField("ItemType");
-        local itemType = bash.Item.Types[itemTypeID];
-        if !itemType then MsgN("NO PICKUP TYPE") return; end
+        local dynamicData = item:GetField("DynamicData", {}, true);
+        dynamicData[fieldName] = val;
+        item:SetField("DynamicData", dynamicData);
 
-        local charID = char:GetField("CharID");
-        local invs = char:GetField("Inventory", {});
-        local addedToInv = false;
-        local inv;
-        for slot, invID in pairs(invs) do
-            inv = tabnet.GetTable(invID);
-            if !inv then continue; end
-
-            if bash.Inventory.AddItem(inv, item) then
-                addedToInv = true;
-                break;
-            end
-        end
-
-        if !addedToInv then
-            -- TODO: Send error to player.
-            MsgN("No room for item IDIOT!");
-            return;
-        end 
-
-        item:SetGlobal(false);
-
-        local oldEnt = bash.Item.GetEntityOwner(itemID);
-        bash.Item.DetachFrom(oldEnt);
-        oldEnt:Remove();
-    end
-
-    -- Associate an item with an entity.
-    function bash.Item.AttachTo(id, ent, deleteOld)
-        if !isent(ent) then return; end
-        bash.Item.DetachFrom(ent, deleteOld);
-
-        local reg = bash.Item.GetRegistry();
-        local index = ent:EntIndex();
-        local oldIndex = reg:GetField(id);
-        local oldOwner = (oldIndex and ents.GetByIndex(oldIndex)) or nil;
-        bash.Item.DetachFrom(oldOwner, false);
-
-        bash.Util.MsgLog(LOG_ITEM, "Attaching item '%s' to entity '%s'...", id, tostring(ent));
-
-        -- Add both for two-way lookup.
-        reg:SetFields{
-            [index] = id,
-            [id] = index
-        };
-
-        local item = tabnet.GetTable(id);
-        hook.Run("OnItemAttach", item, ent);
-    end
-
-    -- Disassociate an item from an entity.
-    function bash.Item.DetachFrom(ent, delete)
-        if !isent(ent) then return; end
-        if !ent:GetItem() then return; end
-
-        local reg = bash.Item.GetRegistry();
-        local item = ent:GetItem();
-        local itemID = item:GetField("ItemID");
-        local index = ent:EntIndex();
-        bash.Util.MsgLog(LOG_ITEM, "Detaching item '%s' from entity '%s'...", itemID, tostring(ent));
-
-        reg:ClearField(index, itemID);
-        hook.Run("OnItemDetach", item, ent);
-
-        if delete then
-            tabnet.DeleteTable(itemID);
+        if SERVER and itemLoaded then
+            bash.Item.Unload(itemID);
         end
     end
 
@@ -424,23 +723,86 @@ if SERVER then
         );
     end);
 
+    -- Spawn all world items.
+    hook.Add("InitPostEntity", "bash_ItemSpawnInWorld", function()
+        bash.Util.MsgDebug(LOG_ITEM, "Spawning world items...");
+
+        tabnet.GetDBProvider():GetTableData(
+            "bash_Item",
+            {"ItemID", "Position"},
+            {Field = "Owner", EQ = "!WORLD!"},
+
+            function(data)
+                for _, item in pairs(data) do
+                    bash.Item.SpawnInWorld(item.ItemID, item.Position);
+                end
+
+                bash.Util.MsgDebug(LOG_ITEM, "Spawned %d items in world.", #data);
+            end
+        );
+    end);
+
+    -- Watch for entity removals.
+    hook.Add("EntityRemoved", "bash_ItemDeleteOnRemoved", function(ent)
+        local item = ent:GetItem();
+        if !item then return; end
+
+        local itemID = item:GetField("ItemID");
+        tabnet.GetDBProvider():SaveTable(item);
+        ent:DetachItem(true);
+        bash.Item.Unload(itemID);
+    end);
+
+    -- Delete a character's inventories.
+    hook.Add("OnInventoryDelete", "bash_ItemDeleteInventory", function(inv)
+        local items = inv:GetField("Contents", {});
+        for itemID, _ in pairs(items) do
+            bash.Item.Delete(itemID);
+        end
+    end);
+
     --
     -- Network hooks.
     --
 
     -- Watch for item move requests.
     vnet.Watch("bash_Net_ItemMoveRequest", function(pck)
-        -- TODO: Clean this up.
         local data = pck:Table();
+        -- TODO: Security check.
 
+        -- TODO: Rewrite this shit.
+        if data.TargetItemOwner and data.TargetItemPos then
+            bash.Item.Move(
+                data.DroppedItemID,
+                data.TargetItemOwner,
+                data.TargetItemPos
+            );
+        else
+            bash.Item.Move(
+                data.DroppedItemID,
+                (data.DroppedItemOwner == data.TargetOwner and true) or data.TargetOwner,
+                data.TargetPos
+            );
+        end
+
+        --[[
         local droppedItem = tabnet.GetTable(data.DroppedItemID);
         if !droppedItem then return; end
+        local droppedItemTypeID = droppedItem:GetField("ItemType", "");
+        local droppedItemType = bash.Item.GetType(droppedItemTypeID);
+        if !droppedItemType then return; end 
+
         local currentItem = tabnet.GetTable(data.CurrentItemID);
 
         if currentItem then
-            -- TODO: Try to combine, else swap.
-            MsgN("Combine/swap two items.")
 
+            local currentItemTypeID = currentItem:GetField("ItemType", "");
+            local currentItemType = bash.Item.GetType(currentItemTypeID);
+            if !currentItemType then return; end 
+
+            MsgN("Combine/swap two items.")
+            
+            -- TODO: Probably won't end up doing this. Combine only.
             if data.DroppedInvID != data.CurrentInvID then
                 -- Change owners and swap.
                 local oldInv = tabnet.GetTable(data.DroppedInvID);
@@ -470,10 +832,14 @@ if SERVER then
                 droppedItem:SetField("Position", data.CurrentItemPos);
                 currentItem:SetField("Position", data.DroppedItemPos);
             end
+
         else
+
             if data.DroppedInvID == data.CurrentInvID then
                 -- TODO: Just move the item.
                 MsgN("Move one item to empty spot.");
+
+                if !bash.Inventory.HasSpace(data.DroppedInvID, droppedItemTypeID, true, data.CurrentItemPos) then return; end
                 droppedItem:SetField("Position", data.CurrentItemPos);
             else
                 -- TODO: See if the item can hold the item.
@@ -484,6 +850,8 @@ if SERVER then
                 if !oldInv then return; end
                 local newInv = tabnet.GetTable(data.CurrentInvID);
                 if !newInv then return; end
+
+                if !bash.Inventory.HasSpace(data.CurrentInvID, droppedItemTypeID, true, data.CurrentItemPos) then return; end
 
                 local oldContents = oldInv:GetField("Contents", {}, true);
                 oldContents[data.DroppedItemID] = nil;
@@ -498,7 +866,9 @@ if SERVER then
                     ["Position"] = data.CurrentItemPos
                 };
             end
+
         end
+        ]]
     end, {1});
 
     -- Watch for item function requests.
@@ -509,11 +879,14 @@ if SERVER then
         local item = tabnet.GetTable(data.ItemID);
         if !item then return; end 
 
+        local currentInvID = item:GetField("Owner");
+        if data.ClientInvID != currentInvID then return; end 
+
         local itemType = bash.Item.Types[item:GetField("ItemType")];
-        if !itemType or !itemType.Functions[data.UseFunc] then MsgN("NO FUNC") return; end
+        if !itemType or !itemType.Functions[data.UseFunc] then return; end
 
         local func = itemType.Functions[data.UseFunc];
-        if !func.RunOnServer then MsgN("NO RUN ON SERVER") return; end
+        if !func.RunOnServer then return; end
         
         local item = tabnet.GetTable(data.ItemID);
         func.Run(requester, item, data.SendData);
@@ -524,6 +897,42 @@ elseif CLIENT then
     --
     -- Engine hooks.
     --
+
+    -- Watch for item attaches.
+    -- TODO: See if this is necessary.
+    hook.Add("OnUpdateTable", "bash_ItemWatchForAttach", function(tab, name, newVal, oldVal)
+        if tab._RegistryID != "bash_ItemLookup" then return; end
+        if type(name) != "number" then return; end
+
+        local entInd = name;
+        local itemID = newVal;
+        local ent = ents.GetByIndex(entInd);
+        if !isent(ent) then return; end
+
+        local item = tabnet.GetTable(itemID);
+        if !item then return; end
+
+        bash.Util.MsgDebug(LOG_ITEM, "Attaching item '%s' to entity '%s'...", itemID, tostring(ent));
+        hook.Run("OnItemAttach", item, ent);
+    end);
+
+    -- Watch for item detaches.
+    -- TODO: See if this is necessary.
+    hook.Add("OnClearTable", "bash_ItemWatchForDetach", function(tab, name, val)
+        if tab._RegistryID != "bash_ItemLookup" then return; end
+        if type(name) != "number" then return; end
+
+        local entInd = name;
+        local itemID = val;
+        local ent = ents.GetByIndex(name);
+        if !isent(ent) then return; end
+
+        local item = tabnet.GetTable(itemID);
+        if !item then return; end
+
+        bash.Util.MsgDebug(LOG_ITEM, "Detaching item '%s' from entity '%s'...", itemID, tostring(ent));
+        hook.Run("OnItemDetach", item, ent);
+    end);
 
     -- Wait for 'use' on entity key presses.
     hook.Add("KeyPress", "bash_ItemUseOnEntity", function(lp, key)
@@ -545,6 +954,7 @@ elseif CLIENT then
         local item = ent:GetItem();
         if !item then return; end 
         local itemID = item:GetField("ItemID");
+        local itemInvID = item:GetField("Owner");
         local itemTypeID = item:GetField("ItemType");
         local itemType = bash.Item.Types[itemTypeID];
         if !itemType then return; end
@@ -564,6 +974,7 @@ elseif CLIENT then
                     local sendUse = vnet.CreatePacket("bash_Net_ItemFuncRequest");
                     sendUse:Table({
                         ItemID = itemID,
+                        ClientInvID = itemInvID,
                         UseFunc = name,
                         SendData = sendData
                     });
@@ -577,6 +988,7 @@ elseif CLIENT then
 
         if added > 0 then
             opts:Open();
+            opts:Center();
             opts.CurrentEntity = ent;
             bash.Item.CurrentMenu = opts;
         else
@@ -603,8 +1015,8 @@ end
 -- Create item structures.
 hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
     if SERVER then
-        if !tabnet.GetTable("bash_ItemRegistry") then
-            tabnet.CreateTable(nil, tabnet.LIST_GLOBAL, nil, "bash_ItemRegistry");
+        if !tabnet.GetTable("bash_ItemLookup") then
+            tabnet.CreateTable(nil, tabnet.LIST_GLOBAL, nil, "bash_ItemLookup");
         end
     end
 
@@ -631,8 +1043,7 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
         FieldType = "string"
     };
 
-    -- Position: Table containing the coordinates of the item in its owning container.
-    -- X Y for inventory, X Y Z for world.
+    -- Position: Table containing the coordinates of the item in the world.
     tabnet.EditSchemaField{
         SchemaName = "bash_Item",
         FieldName = "Position",

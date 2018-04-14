@@ -101,7 +101,14 @@ if !bash.Tested then
 
     concommand.Add("switchchar", function(ply, cmd, args)
         if !ply:GetCharacter() then return; end
-        bash.Character.AttachTo(ply:GetCharacter():Get("CharID"), bash.box, true);
+        bash.box:AttachCharacter(ply:GetCharacter());
+        --bash.Character.AttachTo(ply:GetCharacter():Get("CharID"), bash.box, true);
+    end);
+
+    concommand.Add("switchcharback", function(ply, cmd, args)
+        if !bash.box:GetCharacter() then return; end
+        ply:AttachCharacter(bash.box:GetCharacter());
+        --bash.Character.AttachTo(ply:GetCharacter():Get("CharID"), bash.box, true);
     end);
 
     concommand.Add("createchar", function(ply, cmd, args)
@@ -181,13 +188,13 @@ if !bash.Tested then
 
     bash.Tested = true;
 
-    bash.Inventory.Load("inv_ground");
+    bash.Inventory.Load("inv_ground", true);
 
     concommand.Add("addground", function(ply, cmd, args)
         local ground = tabnet.GetTable("inv_ground");
         if !ground then return; end
 
-        bash.Inventory.AddPlayerListener(ground, ply);
+        bash.Inventory.AddPlayerListener("inv_ground", ply);
     end);
 
     concommand.Add("domove", function(ply, cmd, args)
@@ -276,11 +283,8 @@ if !bash.Tested then
     hook.Add("NewCharacterInventory", "ASDFASDFASDFASDF", function(char)
         local invs = char:GetField("Inventory", {});
         local primaryInvID = invs["Primary"];
-        local primaryInv = bash.Inventory.Load(primaryInvID);
+        local primaryInv, primaryInvLoaded = bash.Inventory.Load(primaryInvID);
         if !primaryInv then return; end
-
-        local openSpot = bash.Inventory.GetOpenSpot(primaryInv, "money", true);
-        if !openSpot then return; end
 
         local money = bash.Item.Create({
             ItemType = "money",
@@ -288,10 +292,29 @@ if !bash.Tested then
                 Stack = 4000
             }
         });
+        local moneyID = money:GetField("ItemID");
 
-        bash.Inventory.AddItem(primaryInv, money, openSpot);
-        tabnet.DeleteTable(money:GetField("ItemID"));
-        tabnet.DeleteTable(primaryInv:GetField("InvID"));
+        if !bash.Inventory.AddItem(primaryInvID, moneyID) then
+            bash.Item.Delete(moneyID);
+        else
+            bash.Item.Unload(moneyID);
+        end
+
+        local junk = bash.Item.Create({
+            ItemType = "junk",
+            DynamicData = {
+                Stack = 4000
+            }
+        });
+        local junkID = junk:GetField("ItemID");
+
+        if !bash.Inventory.AddItem(primaryInvID, junkID) then
+            bash.Item.Delete(junkID);
+        else 
+            bash.Item.Unload(junkID);
+        end
+
+        bash.Inventory.Unload(primaryInvID);
     end);
 
 end
