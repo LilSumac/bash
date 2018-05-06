@@ -157,7 +157,7 @@ function bash.Inventory.HasSpecificItem(invID, itemID)
 end 
 
 -- Checks to see if an inventory contains an item of a certain type.
-function bash.Inventory.HasItemType(invID, id, amount)
+function bash.Inventory.HasItemType(invID, itemTypeID, getList)
     local inv, invLoaded;
     if CLIENT then
         inv = tabnet.GetTable(invID);
@@ -166,23 +166,21 @@ function bash.Inventory.HasItemType(invID, id, amount)
     end
     
     if !inv then return; end
-    amount = amount or 1;
 
     local invCont = inv:GetField("Contents", {});
-    local count, curItem = 0;
+    local itemList, itemIsType, itemStack = {}, false, 0;
     for itemID, _ in pairs(invCont) do
-        curItem = tabnet.GetTable(itemID);
-        -- TODO: Remove invalid items?
-        if !curItem then continue; end
-        if curItem:GetField("ItemType") != id then continue; end
+        itemIsType, itemStack = bash.Item.IsType(itemID, itemTypeID, true);
+        if itemIsType then
+            if getList then
+                itemList[itemID] = itemStack;
+            else
+                if SERVER and invLoaded then
+                    bash.Inventory.Unload(invID);
+                end
 
-        count = count + bash.Item.GetDynamicData(curItem, "Stack");
-        if count >= amount then
-            if SERVER and invLoaded then
-                bash.Inventory.Unload(invID);
+                return true;
             end
-
-            return true, itemID;
         end
     end
 
@@ -190,7 +188,27 @@ function bash.Inventory.HasItemType(invID, id, amount)
         bash.Inventory.Unload(invID);
     end
 
-    return false;
+    return !table.IsEmpty(itemList), itemList;
+end
+
+-- Checks to see if an inventory is of a certain type.
+function bash.Inventory.IsType(invID, invTypeID)
+    local inv, invLoaded;
+    if CLIENT then
+        inv = tabnet.GetTable(invID);
+    else
+        inv, invLoaded = bash.Inventory.Load(invID);
+    end
+
+    if !inv then return; end 
+
+    local isType = invTypeID == inv:GetField("InvType");
+
+    if SERVER and invLoaded then
+        bash.Inventory.Unload(invID);
+    end
+
+    return isType;
 end
 
 --[[ TODO: Remove.

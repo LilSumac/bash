@@ -221,28 +221,20 @@ function bash.Character.HasInventoryType(charID, invTypeID)
     local invs = char:GetField("Inventory", {});
     local inv, invLoaded, hasType;
     for slot, invID in pairs(invs) do
-        if CLIENT then
-            inv = tabnet.GetTable(invID);
-        elseif SERVER then
-            inv, invLoaded = bash.Inventory.Load(invID);
+        if bash.Inventory.IsType(invID, invTypeID) then
+            if SERVER and charLoaded then
+                bash.Character.Unload(charID);
+            end
+
+            return true, invID;
         end
-
-        if !inv then continue; end
-
-        hasType = (inv:GetField("InvType") == invTypeID);
-
-        if SERVER and invLoaded then
-            bash.Inventory.Unload(invID);
-        end
-
-        if hasType then return true, invID; end 
     end
 
     if SERVER and charLoaded then
         bash.Character.Unload(charID);
     end
 
-    return hasInv;
+    return false;
 end 
 
 -- Check to see if a character possesses a certain item.
@@ -275,7 +267,7 @@ function bash.Character.HasSpecificItem(charID, itemID)
 end
 
 -- Check to see if a character possesses an item with a specific type.
-function bash.Character.HasItemType(charID, itemTypeID, amount)
+function bash.Character.HasItemType(charID, itemTypeID, getList)
     local char, charLoaded;
     if CLIENT then
         char = tabnet.GetTable(charID);
@@ -286,23 +278,29 @@ function bash.Character.HasItemType(charID, itemTypeID, amount)
     if !char then return; end
 
     local invs = char:GetField("Inventory", {});
-    local hasType, itemFound;
+    local totalItemList, itemList, invHasItemType = {}, {}, false;
     for slot, invID in pairs(invs) do
-        hasType, itemFound = bash.Inventory.HasItemType(invID, itemTypeID, amount);
-        if hasType then
-            if SERVER and charLoaded then
-                bash.Character.Unload(charID);
-            end
+        invHasItemType, itemList = bash.Inventory.HasItemType(invID, itemTypeID, amount);
+        if invHasItemType then
+            if getList then
+                for itemID, amount in pairs(itemList) do
+                    totalItemList[itemID] = amount;
+                end
+            else
+                if SERVER and charLoaded then
+                    bash.Character.Unload(charID);
+                end
 
-            return true, itemFound;
-        end 
+                return true;
+            end
+        end
     end 
 
     if SERVER and charLoaded then
         bash.Character.Unload(charID);
     end
 
-    return false;
+    return table.IsEmpty(totalItemList), totalItemList;
 end 
 
 if SERVER then
@@ -385,6 +383,7 @@ if SERVER then
             return;
         end
 
+        hook.Run("OnCharacterLoad", char);
         return char, loadedFromDB;
     end
 

@@ -1,19 +1,20 @@
 --[[
-    Junk item.
+    Money item.
 ]]
 
 local ITEM = {};
+
+-- Static fields.
 ITEM.Static = {
-    ID = "junk",
-    Name = "Junk",
+    Base = "base_item",
+    ID = "money",
+    Name = "Money",
     WorldModel = "models/props_lab/box01a.mdl",
-    Size = ITEM_LARGE,
+    Size = ITEM_MED,
     SizeX = 2,
     SizeY = 2,
     CanStack = true,
     MaxStack = 1000000
 };
-ITEM.Dynamic = {
-    Stack = 1
-};
+
 bash.Item.RegisterType(ITEM);

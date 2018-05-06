@@ -18,6 +18,7 @@ local Entity = FindMetaTable("Entity");
 
 bash.Item           = bash.Item or {};
 bash.Item.IDs       = bash.Item.IDs or {};
+bash.Item.Bases     = bash.Item.Bases or {};
 bash.Item.Types     = bash.Item.Types or {};
 
 -- Item size enum.
@@ -91,7 +92,7 @@ if SERVER then
         local item = self:GetItem();
 
         if !noStorePos then
-            item:SetField("Position", {
+            item:SetField("PositionInWorld", {
                 x = pos.x,
                 y = pos.y,
                 z = pos.z
@@ -147,6 +148,30 @@ function bash.Item.HasActiveEntity(itemID)
     return bash.Item.GetActiveEntity(itemID) != nil;
 end
 
+-- Checks to see if an item is of a certain type.
+function bash.Item.IsType(itemID, itemTypeID, includeStack)
+    local item, itemLoaded;
+    if CLIENT then
+        item = tabnet.GetTable(itemID);
+    else
+        item, itemLoaded = bash.Item.Load(itemID);
+    end
+
+    if !item then return; end
+
+    local isType = itemTypeID == item:GetField("ItemType");
+    local amount;
+    if includeStack and isType then
+        amount = bash.Item.GetDynamicData(itemID, "Stack");
+    end
+
+    if SERVER and itemLoaded then
+        bash.Item.Unload(itemID);
+    end
+
+    return isType, amount;
+end
+
 -- Get a field in an item's static data.
 function bash.Item.GetStaticData(itemID, fieldName)
     local item, itemLoaded;
@@ -198,179 +223,96 @@ function bash.Item.GetDynamicData(itemID, fieldName)
     return val;
 end
 
+-- Add a new item base struct.
+function bash.Item.RegisterBase(itemBase)
+    if !itemBase or !istable(itemBase) or 
+       !itemBase.Static or !itemBase.Static.ID then
+        bash.Util.MsgErr("MalformedItemBase");
+        return;
+    end
+
+    itemBase.Dynamic    = itemBase.Dynamic or {};
+    itemBase.Functions  = itemBase.Functions or {};
+
+    bash.Util.MsgDebug(LOG_ITEM, "Registering item base with ID '%s'...", itemBase.Static.ID);
+
+    local baseData      = {};
+    baseData.Static     = itemBase.Static;
+    baseData.Dynamic    = itemBase.Dynamic;
+    baseData.Functions  = itemBase.Functions;
+
+    bash.Item.Bases[baseData.Static.ID] = baseData;
+end
+
 -- Add a new item type struct.
 function bash.Item.RegisterType(itemType)
+    if !itemType or !istable(itemType) or 
+       !itemType.Static or !itemType.Static.ID then
+        bash.Util.MsgErr("MalformedItemType");
+        return;
+    end
+
+    itemType.Dynamic    = itemType.Dynamic or {};
+    itemType.Functions  = itemType.Functions or {};
+
     bash.Util.MsgDebug(LOG_ITEM, "Registering item type with ID '%s'...", itemType.Static.ID);
 
-    local itemData = {};
-
-    -- Static fields.
-    itemData.Static             = itemType.Static or {};
-    itemData.Static.ID          = itemType.Static.ID or "bash_itemid";
-    itemData.Static.Name        = itemType.Static.Name or "Item";
-    itemData.Static.WorldModel  = itemType.Static.WorldModel or "models/props_lab/box01a.mdl"
-    itemData.Static.SizeX       = itemType.Static.SizeX or 2;
-    itemData.Static.SizeY       = itemType.Static.SizeY or 2;
-    itemData.Static.CanStack    = itemType.Static.CanStack or false;
-    itemData.Static.MaxStack    = itemType.Static.MaxStack or 1;
-
-    -- Dynamic fields.
-    itemData.Dynamic = itemType.Dynamic or {};
-    itemData.Dynamic.Stack = itemType.Dynamic.Stack or 1;
-
-    -- Function fields.
-    itemData.Functions = itemType.Functions or {};
-
-    -- DROP
-    itemData.Functions.Drop = {
-
-        ShowInInv = true,
-        ShowOnDrop = false,
-        ShowInWorld = false,
-
-        CanShow = function(item)
-            -- TODO: Add if player is viewing another inventory, return false.
-            -- Can basically replace all of this func.
-            if !item then return false; end
-            local itemID = item:GetField("ItemID");
-
-            local char = LocalPlayer():GetCharacter();
-            local charID = char:GetField("CharID");
-            if !char then return false; end
-            if !bash.Character.HasSpecificItem(charID, itemID) then return false; end
-
-            return true;
-        end,
-
-        MenuName = "Drop",
-
-        RunOnClient = false,
-        RunOnServer = true,
-
-        GetSendData = function(item)
-            local traceTab = {};
-            traceTab.start = LocalPlayer():EyePos();
-            traceTab.endpos = traceTab.start + LocalPlayer():GetAimVector() * 90;
-            traceTab.filter = LocalPlayer();
-            local trace = util.TraceLine(traceTab);
-            local itemPos = trace.HitPos;
-            itemPos.z = itemPos.z + 2;
-            -- TODO: Add position constraints.
-
-            return {
-                ItemPos = itemPos
-            };
-        end,
-
-        Run = function(ply, item, sendData)
-            if !item then return; end
-            
-            local itemID = item:GetField("ItemID");
-            local invID = item:GetField("Owner");
-            local owner = bash.Inventory.GetPlayerOwner(invID);
-            if owner != ply then return; end
-
-            bash.Item.SpawnInWorld(itemID, sendData.ItemPos);
+    local typeData = {};
+    if itemType.Static.Base then
+        local base = bash.Item.Bases[itemType.Static.Base];
+        if !base then
+            bash.Util.MsgErr("InvalidItemBase", itemType.Static.Base);
+            return;
         end
 
-    };
+        -- Recursive item bases!
+        local bases = {};
+        local currentBase;
+        bases[1] = itemType.Static.Base;
+        while base.Static.Base do
+            currentBase = bash.Item.Bases[itemType.Static.Base];
+            -- Get outta here cyclical dependencies!!!
+            if !currentBase or table.HasValue(currentBase.Static.ID) then break; end
 
-    -- PICKUP
-    itemData.Functions.PickUp = {
+            bases[#bases + 1] = currentBase.Static.ID;
+        end
 
-        ShowInInv = false,
-        ShowOnDrop = false,
-        ShowInWorld = true,
+        typeData.Static     = {};
+        typeData.Dynamic    = {};
+        typeData.Functions  = {};
 
-        CanShow = function(item, ent)
-            -- TODO: Add if player is viewing another inventory, return false.
-            -- Can basically replace all of this func.
-            if !item then return false; end
-            if !isent(ent) then return false; end
+        -- Kinda crappy but whatever.
+        for index = #bases, 1, -1 do
+            currentBase = bash.Item.Bases[bases[index]];
+            if !currentBase then continue; end
 
-            local char = LocalPlayer():GetCharacter();
-            if !char then return false; end
-
-            return true;
-        end,
-
-        MenuName = "Pick Up",
-
-        RunOnClient = false,
-        RunOnServer = true,
-
-        Run = function(ply, item, sendData)
-            if !item then return; end
-
-            local itemID = item:GetField("ItemID");
-            local invID = item:GetField("Owner");
-            if invID != "!WORLD!" then return; end
-
-            local char = ply:GetCharacter();
-            if !char then return; end
-            local charID = char:GetField("CharID");
-
-            if !bash.Character.GiveItem(charID, itemID) then
-                MsgN("Couldn't pick up idiot!");
-                -- TODO: Send notif.
+            for key, val in pairs(currentBase.Static) do
+                typeData.Static[key] = val;
+            end
+            for key, val in pairs(currentBase.Dynamic) do
+                typeData.Dynamic[key] = val;
+            end
+            for key, val in pairs(currentBase.Functions) do
+                typeData.Functions[key] = val;
             end
         end
 
-    };
-
-    -- STACK
-    itemData.Functions.Stack = {
-
-        ShowInInv = false,
-        ShowOnDrop = true,
-        ShowInWorld = false,
-
-        CanShow = function(sourceItem, targetItem)
-            if !sourceItem or !targetItem then return false; end
-            
-            local sourceItemTypeID = sourceItem:GetField("ItemType");
-            local targetItemTypeID = targetItem:GetField("ItemType");
-            if sourceItemTypeID != targetItemTypeID then return false; end 
-
-            local sourceItemType = bash.Item.GetType(sourceItemTypeID);
-            local targetItemType = bash.Item.GetType(targetItemTypeID);
-            if !sourceItemType or !targetItemType then return false; end
-            if !sourceItemType.Static.CanStack or !targetItemType.Static.CanStack then return false; end
-
-            local targetItemID = targetItem:GetField("ItemID");
-            local targetStackAmt = bash.Item.GetDynamicData(targetItemID, "Stack");
-            if targetStackAmt >= targetItemType.Static.MaxStack then return false; end
-
-            return true;
-        end,
-
-        MenuName = "Stack",
-
-        RunOnClient = false,
-        RunOnServer = true,
-
-        GetSendData = function(sourceItem, targetItem)
-            return {
-                TargetItemID = targetItem:GetField("ItemID")
-            };
-        end,
-
-        Run = function(ply, sourceItem, sendData)
-            if !sourceItem then return; end
-            local sourceItemID = sourceItem:GetField("ItemID");
-            if !sourceItemID then return; end
-            
-            local targetItemID = sendData.TargetItemID;
-            local targetItem = tabnet.GetTable(targetItemID);
-            if !targetItem then return; end 
-
-
-            --bash.Item.Stack(sourceItem,);
+        for key, val in pairs(itemType.Static) do
+            typeData.Static[key] = val;
+        end
+        for key, val in pairs(itemType.Dynamic) do
+            typeData.Dynamic[key] = val;
+            end
+        for key, val in pairs(itemType.Functions) do
+            typeData.Functions[key] = val;
+        end
+    else
+        typeData.Static     = itemType.Static;
+        typeData.Dynamic    = itemType.Dynamic;
+        typeData.Functions  = itemType.Functions;
         end
 
-    };
-
-    bash.Item.Types[itemData.Static.ID] = itemData;
+    bash.Item.Types[typeData.Static.ID] = typeData;
 end
 
 -- Get an item type struct.
@@ -671,7 +613,7 @@ if SERVER then
 
         item:SetFields{
             ["Owner"] = "!WORLD!",
-            ["Position"] = {
+            ["PositionInWorld"] = {
                 x = pos.x,
                 y = pos.y,
                 z = pos.z
@@ -729,7 +671,7 @@ if SERVER then
 
         tabnet.GetDBProvider():GetTableData(
             "bash_Item",
-            {"ItemID", "Position"},
+            {"ItemID", "PositionInWorld"},
             {Field = "Owner", EQ = "!WORLD!"},
 
             function(data)
@@ -963,7 +905,7 @@ elseif CLIENT then
         local added = 0;
 
         for name, func in pairs(itemType.Functions) do 
-            if !func.ShowInWorld then continue; end
+            if !func.ShowOnUse then continue; end
             if !func.CanShow(item, ent) then continue; end
 
             opts:AddOption(func.MenuName or name, function()
@@ -1020,7 +962,13 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
         end
     end
 
-    bash.Util.ProcessDir("engine/items", false, "SHARED");
+    bash.Util.ProcessDir("engine/items/bases", false, "SHARED");
+    bash.Util.ProcessDir("engine/items/types", false, "SHARED");
+
+    MsgN("BASES");
+    PrintTable(bash.Item.Bases);
+    MsgN("TYPES");
+    PrintTable(bash.Item.Types);
 
     -- ItemID: Unique ID for an item.
     tabnet.EditSchemaField{
@@ -1046,7 +994,7 @@ hook.Add("CreateStructures_Engine", "bash_ItemStructures", function()
     -- Position: Table containing the coordinates of the item in the world.
     tabnet.EditSchemaField{
         SchemaName = "bash_Item",
-        FieldName = "Position",
+        FieldName = "PositionInWorld",
         FieldDefault = EMPTY_TABLE,
         FieldScope = tabnet.SCOPE_PRIVATE,
         IsInSQL = true,
@@ -1086,5 +1034,6 @@ end);
 
 -- Register inventory types (schema).
 hook.Add("CreateStructures", "bash_ItemRegisterTypes", function()
-    bash.Util.ProcessDir("schema/items", false, "SHARED");
+    bash.Util.ProcessDir("schema/items/bases", false, "SHARED");
+    bash.Util.ProcessDir("schema/items/types", false, "SHARED");
 end);

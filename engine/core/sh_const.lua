@@ -54,13 +54,21 @@ ERR_TYPES["InvalidDataType"] = "This data type is not supported! (%s)";
 ERR_TYPES["InvalidEnt"] = "Invalid entity argument!";
 ERR_TYPES["InvalidPly"] = "Invalid player argument!";
 ERR_TYPES["InvalidVarArgs"] = "Invalid number of varible arguments!";
+
 ERR_TYPES["HookError"] = "The '%s' hook from '%s' has failed! Result: %s";
 ERR_TYPES["SchemaOnBase"] = "Tried loading the engine as the schema! Call bash.StartSchema() in a separate gamemode.";
+
 ERR_TYPES["NoDBModule"] = "No tmysql4 module found! This is required and must be resolved.";
 ERR_TYPES["NoDBConnect"] = "Could not connect to database: %s";
 ERR_TYPES["NoDBConnection"] = "Database is not connected!";
 ERR_TYPES["QueryFailed"] = "The SQL query failed!\nQuery: %s\nError: %s";
 ERR_TYPES["QueryNumFailed"] = "The #%d SQL query in the statement failed!\nQuery: %s\nError: %s";
+
+ERR_TYPES["MalformedItemBase"] = "Tried to create an item base with malformed arguments!";
+ERR_TYPES["InvalidItemBase"] = "No item base with the ID '%s'!";
+ERR_TYPES["MalformedItemType"] = "Tried to create an item type with malformed arguments!";
+ERR_TYPES["InvalidItemType"] = "No item type with the ID '%s'!";
+
 ERR_TYPES["NoValidItem"] = "No item available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory available with the Registry ID '%s'!";
 ERR_TYPES["NoValidInv"] = "No inventory type available with the ID '%s' in networked table '%s'!";
@@ -75,6 +83,7 @@ ERR_TYPES["CharNoOwnerAvailable"] = "The owner of character with ID '%s' is not 
 ERR_TYPES["InvNoOwnerSet"] = "No owner set for inventory with ID '%s'.";
 ERR_TYPES["InvNoOwnerAvailable"] = "The owner of inventory with ID '%s' is not available.";
 
+-- TODO: Remove.
 ERR_TYPES["KeyExists"] = "A key already exists in this table! (Column %s in table %s)";
 ERR_TYPES["DefStarted"] = "Tried to start a definition without ending the last one! (End %s before starting %s)";
 ERR_TYPES["NoDefStarted"] = "Tried to end a definition without starting one!";

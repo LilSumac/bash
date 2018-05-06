@@ -94,6 +94,12 @@ function bash.Plugin.Process()
         };
 
         bash.Util.ProcessFile(plugSrc .. "sh_plugin.lua");
+        bash.Util.ProcessDir(plugSrc .. "external/");
+        bash.Util.ProcessDir(plugSrc .. "config/");
+        bash.Util.ProcessDir(plugSrc .. "core/");
+        bash.Util.ProcessDir(plugSrc .. "hooks/");
+        bash.Util.ProcessDir(plugSrc .. "libraries/");
+        bash.Util.ProcessDir(plugSrc .. "derma/");
         bash.Plugin.ProcessEntities(plugSrc);
         bash.Plugin.ProcessWeapons(plugSrc);
         bash.Plugin.ProcessEffects(plugSrc);
